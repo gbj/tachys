@@ -1,39 +1,15 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{
     dom::{Dom, Node},
     view::View,
 };
 
-pub struct Component<S, F, V>
-where
-    S: State,
-    F: Fn(&S, ComponentLink<S>) -> V,
-    V: View,
-{
-    model: S,
-    view_fn: F,
-}
-
-impl<S, F, V> Component<S, F, V>
-where
-    S: State,
-    F: Fn(&S, ComponentLink<S>) -> V,
-    V: View,
-{
-    pub fn new(initial: S, view_fn: F) -> Self {
-        Self {
-            model: initial,
-            view_fn,
-        }
-    }
-}
-
-pub struct ComponentLink<C: State> {
+pub struct ComponentLink<C: Component> {
     updater: Rc<RefCell<Option<Box<dyn FnMut(C::Msg)>>>>,
 }
 
-impl<C: State> Clone for ComponentLink<C> {
+impl<C: Component> Clone for ComponentLink<C> {
     fn clone(&self) -> Self {
         Self {
             updater: Rc::clone(&self.updater),
@@ -41,7 +17,7 @@ impl<C: State> Clone for ComponentLink<C> {
     }
 }
 
-impl<C: State> ComponentLink<C> {
+impl<C: Component> ComponentLink<C> {
     pub fn send(&self, msg: C::Msg) {
         let mut updater = self.updater.borrow_mut();
         let mut updater = updater.as_mut().unwrap();
@@ -49,29 +25,24 @@ impl<C: State> ComponentLink<C> {
     }
 }
 
-impl<S, F, V> View for Component<S, F, V>
-where
-    S: State,
-    F: Fn(&S, ComponentLink<S>) -> V,
-    V: View,
-{
-    type State = (ComponentLink<S>, Rc<RefCell<V::State>>);
+impl<C: Component + 'static> View for C {
+    type State = (ComponentLink<C>, Rc<RefCell<<C::View as View>::State>>);
 
     fn build(self) -> Self::State {
-        let Component { mut model, view_fn } = self;
         let link = ComponentLink {
             updater: Default::default(),
         };
-        let view = view_fn(&model, link.clone());
+        let view = self.view(&link);
         let view_state = Rc::new(RefCell::new(view.build()));
+        let mut model = self;
         let updater = Box::new({
             let view_state = Rc::clone(&view_state);
             let link = link.clone();
-            move |msg: S::Msg| {
+            move |msg: C::Msg| {
                 model.update(msg);
-                let view = view_fn(&model, link.clone());
+                let view = model.view(&link);
                 let mut view_state = (*view_state).borrow_mut();
-                V::rebuild(view, &mut view_state);
+                <C::View as View>::rebuild(view, &mut view_state);
                 Dom::flush();
             }
         });
@@ -86,18 +57,21 @@ where
     fn mount(state: &mut Self::State, parent: Node) {
         let (_, view_state) = state;
         let mut view_state = (**view_state).borrow_mut();
-        V::mount(&mut view_state, parent)
+        <C::View as View>::mount(&mut view_state, parent)
     }
 
     fn unmount(state: &mut Self::State) {
         let (_, view_state) = state;
         let mut view_state = (**view_state).borrow_mut();
-        V::unmount(&mut view_state)
+        <C::View as View>::unmount(&mut view_state)
     }
 }
 
-pub trait State: Sized {
+pub trait Component: Sized {
     type Msg;
+    type View: View;
 
     fn update(&mut self, msg: Self::Msg);
+
+    fn view(&self, link: &ComponentLink<Self>) -> Self::View;
 }

@@ -306,58 +306,58 @@ const attrs = [
 
     extern "C" {
         #[wasm_bindgen]
-        fn get_node(id: u16) -> web_sys::Node;
+        fn get_node(id: u32) -> web_sys::Node;
     }
 
-    fn create_element(id: u16, element_id: u8) {
+    fn create_element(id: u32, element_id: u8) {
         "nodes[$id$]=document.createElement(els[$element_id$]);"
     }
 
-    fn create_text_node(id: u16, val: impl Writable<u8>) {
+    fn create_text_node(id: u32, val: &str) {
         "nodes[$id$]=document.createTextNode($val$);"
     }
 
-    fn set_attribute(id: u16, attribute_id: u8, val: impl Writable<u8>) {
+    fn set_attribute(id: u32, attribute_id: u8, val: &str<u8, attr_cache>) {
         "nodes[$id$].setAttribute(attrs[$attribute_id$],$val$);"
     }
 
-    fn remove_attribute(id: u16, attribute_id: u8) {
+    fn remove_attribute(id: u32, attribute_id: u8) {
         "nodes[$id$].removeAttribute(attrs[$attribute_id$]);"
     }
 
-    fn append_child(id: u16, id2: u16) {
+    fn append_child(id: u32, id2: u32) {
         "nodes[$id$].appendChild(nodes[$id2$]);"
     }
 
-    fn insert_before(parent: u16, id: u16, id2: u16) {
+    fn insert_before(parent: u32, id: u32, id2: u32) {
         "nodes[$parent$].insertBefore(nodes[$id$],nodes[$id2$]);"
     }
 
-    fn set_text(id: u16, text: impl Writable<u8>) {
+    fn set_text(id: u32, text: &str) {
         "nodes[$id$].textContent=$text$;"
     }
 
-    fn set_data(id: u16, text: impl Writable<u8>) {
+    fn set_data(id: u32, text: &str) {
         "nodes[$id$].data=$text$;"
     }
 
-    fn remove(id: u16) {
+    fn remove(id: u32) {
         "nodes[$id$].remove();"
     }
 
-    fn replace(id: u16, id2: u16) {
+    fn replace(id: u32, id2: u32) {
         "nodes[$id$].replaceWith(nodes[$id2$]);"
     }
 
-    fn clone(id: u16, id2: u16) {
+    fn clone(id: u32, id2: u32) {
         "nodes[$id2$]=nodes[$id$].cloneNode(true);"
     }
 
-    fn first_child(id: u16) {
+    fn first_child(id: u32) {
         "node[id]=node[id].firstChild;"
     }
 
-    fn next_sibling(id: u16) {
+    fn next_sibling(id: u32) {
         "node[id]=node[id].nextSibling;"
     }
 }
@@ -365,13 +365,13 @@ const attrs = [
 pub struct Dom;
 
 thread_local! {
-    static NODE_ID: Cell<u16> = Cell::new(0);
+    static NODE_ID: Cell<u32> = Cell::new(0);
     static CHANNEL: RefCell<Channel> = Default::default();
     static LISTENERS: RefCell<Vec<(Node, &'static str, wasm_bindgen::JsValue)>> = Default::default();
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Node(u16);
+pub struct Node(u32);
 
 impl Dom {
     fn next_id() -> Node {
@@ -408,6 +408,10 @@ impl Dom {
         id
     }
 
+    pub fn insert_before(parent: Node, a: Node, b: Node) {
+        CHANNEL.with(|c| c.borrow_mut().insert_before(parent.0, a.0, b.0));
+    }
+
     pub fn flush() {
         CHANNEL.with(|c| c.borrow_mut().flush());
         // TODO event delegation instead
@@ -432,6 +436,10 @@ impl Node {
 
     pub fn set_data(&self, text: &str) {
         CHANNEL.with(|c| c.borrow_mut().set_data(self.0, text))
+    }
+
+    pub fn set_text(&self, text: &str) {
+        CHANNEL.with(|c| c.borrow_mut().set_text(self.0, text))
     }
 
     pub fn set_attribute(&self, key: Attr, value: &str) {

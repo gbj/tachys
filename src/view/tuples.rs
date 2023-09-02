@@ -1,63 +1,84 @@
-use crate::dom::Node;
+use std::fmt::Debug;
 
-use super::View;
+use crate::hydration::Cursor;
+
+use super::{Position, View};
 
 impl View for () {
     type State = ();
 
-    #[inline(always)]
-    fn build(self) -> Self::State {}
+    fn to_html(&self, _buf: &mut String, _position: Position) {}
 
-    #[inline(always)]
-    fn rebuild(self, _state: &mut Self::State) {}
+    fn to_template(buf: &mut String, position: Position) -> Position {
+        position
+    }
 
-    #[inline(always)]
-    fn mount(_state: &mut Self::State, _parent: Node) {}
+    fn hydrate<const IS_HYDRATING: bool>(
+        self,
+        cursor: &mut Cursor,
+        position: Position,
+    ) -> Position {
+        crate::dom::log("hydrating ()");
+        position
+    }
+}
 
-    #[inline(always)]
-    fn unmount(_state: &mut Self::State) {}
+impl<A: View + Debug> View for (A,) {
+    type State = A::State;
+
+    fn to_html(&self, buf: &mut String, position: Position) {
+        self.0.to_html(buf, position);
+    }
+
+    fn to_template(buf: &mut String, position: Position) -> Position {
+        A::to_template(buf, position)
+    }
+
+    fn hydrate<const IS_HYDRATING: bool>(
+        self,
+        cursor: &mut Cursor,
+        position: Position,
+    ) -> Position {
+        crate::dom::log("hydrating (A)");
+        self.0.hydrate::<IS_HYDRATING>(cursor, position)
+    }
 }
 
 macro_rules! impl_view_for_tuples {
-	($($ty:ident),* $(,)?) => {
-		impl<$($ty),*> View for ($($ty,)*)
+	($first:ident, $($ty:ident),* $(,)?) => {
+		impl<$first, $($ty),*> View for ($first, $($ty,)*)
 		where
-			$($ty: View),*
+			$first: View + std::fmt::Debug,
+			$($ty: View + std::fmt::Debug),*
 		{
 			type State = ($($ty::State,)*);
 
-			#[inline]
-			fn build(self) -> Self::State {
+			fn to_html(&self, buf: &mut String, position: Position) {
 				paste::paste! {
-					let ($([<$ty:lower>],)*) = self;
-					(
-						$([<$ty:lower>].build()),*
-					)
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					[<$first:lower>].to_html(buf, position);
+					$([<$ty:lower>].to_html(buf, Position::NextChild));*
 				}
 			}
 
-			#[inline(always)]
-			fn rebuild(self, state: &mut Self::State) {
+			fn to_template(buf: &mut String, position: Position) -> Position {
 				paste::paste! {
-					let ($([<$ty:lower>],)*) = self;
-					let ($([<view_ $ty:lower>],)*) = state;
-					$($ty::rebuild([<$ty:lower>], [<view_ $ty:lower>]));*
+					let mut pos = position;
+					pos = $first ::to_template(buf, pos);
+					$(pos = $ty::to_template(buf, pos));*;
+					pos
 				}
 			}
 
-			#[inline(always)]
-			fn mount(state: &mut Self::State, parent: Node) {
+			////#[tracing::instrument]
+			fn hydrate<const IS_HYDRATING: bool>(self, cursor: &mut Cursor, position: Position) -> Position {
+				$crate::dom::log(concat!("hydrating (", stringify!($first), ", ", $(stringify!($ty), ", ", )* ")"));
 				paste::paste! {
-					let ($([<$ty:lower>],)*) = state;
-					$($ty::mount([<$ty:lower>], parent));*
-				}
-			}
-
-			#[inline(always)]
-			fn unmount(state: &mut Self::State) {
-				paste::paste! {
-					let ($([<$ty:lower>],)*) = state;
-					$($ty::unmount([<$ty:lower>]));*
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					let mut pos = position;
+					pos = [<$first:lower>].hydrate::<IS_HYDRATING>(cursor, pos);
+					$(pos = [<$ty:lower>].hydrate::<IS_HYDRATING>(cursor, pos));*;
+					pos
 				}
 			}
 		}

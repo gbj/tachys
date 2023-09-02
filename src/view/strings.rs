@@ -1,89 +1,102 @@
-use super::View;
-use crate::dom::{Dom, Node};
+use super::{Position, View};
+use crate::dom::document;
+use crate::hydration::Cursor;
+use wasm_bindgen::JsCast;
+use web_sys::{Comment, Text};
 
 impl<'a> View for &'a str {
-    type State = (Self, Node);
+    type State = ();
 
-    #[inline(always)]
-    fn build(self) -> Self::State {
-        let text = Dom::create_text_node(self);
-        (self, text)
-    }
-
-    #[inline(always)]
-    fn rebuild(self, state: &mut Self::State) {
-        let (prev, node) = state;
-        if &self != prev {
-            node.set_data(self);
-            state.0 = self;
+    fn to_html(&self, buf: &mut String, position: Position) {
+        // add a comment node to separate from previous sibling, if any
+        if matches!(position, Position::NextChild | Position::LastChild) {
+            buf.push_str("<!>")
         }
+        buf.push_str(self);
     }
 
-    #[inline(always)]
-    fn mount(state: &mut Self::State, parent: Node) {
-        parent.append_child(&state.1);
+    fn to_template(buf: &mut String, position: Position) -> Position {
+        buf.push_str("<!>");
+        Position::NextChild
     }
 
-    #[inline(always)]
-    fn unmount(state: &mut Self::State) {
-        state.1.remove();
-    }
-}
-
-impl<'a> View for &'a String {
-    type State = (Self, Node);
-
-    #[inline(always)]
-    fn build(self) -> Self::State {
-        let text = Dom::create_text_node(self);
-        (self, text)
-    }
-
-    #[inline(always)]
-    fn rebuild(self, state: &mut Self::State) {
-        let (prev, node) = state;
-        if &self != prev {
-            node.set_data(self);
-            state.0 = self;
+    fn hydrate<const IS_HYDRATING: bool>(
+        self,
+        cursor: &mut Cursor,
+        position: Position,
+    ) -> Position {
+        crate::dom::log(&format!("hydrating {self}"));
+        if position == Position::FirstChild {
+            cursor.child();
+        } else {
+            cursor.sibling();
         }
-    }
-
-    #[inline(always)]
-    fn mount(state: &mut Self::State, parent: Node) {
-        parent.append_child(&state.1);
-    }
-
-    #[inline(always)]
-    fn unmount(state: &mut Self::State) {
-        state.1.remove();
+        if IS_HYDRATING && matches!(position, Position::NextChild | Position::LastChild) {
+            crate::dom::log("skipping <!>");
+            cursor.sibling();
+        }
+        if !IS_HYDRATING {
+            cursor
+                .current()
+                .unchecked_ref::<Comment>()
+                .replace_with_with_node_1(&document().create_text_node(&self));
+        }
+        Position::NextChild
     }
 }
 
 impl View for String {
-    type State = (Self, Node);
+    type State = ();
 
-    #[inline(always)]
-    fn build(self) -> Self::State {
-        let text = Dom::create_text_node(&self);
-        (self, text)
+    fn to_html(&self, buf: &mut String, position: Position) {
+        self.as_str().to_html(buf, position)
     }
 
-    #[inline(always)]
-    fn rebuild(self, state: &mut Self::State) {
-        let (prev, node) = state;
-        if &self != prev {
-            node.set_data(&self);
-            state.0 = self;
+    fn to_template(buf: &mut String, position: Position) -> Position {
+        <&str as View>::to_template(buf, position)
+    }
+
+    fn hydrate<const IS_HYDRATING: bool>(
+        self,
+        cursor: &mut Cursor,
+        position: Position,
+    ) -> Position {
+        self.as_str().hydrate::<IS_HYDRATING>(cursor, position)
+    }
+}
+
+#[derive(Debug)]
+pub struct Static<const V: &'static str>;
+
+impl<const V: &'static str> View for Static<V> {
+    type State = ();
+
+    fn to_html(&self, buf: &mut String, position: Position) {
+        // add a comment node to separate from previous sibling, if any
+        if matches!(position, Position::NextChild | Position::LastChild) {
+            buf.push_str("<!>")
         }
+        buf.push_str(V)
     }
 
-    #[inline(always)]
-    fn mount(state: &mut Self::State, parent: Node) {
-        parent.append_child(&state.1);
+    fn to_template(buf: &mut String, position: Position) -> Position {
+        if matches!(position, Position::NextChild | Position::LastChild) {
+            buf.push_str("<!>")
+        }
+        buf.push_str(V);
+        Position::NextChild
     }
 
-    #[inline(always)]
-    fn unmount(state: &mut Self::State) {
-        state.1.remove();
+    fn hydrate<const IS_HYDRATING: bool>(
+        self,
+        cursor: &mut Cursor,
+        position: Position,
+    ) -> Position {
+        if position == Position::FirstChild {
+            cursor.child();
+        } else {
+            cursor.sibling();
+        }
+        Position::NextChild
     }
 }

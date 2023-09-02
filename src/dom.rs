@@ -430,7 +430,7 @@ impl Node {
         get_node(self.0)
     }
 
-    pub fn append_child(&self, child: &Node) {
+    pub fn append_child(&self, child: Node) {
         CHANNEL.with(|c| c.borrow_mut().append_child(self.0, child.0))
     }
 
@@ -455,10 +455,26 @@ impl Node {
     }
 }
 
-#[allow(non_camel_case_types)]
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum El {
+macro_rules! html_elements {
+	($($tag:ident),* $(,)?) => {
+        $(pub fn $tag<A: $crate::view::html::attribute::Attribute, C: $crate::View>(attributes: A, children: C) -> $crate::view::html::Html<A, C> {
+            $crate::view::html::Html {
+                tag: $crate::dom::El::$tag,
+                attributes,
+                children
+            }
+        })*
+
+        #[allow(non_camel_case_types)]
+        #[repr(u8)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        pub enum El {
+            $($tag,)*
+        }
+    }
+}
+
+html_elements! {
     a,
     abbr,
     acronym,
@@ -592,7 +608,7 @@ pub enum El {
     var,
     video,
     wbr,
-    xmp,
+    xmp
 }
 
 #[allow(non_camel_case_types)]

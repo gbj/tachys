@@ -1,22 +1,145 @@
 use super::{
     html::{attribute::Attribute, Html},
-    View,
+    Mount, View,
 };
 use crate::dom::{Dom, Node};
 use drain_filter_polyfill::VecExt as VecDrainFilterExt;
 use indexmap::IndexSet;
+use leptos_reactive::{as_child_of_owner, create_effect, Disposer, Effect, Owner, SignalWith};
 use rustc_hash::FxHasher;
-use std::hash::{BuildHasherDefault, Hash};
+use std::{
+    hash::{BuildHasherDefault, Hash},
+    rc::Rc,
+};
 
 type FxIndexSet<T> = IndexSet<T, BuildHasherDefault<FxHasher>>;
 
-pub struct Keyed<K, A, C>(pub K, pub Html<A, C>)
+pub struct Keyed<EF, I, E, KF, K, VF, A, C>
 where
+    E: 'static,
+    EF: SignalWith<Value = I>,
+    for<'a> &'a I: IntoIterator<Item = &'a E>,
+    KF: Fn(&E) -> K,
     K: Eq + Hash + 'static,
-    A: Attribute,
-    C: View;
+    VF: Fn(&E) -> Html<A, C> + Clone + 'static,
+    A: Attribute + 'static,
+    <A as Attribute>::State: 'static,
+    C: View + 'static,
+    <C as View>::State: 'static,
+{
+    pub each_signal: EF,
+    pub key_fn: KF,
+    pub view_fn: VF,
+}
 
-impl<'a, K, A, C> View for Vec<Keyed<K, A, C>>
+impl<EF, I, E, KF, K, VF, A, C> View for Keyed<EF, I, E, KF, K, VF, A, C>
+where
+    E: 'static,
+    EF: SignalWith<Value = I> + 'static,
+    for<'a> &'a I: IntoIterator<Item = &'a E>,
+    KF: Fn(&E) -> K + 'static,
+    K: Eq + Hash + 'static,
+    VF: Fn(&E) -> Html<A, C> + Clone + 'static,
+    A: Attribute + 'static,
+    <A as Attribute>::State: 'static,
+    C: View + 'static,
+    <C as View>::State: 'static,
+{
+    type State = Effect<(
+        Option<Mount>,
+        IndexSet<K, BuildHasherDefault<FxHasher>>,
+        Vec<Option<(<Html<A, C> as View>::State, Disposer)>>,
+    )>;
+
+    fn build(self) -> Self::State {
+        let owner = Owner::current();
+        let view_fn = self.view_fn.clone();
+
+        create_effect(
+            move |prev: Option<(
+                Option<Mount>,
+                IndexSet<K, BuildHasherDefault<FxHasher>>,
+                Vec<Option<(<Html<A, C> as View>::State, Disposer)>>,
+            )>| {
+                self.each_signal.with(|items| {
+                    let view_fn = as_child_of_owner(owner, {
+                        let view_fn = view_fn.clone();
+                        move |val| {
+                            let view = view_fn(val);
+                            view.build()
+                        }
+                    });
+                    let items = (&items).into_iter();
+                    let (lower, upper) = items.size_hint();
+                    let capacity = upper.unwrap_or(lower);
+
+                    if let Some(mut prev) = prev {
+                        let (parent, ref mut prev_hashes, ref mut children) = prev;
+                        let mut new_hashed_items =
+                            FxIndexSet::with_capacity_and_hasher(capacity, Default::default());
+
+                        let mut new_items = Vec::new();
+                        for item in items.into_iter() {
+                            new_hashed_items.insert((&self.key_fn)(&item));
+                            new_items.push(Some(item));
+                        }
+
+                        let cmds = diff(&prev_hashes, &new_hashed_items);
+
+                        apply_diff::<E, A, C, _>(
+                            parent.unwrap(),
+                            cmds,
+                            children,
+                            new_items,
+                            view_fn.clone(),
+                        );
+
+                        *prev_hashes = new_hashed_items;
+                        prev
+                    } else {
+                        let mut hashed_items =
+                            FxIndexSet::with_capacity_and_hasher(capacity, Default::default());
+                        let mut rendered_items = Vec::new();
+                        for item in items.into_iter() {
+                            hashed_items.insert((self.key_fn)(&item));
+                            let item = view_fn(&item);
+                            rendered_items.push(Some(item));
+                        }
+
+                        (None, hashed_items, rendered_items)
+                    }
+                })
+            },
+        )
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+
+    fn mount(state: &mut Self::State, kind: Mount) {
+        state.with_value_mut(|state| {
+            if let Some((empty_kind, _, items)) = state {
+                *empty_kind = Some(kind);
+                for (item, _) in items.iter_mut().flatten() {
+                    Html::<A, C>::mount(item, kind);
+                }
+            }
+        });
+    }
+
+    fn unmount(state: &mut Self::State) {
+        state.with_value_mut(|state| {
+            if let Some((_, _, items)) = state {
+                for (item, _) in items.iter_mut().flatten() {
+                    Html::<A, C>::unmount(item);
+                }
+            }
+        });
+    }
+}
+
+/*impl<'a, K, A, C> View for Vec<Keyed<K, A, C>>
 where
     K: Eq + Hash + 'static,
     A: Attribute,
@@ -72,7 +195,7 @@ where
             Html::<A, C>::unmount(item);
         }
     }
-}
+}*/
 
 trait VecExt<T> {
     fn get_next_closest_mounted_sibling(&self, start_at: usize) -> Option<&Option<T>>;
@@ -247,15 +370,23 @@ impl Default for DiffOpAddMode {
     }
 }
 
-fn apply_diff<A, C>(
-    parent: Node,
+fn apply_diff<'a, T, A, C, F>(
+    mount: Mount,
     diff: Diff,
-    children: &mut Vec<Option<<Html<A, C> as View>::State>>,
-    mut items: Vec<Option<Html<A, C>>>,
+    children: &mut Vec<Option<(<Html<A, C> as View>::State, Disposer)>>,
+    mut items: Vec<Option<&'a T>>,
+    view_fn: F,
 ) where
     A: Attribute,
     C: View,
+    F: Fn(&'a T) -> (<Html<A, C> as View>::State, Disposer),
 {
+    let parent = match mount {
+        Mount::Append { parent } | Mount::Before { parent, .. } | Mount::OnlyChild { parent } => {
+            parent
+        }
+    };
+
     // The order of cmds needs to be:
     // 1. Clear
     // 2. Removals
@@ -265,6 +396,7 @@ fn apply_diff<A, C>(
     // 6. Additions
     // 7. Removes holes
     if diff.clear {
+        // TODO
         parent.set_text("");
         children.clear();
 
@@ -276,7 +408,7 @@ fn apply_diff<A, C>(
     for DiffOpRemove { at } in &diff.removed {
         let mut item_to_remove = children[*at].take().unwrap();
 
-        Html::<A, C>::unmount(&mut item_to_remove);
+        Html::<A, C>::unmount(&mut item_to_remove.0);
     }
 
     let (move_cmds, add_cmds) = unpack_moves(&diff);
@@ -285,6 +417,11 @@ fn apply_diff<A, C>(
         .iter()
         .map(|move_| {
             let mut each_item = children[move_.from].take().unwrap();
+
+            if move_.move_in_dom {
+                Html::<A, C>::unmount(&mut each_item.0);
+            }
+
             Some(each_item)
         })
         .collect::<Vec<_>>();
@@ -296,11 +433,8 @@ fn apply_diff<A, C>(
         .enumerate()
         .filter(|(_, move_)| !move_.move_in_dom)
     {
-        let mut child = moved_children[i].take();
+        let child = moved_children[i].take();
         let item = items[i].take();
-        if let (Some(child), Some(item)) = (&mut child, item) {
-            item.rebuild(child);
-        }
         children[*to] = child;
     }
 
@@ -311,10 +445,10 @@ fn apply_diff<A, C>(
     {
         let mut each_item = moved_children[i].take().unwrap();
 
-        if let Some(Some((node, _, _))) = children.get_next_closest_mounted_sibling(to) {
-            Dom::insert_before(parent, each_item.0, *node);
+        if let Some(Some(((node, _, _), _))) = children.get_next_closest_mounted_sibling(to) {
+            Dom::insert_before(parent, each_item.0 .0, *node);
         } else {
-            Html::<A, C>::mount(&mut each_item, parent);
+            Html::<A, C>::mount(&mut each_item.0, mount);
         }
 
         children[to] = Some(each_item);
@@ -322,28 +456,22 @@ fn apply_diff<A, C>(
 
     for DiffOpAdd { at, mode } in add_cmds {
         let item = items[at].take().unwrap();
-        let mut item = item.build();
+        let (mut item, disposer) = view_fn(item);
 
         match mode {
             DiffOpAddMode::Normal => {
-                if let Some(Some((node, _, _))) = moved_children.get(at + 1) {
+                if let Some(Some(((node, _, _), _))) = moved_children.get(at + 1) {
                     Dom::insert_before(parent, *node, item.0);
                 } else {
-                    Html::<A, C>::mount(&mut item, parent);
+                    Html::<A, C>::mount(&mut item, mount);
                 }
             }
             DiffOpAddMode::Append => {
-                Html::<A, C>::mount(&mut item, parent);
+                Html::<A, C>::mount(&mut item, mount);
             }
         }
 
-        children[at] = Some(item);
-    }
-
-    for (item, state) in items.into_iter().zip(children.iter_mut()) {
-        if let (Some(item), Some(state)) = (item, state.as_mut()) {
-            item.rebuild(state);
-        }
+        children[at] = Some((item, disposer));
     }
 
     #[allow(unstable_name_collisions)]

@@ -1,6 +1,6 @@
-use crate::dom::{Attr, Node};
-use crate::view::Static;
+use leptos_reactive::{create_effect, Effect};
 
+use crate::dom::{Attr, Node};
 pub trait Attribute {
     type State;
 
@@ -12,24 +12,24 @@ pub trait Attribute {
 impl Attribute for () {
     type State = ();
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn build(self, parent: Node) -> Self::State {}
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn rebuild(self, state: &mut Self::State) {}
 }
 
 impl<'a> Attribute for (Attr, &'a str) {
     type State = (Attr, &'a str, Node);
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn build(self, parent: Node) -> Self::State {
         let (key, value) = self;
         parent.set_attribute(key, value);
         (key, value, parent)
     }
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn rebuild(self, state: &mut Self::State) {
         let (key, value) = self;
         let (prev_key, prev_value, parent) = state;
@@ -40,17 +40,44 @@ impl<'a> Attribute for (Attr, &'a str) {
     }
 }
 
+impl<F, A> Attribute for F
+where
+    F: Fn() -> A + 'static,
+    A: Attribute,
+    <A as Attribute>::State: 'static,
+{
+    type State = Effect<A::State>;
+
+    ////#[inline(always)]
+    fn build(self, parent: Node) -> Self::State {
+        create_effect(move |prev| {
+            let value = self();
+            if let Some(mut prev) = prev {
+                value.rebuild(&mut prev);
+                prev
+            } else {
+                value.build(parent)
+            }
+        })
+    }
+
+    ////#[inline(always)]
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
 impl<'a> Attribute for (Attr, String) {
     type State = (Attr, String, Node);
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn build(self, parent: Node) -> Self::State {
         let (key, value) = self;
         parent.set_attribute(key, &value);
         (key, value, parent.clone())
     }
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn rebuild(self, state: &mut Self::State) {
         let (key, value) = self;
         let (prev_key, prev_value, parent) = state;
@@ -59,18 +86,6 @@ impl<'a> Attribute for (Attr, String) {
             state.1 = value;
         }
     }
-}
-
-impl<'a, T: Attribute> Attribute for Static<T> {
-    type State = <T as Attribute>::State;
-
-    #[inline(always)]
-    fn build(self, parent: Node) -> Self::State {
-        <T as Attribute>::build(self.0, parent)
-    }
-
-    #[inline(always)]
-    fn rebuild(self, state: &mut Self::State) {}
 }
 
 // Events
@@ -87,7 +102,7 @@ impl Attribute for On {
         parent.add_event_listener(event, cb);
     }
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn rebuild(self, state: &mut Self::State) {}
 }
 
@@ -101,7 +116,7 @@ where
         self.map(|item| item.build(parent))
     }
 
-    #[inline(always)]
+    ////#[inline(always)]
     fn rebuild(self, state: &mut Self::State) {
         for (item, state) in self.into_iter().zip(state.iter_mut()) {
             item.rebuild(state);
@@ -127,7 +142,7 @@ macro_rules! impl_attribute_for_tuples {
 				}
 			}
 
-			#[inline(always)]
+			////#[inline(always)]
 			fn rebuild(self, state: &mut Self::State) {
 				paste::paste! {
 					let ($([<$ty:lower>],)*) = self;

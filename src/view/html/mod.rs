@@ -1,7 +1,7 @@
 use crate::dom::{Dom, El, Node};
 
 use self::attribute::Attribute;
-use super::View;
+use super::{Mount, View};
 
 pub mod attribute;
 
@@ -26,7 +26,7 @@ where
         let el = Dom::create_element(self.tag);
         let attrs = self.attributes.build(el);
         let mut children = self.children.build();
-        C::mount(&mut children, el);
+        C::mount(&mut children, Mount::Append { parent: el });
         (el, attrs, children)
     }
 
@@ -36,9 +36,9 @@ where
         C::rebuild(self.children, children);
     }
 
-    fn mount(state: &mut Self::State, parent: Node) {
+    fn mount(state: &mut Self::State, parent: Mount) {
         let (el, _, _) = state;
-        parent.append_child(&el);
+        parent.mount_node(*el);
     }
 
     fn unmount(state: &mut Self::State) {

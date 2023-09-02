@@ -1,21 +1,37 @@
 use crate::dom::Node;
 
-use super::View;
+use super::{Mount, View};
 
 impl View for () {
     type State = ();
 
-    #[inline(always)]
     fn build(self) -> Self::State {}
 
-    #[inline(always)]
     fn rebuild(self, _state: &mut Self::State) {}
 
-    #[inline(always)]
-    fn mount(_state: &mut Self::State, _parent: Node) {}
+    fn mount(_state: &mut Self::State, _kind: Mount) {}
 
-    #[inline(always)]
     fn unmount(_state: &mut Self::State) {}
+}
+
+impl<A: View> View for (A,) {
+    type State = A::State;
+
+    fn build(self) -> Self::State {
+        self.0.build()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        self.0.rebuild(state)
+    }
+
+    fn mount(state: &mut Self::State, kind: Mount) {
+        A::mount(state, kind)
+    }
+
+    fn unmount(state: &mut Self::State) {
+        A::unmount(state)
+    }
 }
 
 macro_rules! impl_view_for_tuples {
@@ -36,7 +52,7 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			#[inline(always)]
+			////#[inline(always)]
 			fn rebuild(self, state: &mut Self::State) {
 				paste::paste! {
 					let ($([<$ty:lower>],)*) = self;
@@ -45,15 +61,15 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			#[inline(always)]
-			fn mount(state: &mut Self::State, parent: Node) {
+			////#[inline(always)]
+			fn mount(state: &mut Self::State, kind: Mount) {
 				paste::paste! {
 					let ($([<$ty:lower>],)*) = state;
-					$($ty::mount([<$ty:lower>], parent));*
+					$($ty::mount([<$ty:lower>], kind));*
 				}
 			}
 
-			#[inline(always)]
+			////#[inline(always)]
 			fn unmount(state: &mut Self::State) {
 				paste::paste! {
 					let ($([<$ty:lower>],)*) = state;

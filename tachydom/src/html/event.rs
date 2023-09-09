@@ -1,4 +1,6 @@
 use crate::html::attribute::Attribute;
+use crate::view::Position;
+use crate::view::ToTemplate;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use wasm_bindgen::{convert::FromWasmAbi, JsCast, JsValue};
@@ -25,13 +27,19 @@ impl Debug for On {
 }
 
 impl Attribute for On {
+    type State = ();
+
     fn to_html(&self, _buf: &mut String) {}
 
-    fn to_template(_buf: &mut String) {}
-
-    fn hydrate<const IS_HYDRATING: bool>(self, el: &web_sys::Element) {
+    fn hydrate<const FROM_SERVER: bool>(self, el: &web_sys::Element) {
         el.add_event_listener_with_callback(&self.0, (self.1)().as_ref().unchecked_ref());
     }
+
+    fn rebuild(self, _state: &mut Self::State) {}
+}
+
+impl ToTemplate for On {
+    fn to_template(buf: &mut String, position: &mut Position) {}
 }
 
 /// A trait for converting types into [web_sys events](web_sys).

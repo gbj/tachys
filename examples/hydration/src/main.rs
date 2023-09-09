@@ -7,7 +7,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             // serve JS/WASM/CSS from `pkg`
-            .service(Files::new("/pkg", "target/site/pkg"))
+            .service(Files::new("/pkg", "target/site/pkg").show_files_listing())
             // serve other assets from the `assets` directory
             .service(Files::new("/assets", "target/site"))
             .route(
@@ -15,7 +15,7 @@ async fn main() -> std::io::Result<()> {
                 web::get().to(|| async {
                     HttpResponse::Ok()
                         .content_type(http::header::ContentType::html())
-                        .body(tachyh::app::my_app().to_html())
+                        .body(hydration_ex::app::my_app().to_html())
                 }),
             )
         // serve the favicon from /favicon.ico

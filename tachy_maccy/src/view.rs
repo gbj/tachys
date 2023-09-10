@@ -2,8 +2,8 @@ use convert_case::{Case::Snake, Casing};
 use leptos_hot_reload::parsing::is_component_node;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use proc_macro_error::abort;
-use quote::{quote, quote_spanned};
-use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName};
+use quote::{quote, quote_spanned, ToTokens};
+use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName, NodeNameFragment};
 use std::collections::HashMap;
 use syn::{spanned::Spanned, Expr, ExprPath};
 
@@ -210,7 +210,19 @@ fn attribute_to_tokens(
             if name == "ref" || name == "_ref" || name == "ref_" || name == "node_ref" {
                 todo!()
             } else if let Some(name) = name.strip_prefix("on:") {
-                Some(event_to_tokens(span, name, node))
+                Some(event_to_tokens(name, node))
+            } else if let Some(name) = name.strip_prefix("class:") {
+                let class = match &node.key {
+                    NodeName::Punctuated(parts) => &parts[0],
+                    _ => unreachable!(),
+                };
+                Some(class_to_tokens(node, class.into_token_stream(), Some(name)))
+            } else if name == "class" {
+                let class = match &node.key {
+                    NodeName::Path(path) => path.path.get_ident(),
+                    _ => unreachable!(),
+                };
+                Some(class_to_tokens(node, class.into_token_stream(), None))
             } else {
                 todo!()
             }
@@ -218,7 +230,7 @@ fn attribute_to_tokens(
     }
 }
 
-fn event_to_tokens(span: Span, name: &str, node: &KeyedAttribute) -> TokenStream {
+fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
     let handler = attribute_value(node);
 
     let (event_type, is_custom, is_force_undelegated) = parse_event_name(name);
@@ -275,6 +287,23 @@ fn event_to_tokens(span: Span, name: &str, node: &KeyedAttribute) -> TokenStream
 
     quote! {
         ::tachydom::html::event::#on(#event_type, #handler)
+    }
+}
+
+fn class_to_tokens(
+    node: &KeyedAttribute,
+    class: TokenStream,
+    class_name: Option<&str>,
+) -> TokenStream {
+    let value = attribute_value(node);
+    if let Some(class_name) = class_name {
+        quote! {
+            ::tachydom::html::class::#class((#class_name, #value))
+        }
+    } else {
+        quote! {
+            ::tachydom::html::class::#class(#value)
+        }
     }
 }
 

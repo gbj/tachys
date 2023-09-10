@@ -17,7 +17,7 @@ tachy_maccy = { path = "../../tachy_maccy" }
 wasm-bindgen = "0.2.8"
 
 [features]
-hydrate = ["leptos_reactive/csr"]
+hydrate = ["leptos_reactive/hydrate"]
 ssr = ["dep:actix-files", "dep:actix-web", "leptos_reactive/ssr"]
 
 # Defines a size-optimized profile for the WASM bundle in release mode

@@ -29,17 +29,21 @@ impl Debug for On {
 impl Attribute for On {
     type State = ();
 
-    fn to_html(&self, _buf: &mut String) {}
+    #[inline(always)]
+    fn to_html(&self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
 
+    #[inline(always)]
     fn hydrate<const FROM_SERVER: bool>(self, el: &web_sys::Element) {
         el.add_event_listener_with_callback(&self.0, (self.1)().as_ref().unchecked_ref());
     }
 
+    #[inline(always)]
     fn rebuild(self, _state: &mut Self::State) {}
 }
 
 impl ToTemplate for On {
-    fn to_template(buf: &mut String, position: &mut Position) {}
+    #[inline(always)]
+    fn to_template(_buf: &mut String, _position: &mut Position) {}
 }
 
 /// A trait for converting types into [web_sys events](web_sys).

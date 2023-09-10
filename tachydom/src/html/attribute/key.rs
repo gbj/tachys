@@ -73,7 +73,7 @@ attributes! {
     charset "charset",
     checked "checked",
     cite "cite",
-    class "class",
+    //class "class",
     code "code",
     codebase "codebase",
     color "color",

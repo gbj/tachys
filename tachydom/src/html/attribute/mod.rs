@@ -9,7 +9,7 @@ use web_sys::Element;
 pub trait Attribute {
     type State;
 
-    fn to_html(&self, buf: &mut String);
+    fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
@@ -19,7 +19,7 @@ pub trait Attribute {
 impl Attribute for () {
     type State = ();
 
-    fn to_html(&self, _buf: &mut String) {}
+    fn to_html(&self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &Element) -> Self::State {}
 
@@ -49,7 +49,7 @@ where
 {
     type State = V::State;
 
-    fn to_html(&self, buf: &mut String) {
+    fn to_html(&self, buf: &mut String, _class: &mut String, _style: &mut String) {
         self.1.to_html(K::KEY, buf);
     }
 
@@ -81,8 +81,8 @@ where
 {
     type State = ();
 
-    fn to_html(&self, buf: &mut String) {
-        V.to_html(K::KEY, buf)
+    fn to_html(&self, buf: &mut String, _class: &mut String, _style: &mut String) {
+        AttributeValue::to_html(&V, K::KEY, buf)
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {}
@@ -98,3 +98,68 @@ pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
 pub fn static_attr<K: AttributeKey, const V: &'static str>() -> StaticAttr<K, V> {
     StaticAttr { ty: PhantomData }
 }
+
+macro_rules! impl_attr_for_tuples {
+	($first:ident, $($ty:ident),* $(,)?) => {
+		impl<$first, $($ty),*> Attribute for ($first, $($ty,)*)
+		where
+			$first: Attribute,
+			$($ty: Attribute),*
+		{
+			type State = ($first::State, $($ty::State,)*);
+
+			fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String) {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					[<$first:lower>].to_html(buf, class, style);
+					$([<$ty:lower>].to_html(buf, class, style));*
+				}
+			}
+
+			fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					(
+						[<$first:lower>].hydrate::<FROM_SERVER>(el),
+						$([<$ty:lower>].hydrate::<FROM_SERVER>(el)),*
+					)
+				}
+			}
+
+			fn rebuild(self, state: &mut Self::State) {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					let ([<view_ $first:lower>], $([<view_ $ty:lower>],)*) = state;
+					[<$first:lower>].rebuild([<view_ $first:lower>]);
+					$([<$ty:lower>].rebuild([<view_ $ty:lower>]));*
+				}
+			}
+		}
+	};
+}
+
+impl_attr_for_tuples!(A, B);
+impl_attr_for_tuples!(A, B, C);
+impl_attr_for_tuples!(A, B, C, D);
+impl_attr_for_tuples!(A, B, C, D, E);
+impl_attr_for_tuples!(A, B, C, D, E, F);
+impl_attr_for_tuples!(A, B, C, D, E, F, G);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
+impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);

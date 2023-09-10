@@ -15,14 +15,16 @@ use tachydom::view::View;
 #[derive(Debug)]
 pub struct App<C: View>(C);
 
-pub fn my_app() -> App<impl View + ToTemplate> {
+pub fn my_app() -> App<impl View> {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
     create_effect(move |_| {
         tachydom::log(&count.get().to_string());
     });
     let view = view! {
-        <p>This is <strong>"very"</strong> cool stuff.<span></span></p>
+        <p class:bar=move || count.get() % 2 == 0 class="foo" class:baz=true class:not=|| false>
+            This is <strong>"very"</strong> cool stuff.<span></span>
+        </p>
         <button
             on:click=move |ev| set_count.update(|n| *n += 1)
         >
@@ -37,13 +39,13 @@ pub fn my_app() -> App<impl View + ToTemplate> {
     App::new(view)
 }
 
-impl<C: View + ToTemplate> App<C> {
+impl<C: View> App<C> {
     pub fn new(view: C) -> Self {
         Self(view)
     }
 }
 
-impl<C: View + ToTemplate> App<C> {
+impl<C: View> App<C> {
     pub fn hydrate(self) {
         let mut cursor = Cursor::new(tachydom::dom::body());
         // hydrate from HTML
@@ -78,7 +80,7 @@ impl<C: View + ToTemplate> App<C> {
         );
         let mut position = Position::Root;
         self.0.to_html(&mut buf, &mut position);
-        buf.push_str("</body></html>");
+        buf.push_str("<script>__LEPTOS_PENDING_RESOURCES = [];__LEPTOS_RESOLVED_RESOURCES = new Map();__LEPTOS_RESOURCE_RESOLVERS = new Map();</script></body></html>");
         buf
     }
 }

@@ -19,6 +19,7 @@ web-sys = { version = "0.3.64", features = [
 	"Node",
 	"HtmlTemplateElement",
 	"DocumentFragment",
+	"DomTokenList",
 	# Events we cast to in leptos_macro -- added here so we don't force users to import them
 	"AddEventListenerOptions",
 	"AnimationEvent",

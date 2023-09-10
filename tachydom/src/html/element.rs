@@ -20,6 +20,7 @@ where
 
 pub trait ElementType {
     const TAG: &'static str;
+    const SELF_CLOSING: bool;
 }
 
 impl<E, At, Ch> View for HtmlElement<E, At, Ch>
@@ -31,20 +32,52 @@ where
     type State = (Element, At::State, Ch::State);
 
     fn to_html(&self, buf: &mut String, position: &mut Position) {
-        // opening tag and attributes
+        // opening tag
         buf.push('<');
         buf.push_str(E::TAG);
-        self.attributes.to_html(buf);
+
+        // attributes
+
+        // `class` and `style` are created first, and pushed later
+        // this is because they can be filled by a mixture of values that include
+        // either the whole value (`class="..."` or `style="..."`) and individual
+        // classes and styles (`class:foo=true` or `style:height="40px"`), so they
+        // need to be filled during the whole attribute-creation process and then
+        // added
+
+        // String doesn't allocate until the first push, so this is cheap if there
+        // is no class or style on an element
+        let mut class = String::new();
+        let mut style = String::new();
+
+        // inject regular attributes, and fill class and style
+        self.attributes.to_html(buf, &mut class, &mut style);
+
+        if !class.is_empty() {
+            buf.push(' ');
+            buf.push_str("class=\"");
+            buf.push_str(class.trim_start().trim_end());
+            buf.push('"');
+        }
+        if !style.is_empty() {
+            buf.push(' ');
+            buf.push_str("style=\"");
+            buf.push_str(style.trim_start().trim_end());
+            buf.push('"');
+        }
+
         buf.push('>');
 
-        // children
-        *position = Position::FirstChild;
-        self.children.to_html(buf, position);
+        if !E::SELF_CLOSING {
+            // children
+            *position = Position::FirstChild;
+            self.children.to_html(buf, position);
 
-        // closing tag
-        buf.push_str("</");
-        buf.push_str(E::TAG);
-        buf.push('>');
+            // closing tag
+            buf.push_str("</");
+            buf.push_str(E::TAG);
+            buf.push('>');
+        }
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -52,9 +85,6 @@ where
         cursor: &mut Cursor,
         position: &mut Position,
     ) -> Self::State {
-        web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!(
-            "position is {position:?}"
-        )));
         if *position == Position::FirstChild {
             cursor.child();
         } else {
@@ -76,7 +106,7 @@ where
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        let (el, attributes, children) = state;
+        let (_, attributes, children) = state;
         self.attributes.rebuild(attributes);
         self.children.rebuild(children);
     }
@@ -128,6 +158,7 @@ macro_rules! html_elements {
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
+                    const SELF_CLOSING: bool = false;
                 }
             )*
 		}
@@ -154,6 +185,7 @@ macro_rules! html_self_closing_elements {
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
+                    const SELF_CLOSING: bool = true;
                 }
             )*
 		}

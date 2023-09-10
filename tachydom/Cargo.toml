@@ -1,0 +1,58 @@
+[package]
+name = "tachydom"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+leptos_reactive = { path = "/Users/gjohnston/Documents/Projects/leptos-main/leptos/leptos_reactive" }
+paste = "1.0.14"
+wasm-bindgen = "=0.2.87"
+web-sys = { version = "0.3.64", features = [
+	"Window",
+	"Document",
+	"HtmlElement",
+	"Element",
+	"Event",
+	"console",
+	"Comment",
+	"Text",
+	"Node",
+	"HtmlTemplateElement",
+	"DocumentFragment",
+	"DomTokenList",
+	# Events we cast to in leptos_macro -- added here so we don't force users to import them
+	"AddEventListenerOptions",
+	"AnimationEvent",
+	"BeforeUnloadEvent",
+	"ClipboardEvent",
+	"CompositionEvent",
+	"CustomEvent",
+	"DeviceMotionEvent",
+	"DeviceOrientationEvent",
+	"DragEvent",
+	"ErrorEvent",
+	"Event",
+	"FocusEvent",
+	"GamepadEvent",
+	"HashChangeEvent",
+	"InputEvent",
+	"KeyboardEvent",
+	"MessageEvent",
+	"MouseEvent",
+	"PageTransitionEvent",
+	"PointerEvent",
+	"PopStateEvent",
+	"ProgressEvent",
+	"PromiseRejectionEvent",
+	"SecurityPolicyViolationEvent",
+	"StorageEvent",
+	"SubmitEvent",
+	"TouchEvent",
+	"TransitionEvent",
+	"UiEvent",
+	"WheelEvent",
+] }
+
+[features]
+hydrate = []
+ssr = []

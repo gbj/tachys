@@ -1,4 +1,4 @@
-#![feature(adt_const_params)]
+#![cfg_attr(feature = "nightly", feature(adt_const_params))]
 
 pub mod dom;
 pub mod html;

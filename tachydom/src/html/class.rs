@@ -3,7 +3,7 @@ use web_sys::{DomTokenList, Element};
 
 use crate::view::ToTemplate;
 
-use super::attribute::{Attribute, StaticAttr};
+use super::attribute::Attribute;
 
 #[inline(always)]
 pub fn class(c: impl IntoClass) -> impl Attribute {
@@ -66,9 +66,10 @@ impl<'a> IntoClass for &'a str {
 
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
-        if &self != &*prev {
+        if self != *prev {
             el.set_attribute("class", self);
         }
+        *prev = self;
     }
 }
 
@@ -88,6 +89,7 @@ impl IntoClass for String {
         if &self != &*prev {
             el.set_attribute("class", &self);
         }
+        *prev = self;
     }
 }
 
@@ -116,6 +118,7 @@ impl IntoClass for (&'static str, bool) {
                 class_list.remove_1(name);
             }
         }
+        *prev_include = include;
     }
 }
 

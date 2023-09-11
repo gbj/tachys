@@ -36,7 +36,9 @@ impl<'a> AttributeValue for &'a str {
         buf.push('"');
     }
 
-    fn to_template(key: &str, buf: &mut String) {}
+    fn to_template(key: &str, buf: &mut String) {
+        // TODO
+    }
 
     fn hydrate<const FROM_SERVER: bool>(self, key: &str, el: &Element) -> Self::State {
         // if we're actually hydrating from SSRed HTML, we don't need to set the attribute
@@ -52,6 +54,7 @@ impl<'a> AttributeValue for &'a str {
         if self != *prev_value {
             el.set_attribute(key, self);
         }
+        *prev_value = self;
     }
 }
 
@@ -74,6 +77,7 @@ impl AttributeValue for String {
         if self != *prev_value {
             el.set_attribute(key, &self);
         }
+        *prev_value = self;
     }
 }
 
@@ -107,6 +111,7 @@ impl AttributeValue for bool {
                 el.remove_attribute(key);
             }
         }
+        *prev_value = self;
     }
 }
 

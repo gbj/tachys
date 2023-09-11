@@ -1,7 +1,5 @@
-use super::{Attr, Attribute, AttributeValue, StaticAttr};
-use crate::view::{Position, ToTemplate};
+use super::{Attr, AttributeValue};
 use std::fmt::Debug;
-use web_sys::Element;
 
 pub trait AttributeKey {
     const KEY: &'static str;
@@ -73,6 +71,7 @@ attributes! {
     charset "charset",
     checked "checked",
     cite "cite",
+    // class is handled in ../class.rs instead
     //class "class",
     code "code",
     codebase "codebase",
@@ -172,7 +171,8 @@ attributes! {
     srcset "srcset",
     start "start",
     step "step",
-    style "style",
+    // style is handled in ../style.rs instead
+    // style "style",
     summary "summary",
     tabindex "tabindex",
     target "target",

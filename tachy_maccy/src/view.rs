@@ -3,9 +3,9 @@ use leptos_hot_reload::parsing::is_component_node;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use proc_macro_error::abort;
 use quote::{quote, quote_spanned, ToTokens};
-use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName, NodeNameFragment};
+use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName};
 use std::collections::HashMap;
-use syn::{spanned::Spanned, Expr, ExprPath};
+use syn::{spanned::Spanned, Expr, ExprLit, ExprPath, LitStr};
 
 #[derive(Clone, Copy)]
 pub(crate) enum TagType {
@@ -86,15 +86,28 @@ fn node_to_tokens(
             view_marker,
         ),
         Node::Block(block) => Some(quote! { #block }),
-        Node::Text(text) => Some(quote! { #text }),
+        Node::Text(text) => Some(text_to_tokens(&text.value)),
         Node::RawText(raw) => {
             let text = raw.to_string_best();
             let text = syn::LitStr::new(&text, raw.span());
-            Some(quote! { #text })
+            Some(text_to_tokens(&text))
         }
         Node::Element(node) => {
             element_to_tokens(node, parent_type, parent_slots, global_class, view_marker)
         }
+    }
+}
+
+fn text_to_tokens(text: &LitStr) -> TokenStream {
+    // on nightly, can use static string optimization
+    if cfg!(feature = "nightly") {
+        quote! {
+            ::tachydom::view::static_types::Static::<#text>
+        }
+    }
+    // otherwise, just use the literal string
+    else {
+        quote! { #text }
     }
 }
 
@@ -223,8 +236,36 @@ fn attribute_to_tokens(
                     _ => unreachable!(),
                 };
                 Some(class_to_tokens(node, class.into_token_stream(), None))
+            } else if let Some(name) = name.strip_prefix("style:") {
+                let style = match &node.key {
+                    NodeName::Punctuated(parts) => &parts[0],
+                    _ => unreachable!(),
+                };
+                Some(style_to_tokens(node, style.into_token_stream(), Some(name)))
+            } else if name == "style" {
+                let style = match &node.key {
+                    NodeName::Path(path) => path.path.get_ident(),
+                    _ => unreachable!(),
+                };
+                Some(style_to_tokens(node, style.into_token_stream(), None))
             } else {
+                let key = &node.key;
+                let key = quote! {
+                    ::tachydom::html::attribute::key::#key
+                };
+                let value = attribute_value(node);
                 todo!()
+                /* if let Expr::Lit(ExprLit::Lit(Lit::Str(s))) = value {
+                    if cfg!(feature = "nightly") {
+                        quote! {
+                            ::tachydom::view::static_types::static_attr<#key, #s>()
+                        }
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                } */
             }
         }
     }
@@ -303,6 +344,23 @@ fn class_to_tokens(
     } else {
         quote! {
             ::tachydom::html::class::#class(#value)
+        }
+    }
+}
+
+fn style_to_tokens(
+    node: &KeyedAttribute,
+    style: TokenStream,
+    style_name: Option<&str>,
+) -> TokenStream {
+    let value = attribute_value(node);
+    if let Some(style_name) = style_name {
+        quote! {
+            ::tachydom::html::style::#style((#style_name, #value))
+        }
+    } else {
+        quote! {
+            ::tachydom::html::style::#style(#value)
         }
     }
 }

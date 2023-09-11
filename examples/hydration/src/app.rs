@@ -22,7 +22,19 @@ pub fn my_app() -> App<impl View> {
         tachydom::log(&count.get().to_string());
     });
     let view = view! {
-        <p class:bar=move || count.get() % 2 == 0 class="foo" class:baz=true class:not=|| false>
+        <p
+            class:bar=move || count.get() % 2 == 0
+            class="foo"
+            class:baz=true
+            class:not=|| false
+            style="font-weight: bold"
+            style:color=move || if count.get() % 2 == 0 {
+                "blue"
+            } else {
+                "red"
+            }
+            style:display="block"
+        >
             This is <strong>"very"</strong> cool stuff.<span></span>
         </p>
         <button
@@ -32,10 +44,6 @@ pub fn my_app() -> App<impl View> {
         </button>
     };
 
-    /* button(
-        on(event::click, move |ev| set_count.update(|n| *n += 1)),
-        move || count.get().to_string(),
-    ); */
     App::new(view)
 }
 

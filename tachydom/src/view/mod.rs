@@ -1,6 +1,8 @@
 use crate::hydration::Cursor;
 
 pub mod dynamic;
+#[cfg(feature = "nightly")]
+pub mod static_types;
 pub mod strings;
 pub mod tuples;
 

@@ -1,10 +1,8 @@
 mod view;
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenTree};
+use proc_macro2::TokenTree;
 use proc_macro_error::abort;
-use quote::{quote, ToTokens};
-use rstml::{node::KeyedAttribute, parse};
-use syn::parse_macro_input;
+use quote::quote;
 
 #[proc_macro_error::proc_macro_error]
 #[proc_macro]

@@ -2,7 +2,7 @@ mod key;
 mod value;
 use crate::view::{Position, ToTemplate};
 pub use key::*;
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 pub use value::*;
 use web_sys::Element;
 
@@ -23,7 +23,7 @@ impl Attribute for () {
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &Element) -> Self::State {}
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {}
 }
 
 #[derive(Debug)]
@@ -60,43 +60,6 @@ where
     fn rebuild(self, state: &mut Self::State) {
         V::rebuild(self.1, K::KEY, state);
     }
-}
-
-impl<K, const V: &'static str> ToTemplate for StaticAttr<K, V>
-where
-    K: AttributeKey,
-{
-    fn to_template(buf: &mut String, _position: &mut Position) {
-        buf.push(' ');
-        buf.push_str(K::KEY);
-        buf.push_str("=\"");
-        buf.push_str(V);
-        buf.push('"');
-    }
-}
-
-impl<K, const V: &'static str> Attribute for StaticAttr<K, V>
-where
-    K: AttributeKey,
-{
-    type State = ();
-
-    fn to_html(&self, buf: &mut String, _class: &mut String, _style: &mut String) {
-        AttributeValue::to_html(&V, K::KEY, buf)
-    }
-
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {}
-
-    fn rebuild(self, state: &mut Self::State) {}
-}
-
-#[derive(Debug)]
-pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
-    ty: PhantomData<K>,
-}
-
-pub fn static_attr<K: AttributeKey, const V: &'static str>() -> StaticAttr<K, V> {
-    StaticAttr { ty: PhantomData }
 }
 
 macro_rules! impl_attr_for_tuples {

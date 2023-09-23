@@ -1,4 +1,4 @@
-use leptos_reactive::Effect;
+use leptos_reactive::{create_render_effect, Effect};
 use web_sys::{DomTokenList, Element};
 
 use crate::view::ToTemplate;
@@ -29,6 +29,10 @@ where
         self.0.hydrate::<FROM_SERVER>(el)
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        self.0.build(el)
+    }
+
     fn rebuild(self, state: &mut Self::State) {
         self.0.rebuild(state)
     }
@@ -50,6 +54,8 @@ pub trait IntoClass {
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
+    fn build(self, el: &Element) -> Self::State;
+
     fn rebuild(self, state: &mut Self::State);
 }
 
@@ -61,6 +67,11 @@ impl<'a> IntoClass for &'a str {
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+        (el.to_owned(), self)
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        el.set_attribute("class", self);
         (el.to_owned(), self)
     }
 
@@ -81,6 +92,11 @@ impl IntoClass for String {
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+        (el.to_owned(), self)
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        el.set_attribute("class", &self);
         (el.to_owned(), self)
     }
 
@@ -105,6 +121,15 @@ impl IntoClass for (&'static str, bool) {
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
         let class_list = el.class_list();
+        (class_list, self.1)
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        let (name, include) = self;
+        let class_list = el.class_list();
+        if include {
+            class_list.add_1(name);
+        }
         (class_list, self.1)
     }
 
@@ -137,13 +162,26 @@ where
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
         // TODO FROM_SERVER vs template
         let el = el.to_owned();
-        Effect::new(move |prev| {
+        create_render_effect(move |prev| {
             let value = self();
             if let Some(mut state) = prev {
                 value.rebuild(&mut state);
                 state
             } else {
                 value.hydrate::<FROM_SERVER>(&el)
+            }
+        })
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        let el = el.to_owned();
+        create_render_effect(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&mut state);
+                state
+            } else {
+                value.build(&el)
             }
         })
     }
@@ -169,7 +207,23 @@ where
         // TODO FROM_SERVER vs template
         let (name, f) = self;
         let class_list = el.class_list();
-        Effect::new(move |prev| {
+        create_render_effect(move |prev| {
+            let include = f();
+            if Some(include) != prev {
+                if include {
+                    class_list.add_1(name);
+                } else {
+                    class_list.remove_1(name);
+                }
+            }
+            include
+        })
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        let (name, f) = self;
+        let class_list = el.class_list();
+        create_render_effect(move |prev| {
             let include = f();
             if Some(include) != prev {
                 if include {
@@ -189,14 +243,14 @@ where
 mod tests {
     use crate::{
         html::{class::class, element::p},
-        view::{Position, View},
+        view::{Position, PositionState, View},
     };
 
     #[test]
     fn adds_simple_class() {
         let mut html = String::new();
         let el = p(class("foo bar"), ());
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar"></p>"#);
     }
@@ -205,7 +259,7 @@ mod tests {
     fn adds_class_with_dynamic() {
         let mut html = String::new();
         let el = p((class("foo bar"), class(("baz", true))), ());
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
     }
@@ -221,7 +275,7 @@ mod tests {
             ),
             (),
         );
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
     }

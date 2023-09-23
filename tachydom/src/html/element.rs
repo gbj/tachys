@@ -1,11 +1,13 @@
+use crate::dom::document;
 use crate::html::attribute::Attribute;
 use crate::hydration::Cursor;
-use crate::view::Position;
+use crate::view::{Mountable, Position, PositionState};
 use crate::view::{ToTemplate, View};
+use once_cell::unsync::Lazy;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use wasm_bindgen::JsCast;
-use web_sys::Element;
+use web_sys::{Element, Node};
 
 pub struct HtmlElement<E, At, Ch>
 where
@@ -21,6 +23,8 @@ where
 pub trait ElementType {
     const TAG: &'static str;
     const SELF_CLOSING: bool;
+
+    fn create_element() -> Element;
 }
 
 impl<E, At, Ch> View for HtmlElement<E, At, Ch>
@@ -31,7 +35,7 @@ where
 {
     type State = (Element, At::State, Ch::State);
 
-    fn to_html(&self, buf: &mut String, position: &mut Position) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);
@@ -70,7 +74,7 @@ where
 
         if !E::SELF_CLOSING {
             // children
-            *position = Position::FirstChild;
+            position.set(Position::FirstChild);
             self.children.to_html(buf, position);
 
             // closing tag
@@ -82,12 +86,15 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
-        if *position == Position::FirstChild {
+        crate::log(&format!("Hydrating {} at {:?}", E::TAG, position));
+        if position.get() == Position::FirstChild {
+            crate::log("Position::FirstChild");
             cursor.child();
         } else {
+            crate::log("look for sibling");
             cursor.sibling();
         }
         let el = cursor.current().to_owned();
@@ -95,12 +102,13 @@ where
         let attrs = self.attributes.hydrate::<FROM_SERVER>(el.unchecked_ref());
 
         // hydrate children
-        *position = Position::FirstChild;
+        crate::log("setting back to FirstChild for children");
+        position.set(Position::FirstChild);
         let children = self.children.hydrate::<FROM_SERVER>(cursor, position);
         cursor.set(el.clone());
 
         // go to next sibling
-        *position = Position::NextChild;
+        position.set(Position::NextChild);
 
         (el.unchecked_into(), attrs, children)
     }
@@ -109,6 +117,26 @@ where
         let (_, attributes, children) = state;
         self.attributes.rebuild(attributes);
         self.children.rebuild(children);
+    }
+
+    fn build(self) -> Self::State {
+        let el = E::create_element();
+        let at = self.attributes.build(&el);
+        let children = self.children.build();
+        if let Some(child) = children.as_mountable() {
+            el.append_child(&child);
+        }
+        (el, at, children)
+    }
+}
+
+impl<At, Ch> Mountable for (Element, At, Ch) {
+    fn unmount(&mut self) {
+        self.0.remove()
+    }
+
+    fn as_mountable(&self) -> Option<Node> {
+        Some(self.0.clone().unchecked_into())
     }
 }
 
@@ -159,6 +187,15 @@ macro_rules! html_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
+
+                    fn create_element() -> Element {
+                        thread_local! {
+                            static ELEMENT: Lazy<Element> = Lazy::new(|| {
+                                document().create_element(stringify!($tag)).unwrap()
+                            });
+                        }
+                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+                    }
                 }
             )*
 		}
@@ -186,6 +223,15 @@ macro_rules! html_self_closing_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = true;
+
+                    fn create_element() -> Element {
+                        thread_local! {
+                            static ELEMENT: Lazy<Element> = Lazy::new(|| {
+                                document().create_element(stringify!($tag)).unwrap()
+                            });
+                        }
+                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+                    }
                 }
             )*
 		}
@@ -283,7 +329,7 @@ html_elements! {
     object,
     ol,
     optgroup,
-    option,
+    // option, // creates conflict with core Option
     output,
     p,
     picture,
@@ -330,4 +376,33 @@ html_elements! {
     var,
     video,
     xmp
+}
+
+pub fn option<At, Ch>(attributes: At, children: Ch) -> HtmlElement<Option_, At, Ch>
+where
+    At: Attribute,
+    Ch: View,
+{
+    HtmlElement {
+        ty: PhantomData,
+        attributes,
+        children,
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Option_;
+
+impl ElementType for Option_ {
+    const TAG: &'static str = "option";
+    const SELF_CLOSING: bool = false;
+
+    fn create_element() -> Element {
+        thread_local! {
+            static ELEMENT: Lazy<Element> = Lazy::new(|| {
+                document().create_element("option").unwrap()
+            });
+        }
+        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+    }
 }

@@ -13,6 +13,8 @@ pub trait Attribute {
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
+    fn build(self, el: &Element) -> Self::State;
+
     fn rebuild(self, state: &mut Self::State);
 }
 
@@ -22,6 +24,8 @@ impl Attribute for () {
     fn to_html(&self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &Element) -> Self::State {}
+
+    fn build(self, el: &Element) -> Self::State {}
 
     fn rebuild(self, _state: &mut Self::State) {}
 }
@@ -57,6 +61,10 @@ where
         self.1.hydrate::<FROM_SERVER>(K::KEY, el)
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        V::build(self.1, el, K::KEY)
+    }
+
     fn rebuild(self, state: &mut Self::State) {
         V::rebuild(self.1, K::KEY, state);
     }
@@ -86,6 +94,16 @@ macro_rules! impl_attr_for_tuples {
 						[<$first:lower>].hydrate::<FROM_SERVER>(el),
 						$([<$ty:lower>].hydrate::<FROM_SERVER>(el)),*
 					)
+				}
+			}
+
+            fn build(self, el: &Element) -> Self::State {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+                    (
+                        [<$first:lower>].build(el),
+                        $([<$ty:lower>].build(el)),*
+                    )
 				}
 			}
 

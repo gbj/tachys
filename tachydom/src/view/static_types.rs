@@ -1,13 +1,27 @@
-use web_sys::Element;
+use web_sys::{Element, Text};
 
 use crate::{
+    dom::document,
     html::attribute::{Attribute, AttributeKey, AttributeValue},
     hydration::Cursor,
 };
 use std::marker::PhantomData;
 
-use super::{Position, ToTemplate, View};
+use super::{Position, PositionState, ToTemplate, View};
 
+/// An attribute for which both the key and the value are known at compile time,
+/// i.e., as `&'static str`s.
+///
+/// ```
+/// use tachydom::view::static_types::{StaticAttr, static_attr};
+/// use tachydom::html::attribute::{Attribute, Type};
+/// let input_type = static_attr::<Type, "text">();
+/// let mut buf = String::new();
+/// let mut classes = String::new();
+/// let mut styles = String::new();
+/// input_type.to_html(&mut buf, &mut classes, &mut styles);
+/// assert_eq!(buf, " type=\"text\"");
+/// ```
 #[derive(Debug)]
 pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
     ty: PhantomData<K>,
@@ -42,6 +56,10 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {}
 
+    fn build(self, el: &Element) -> Self::State {
+        el.set_attribute(K::KEY, V);
+    }
+
     fn rebuild(self, state: &mut Self::State) {}
 }
 
@@ -49,11 +67,11 @@ where
 pub struct Static<const V: &'static str>;
 
 impl<const V: &'static str> View for Static<V> {
-    type State = ();
+    type State = Option<Text>;
 
-    fn to_html(&self, buf: &mut String, position: &mut Position) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
-        if matches!(position, Position::NextChild | Position::LastChild) {
+        if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
         }
         buf.push_str(V)
@@ -61,15 +79,23 @@ impl<const V: &'static str> View for Static<V> {
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
-        if *position == Position::FirstChild {
+        if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
         }
-        *position = Position::NextChild;
+        position.set(Position::NextChild);
+
+        // no view state is created when hydrating, because this is static
+        None
+    }
+
+    fn build(self) -> Self::State {
+        // a view state has to be returned so it can be mounted
+        Some(document().create_text_node(V))
     }
 
     // This type is specified as static, so no rebuilding is done.

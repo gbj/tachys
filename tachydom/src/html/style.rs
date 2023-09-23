@@ -1,19 +1,27 @@
 use std::borrow::Cow;
 
-use leptos_reactive::Effect;
+use leptos_reactive::{create_render_effect, Effect};
 use wasm_bindgen::JsCast;
 use web_sys::{CssStyleDeclaration, Element, HtmlElement};
 
+use crate::or_debug;
 use crate::view::ToTemplate;
 
 use super::attribute::Attribute;
 
+/// Adds to the style attribute of the parent element.
+///
+/// This can take a plain string value, which will be assigned to the `style`
+///
 #[inline(always)]
-pub fn style(s: impl IntoStyle) -> impl Attribute {
+pub fn style<S>(s: S) -> Style<S>
+where
+    S: IntoStyle,
+{
     Style(s)
 }
 
-struct Style<S>(S)
+pub struct Style<S>(S)
 where
     S: IntoStyle;
 
@@ -31,6 +39,10 @@ where
         self.0.hydrate::<FROM_SERVER>(el)
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        self.0.build(el)
+    }
+
     fn rebuild(self, state: &mut Self::State) {
         self.0.rebuild(state)
     }
@@ -45,6 +57,8 @@ where
     }
 }
 
+/// Any type that can be added to the `style` attribute or set as a style in
+/// the [`CssStyleDeclaration`]. This could be a plain string, or a property name-value pair.
 pub trait IntoStyle {
     type State;
 
@@ -52,7 +66,20 @@ pub trait IntoStyle {
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
+    fn build(self, el: &Element) -> Self::State;
+
     fn rebuild(self, state: &mut Self::State);
+}
+
+pub trait StylePropertyValue {
+    type State;
+
+    fn to_html(&self, name: &str, class: &mut String);
+
+    fn hydrate<const FROM_SERVER: bool>(self, name: Cow<'static, str>, el: &Element)
+        -> Self::State;
+
+    fn rebuild(self, name: Cow<'static, str>, state: &mut Self::State);
 }
 
 impl<'a> IntoStyle for &'a str {
@@ -67,10 +94,15 @@ impl<'a> IntoStyle for &'a str {
         (el.to_owned(), self)
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        el.set_attribute("style", self);
+        (el.to_owned(), self)
+    }
+
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
         if self != *prev {
-            el.set_attribute("style", self);
+            or_debug!(el.set_attribute("style", self), el, "setAttribute");
         }
         *prev = self;
     }
@@ -85,6 +117,11 @@ impl IntoStyle for String {
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+        (el.to_owned(), self)
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        el.set_attribute("style", &self);
         (el.to_owned(), self)
     }
 
@@ -113,6 +150,13 @@ impl<'a> IntoStyle for (&'a str, &'a str) {
         (style, self.1)
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        let (name, value) = self;
+        let style = el.unchecked_ref::<HtmlElement>().style();
+        style.set_property(name, &value);
+        (style, self.1)
+    }
+
     fn rebuild(self, state: &mut Self::State) {
         let (name, value) = self;
         let (style, prev) = state;
@@ -136,6 +180,13 @@ impl<'a> IntoStyle for (&'a str, String) {
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
         let style = el.unchecked_ref::<HtmlElement>().style();
+        (style, self.1)
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        let (name, value) = &self;
+        let style = el.unchecked_ref::<HtmlElement>().style();
+        style.set_property(name, &value);
         (style, self.1)
     }
 
@@ -169,21 +220,23 @@ where
         let (name, f) = self;
         // TODO FROM_SERVER vs template
         let style = el.unchecked_ref::<HtmlElement>().style();
-        Effect::new(move |prev| {
+        create_render_effect(move |prev| {
             let value = f().into();
             if let Some(mut state) = prev {
                 let (style, prev): &mut (CssStyleDeclaration, Cow<'static, str>) = &mut state;
-                crate::log(&format!("update branch for style: {value} == {prev}?"));
                 if &value != prev {
                     style.set_property(name, &value);
                 }
                 *prev = value;
                 state
             } else {
-                crate::log("initial branch for style");
                 (style.clone(), value)
             }
         })
+    }
+
+    fn build(self, el: &Element) -> Self::State {
+        todo!()
     }
 
     fn rebuild(self, state: &mut Self::State) {}
@@ -204,7 +257,7 @@ where
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
         // TODO FROM_SERVER vs template
         let el = el.to_owned();
-        Effect::new(move |prev| {
+        create_render_effect(move |prev| {
             let value = self();
             if let Some(mut state) = prev {
                 value.rebuild(&mut state);
@@ -215,6 +268,10 @@ where
         })
     }
 
+    fn build(self, el: &Element) -> Self::State {
+        todo!()
+    }
+
     fn rebuild(self, state: &mut Self::State) {}
 }
 
@@ -222,14 +279,14 @@ where
 mod tests {
     use crate::{
         html::{element::p, style::style},
-        view::{Position, View},
+        view::{Position, PositionState, View},
     };
 
     #[test]
     fn adds_simple_style() {
         let mut html = String::new();
         let el = p(style("display: block"), ());
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;"></p>"#);
     }
@@ -238,7 +295,7 @@ mod tests {
     fn mixes_plain_and_specific_styles() {
         let mut html = String::new();
         let el = p((style("display: block"), style(("color", "blue"))), ());
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;color:blue;"></p>"#);
     }
@@ -254,7 +311,7 @@ mod tests {
             ),
             (),
         );
-        el.to_html(&mut html, &mut Position::FirstChild);
+        el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(
             html,

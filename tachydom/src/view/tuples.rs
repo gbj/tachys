@@ -1,20 +1,32 @@
+use web_sys::Node;
+
 use crate::hydration::Cursor;
 
-use super::{Position, ToTemplate, View};
+use super::{Mountable, Position, PositionState, ToTemplate, View};
 
 impl View for () {
     type State = ();
 
-    fn to_html(&self, _buf: &mut String, _position: &mut Position) {}
+    fn to_html(&self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
     }
 
+    fn build(self) -> Self::State {}
+
     fn rebuild(self, state: &mut Self::State) {}
+}
+
+impl Mountable for () {
+    fn unmount(&mut self) {}
+
+    fn as_mountable(&self) -> Option<Node> {
+        None
+    }
 }
 
 impl ToTemplate for () {
@@ -24,16 +36,20 @@ impl ToTemplate for () {
 impl<A: View> View for (A,) {
     type State = A::State;
 
-    fn to_html(&self, buf: &mut String, position: &mut Position) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
         self.0.hydrate::<FROM_SERVER>(cursor, position)
+    }
+
+    fn build(self) -> Self::State {
+        self.0.build()
     }
 
     fn rebuild(self, state: &mut Self::State) {
@@ -56,22 +72,32 @@ macro_rules! impl_view_for_tuples {
 		{
 			type State = ($first::State, $($ty::State,)*);
 
-			fn to_html(&self, buf: &mut String, position: &mut Position) {
+			fn to_html(&self, buf: &mut String, position: &PositionState) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html(buf, position);
-					*position = Position::NextChild;
+					position.set(Position::NextChild);
 					$([<$ty:lower>].to_html(buf, position));*
 				}
 			}
 
 			////#[tracing::instrument]
-			fn hydrate<const FROM_SERVER: bool>(self, cursor: &mut Cursor, position: &mut Position) -> Self::State {
+			fn hydrate<const FROM_SERVER: bool>(self, cursor: &Cursor, position: &PositionState) -> Self::State {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					(
 						[<$first:lower>].hydrate::<FROM_SERVER>(cursor, position),
-						$([<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)),*
+						$({$crate::log(&format!("position is {position:?}")); [<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)}),*
+					)
+				}
+			}
+
+			fn build(self) -> Self::State {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					(
+						[<$first:lower>].build(),
+						$([<$ty:lower>].build()),*
 					)
 				}
 			}
@@ -96,6 +122,23 @@ macro_rules! impl_view_for_tuples {
 					$first ::to_template(buf, position);
 					$($ty::to_template(buf, position));*;
 				}
+			}
+		}
+
+		impl<$first, $($ty),*> Mountable for ($first, $($ty,)*) where
+			$first: Mountable,
+			$($ty: Mountable),*
+		{
+			fn unmount(&mut self) {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					[<$first:lower>].unmount();
+					$([<$ty:lower>].unmount());*
+				}
+			}
+
+			fn as_mountable(&self) -> Option<Node> {
+				todo!()
 			}
 		}
 	};

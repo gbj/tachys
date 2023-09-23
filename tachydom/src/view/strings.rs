@@ -1,15 +1,15 @@
-use super::{Position, ToTemplate, View};
+use super::{Mountable, Position, PositionState, ToTemplate, View};
 use crate::dom::document;
 use crate::hydration::Cursor;
 use wasm_bindgen::JsCast;
-use web_sys::{Comment, Text};
+use web_sys::{Comment, Node, Text};
 
 impl<'a> View for &'a str {
     type State = (Text, &'a str);
 
-    fn to_html(&self, buf: &mut String, position: &mut Position) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
-        if matches!(position, Position::NextChild | Position::LastChild) {
+        if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
         }
         buf.push_str(self);
@@ -17,17 +17,17 @@ impl<'a> View for &'a str {
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
-        if *position == Position::FirstChild {
+        if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
         }
         let mut node = cursor.current().to_owned().unchecked_into::<Text>();
 
-        if FROM_SERVER && matches!(*position, Position::NextChild | Position::LastChild) {
+        if FROM_SERVER && matches!(position.get(), Position::NextChild | Position::LastChild) {
             cursor.sibling();
         }
         if !FROM_SERVER {
@@ -36,8 +36,13 @@ impl<'a> View for &'a str {
                 .replace_with_with_node_1(&new);
             node = new;
         }
-        *position = Position::NextChild;
+        position.set(Position::NextChild);
 
+        (node, self)
+    }
+
+    fn build(self) -> Self::State {
+        let node = document().create_text_node(self);
         (node, self)
     }
 
@@ -60,16 +65,21 @@ impl<'a> ToTemplate for &'a str {
 impl View for String {
     type State = (Text, String);
 
-    fn to_html(&self, buf: &mut String, position: &mut Position) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         self.as_str().to_html(buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &mut Cursor,
-        position: &mut Position,
+        cursor: &Cursor,
+        position: &PositionState,
     ) -> Self::State {
         let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
+        (node, self)
+    }
+
+    fn build(self) -> Self::State {
+        let node = document().create_text_node(&self);
         (node, self)
     }
 
@@ -85,5 +95,35 @@ impl View for String {
 impl ToTemplate for String {
     fn to_template(buf: &mut String, position: &mut Position) {
         <&str as ToTemplate>::to_template(buf, position)
+    }
+}
+
+impl Mountable for Text {
+    fn unmount(&mut self) {
+        self.remove()
+    }
+
+    fn as_mountable(&self) -> Option<Node> {
+        Some(self.clone().unchecked_into())
+    }
+}
+
+impl Mountable for (Text, String) {
+    fn unmount(&mut self) {
+        self.0.unmount()
+    }
+
+    fn as_mountable(&self) -> Option<Node> {
+        self.0.as_mountable()
+    }
+}
+
+impl<'a> Mountable for (Text, &'a str) {
+    fn unmount(&mut self) {
+        self.0.unmount()
+    }
+
+    fn as_mountable(&self) -> Option<Node> {
+        self.0.as_mountable()
     }
 }

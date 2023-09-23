@@ -38,6 +38,11 @@ impl Attribute for On {
     }
 
     #[inline(always)]
+    fn build(self, el: &web_sys::Element) {
+        el.add_event_listener_with_callback(&self.0, (self.1)().as_ref().unchecked_ref());
+    }
+
+    #[inline(always)]
     fn rebuild(self, _state: &mut Self::State) {}
 }
 

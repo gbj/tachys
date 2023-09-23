@@ -3,6 +3,7 @@
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
+    use tachydom::view::{Position, PositionState, View};
 
     HttpServer::new(move || {
         App::new()
@@ -15,7 +16,19 @@ async fn main() -> std::io::Result<()> {
                 web::get().to(|| async {
                     HttpResponse::Ok()
                         .content_type(http::header::ContentType::html())
-                        .body(hydration_ex::app::my_app().to_html())
+                        .body({
+                            let mut buf = String::from(
+                                r#"<!DOCTYPE html>
+                                    <html>
+                                        <head>
+                                        <script>import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
+                                        </head><body>"#,
+                            );
+                            hydration_ex::app::my_app()
+                                .to_html(&mut buf, &PositionState::new(Position::FirstChild));
+                            buf.push_str("<script>__LEPTOS_PENDING_RESOURCES = [];__LEPTOS_RESOLVED_RESOURCES = new Map();__LEPTOS_RESOURCE_RESOLVERS = new Map();</script></body></html>");
+                            buf
+                        })
                 }),
             )
         // serve the favicon from /favicon.ico

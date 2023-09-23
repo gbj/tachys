@@ -12,16 +12,10 @@ use tachydom::view::Position;
 use tachydom::view::ToTemplate;
 use tachydom::view::View;
 
-#[derive(Debug)]
-pub struct App<C: View>(C);
-
-pub fn my_app() -> App<impl View> {
+pub fn my_app() -> impl View {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
-    create_effect(move |_| {
-        tachydom::log(&count.get().to_string());
-    });
-    let view = view! {
+    view! {
         <p
             class:bar=move || count.get() % 2 == 0
             class="foo"
@@ -37,16 +31,23 @@ pub fn my_app() -> App<impl View> {
         >
             This is <strong>"very"</strong> cool stuff.<span></span>
         </p>
+        {move || (count() % 2 == 1).then(|| view! {
+            <p>"Odd"</p>
+        })}
         <button
-            on:click=move |ev| set_count.update(|n| *n += 1)
+            on:click=move |ev| {
+                tachydom::log("click");
+                set_count.update(|n| *n += 1)
+            }
         >
             {move || count.get().to_string()}
         </button>
-    };
-
-    App::new(view)
+        {move || (count() % 2 == 0).then(|| view! {
+            <p>"Even"</p>
+        })}
+    }
 }
-
+/*
 impl<C: View> App<C> {
     pub fn new(view: C) -> Self {
         Self(view)
@@ -61,7 +62,7 @@ impl<C: View> App<C> {
         self.0.hydrate::<true>(&mut cursor, &mut position);
     }
 
-    /* pub fn client_render(self) {
+    pub fn client_render(self) {
         // hydrate from <template>
         let mut html = String::new();
         let mut position = Position::Root;
@@ -76,19 +77,20 @@ impl<C: View> App<C> {
         let mut position = Position::FirstChild;
         self.0.hydrate::<false>(&mut cursor, &mut position);
         body().append_child(&contents);
-    } */
+    }
 
     pub fn to_html(&self) -> String {
         let mut buf = String::from(
             r#"<!DOCTYPE html>
 <html>
-	<head>
+    <head>
     <script>import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
-    </head>"#,
+    </head><body>"#,
         );
-        let mut position = Position::Root;
-        self.0.to_html(&mut buf, &mut position);
+        self.0
+            .to_html(&mut buf, &PositionState::new(Position::Root));
         buf.push_str("<script>__LEPTOS_PENDING_RESOURCES = [];__LEPTOS_RESOLVED_RESOURCES = new Map();__LEPTOS_RESOURCE_RESOLVERS = new Map();</script></body></html>");
         buf
     }
 }
+*/

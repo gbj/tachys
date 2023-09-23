@@ -7,7 +7,7 @@ use crate::{
 };
 use std::marker::PhantomData;
 
-use super::{Position, PositionState, ToTemplate, View};
+use super::{Position, PositionState, Render, ToTemplate};
 
 /// An attribute for which both the key and the value are known at compile time,
 /// i.e., as `&'static str`s.
@@ -66,7 +66,7 @@ where
 #[derive(Debug)]
 pub struct Static<const V: &'static str>;
 
-impl<const V: &'static str> View for Static<V> {
+impl<const V: &'static str> Render for Static<V> {
     type State = Option<Text>;
 
     fn to_html(&self, buf: &mut String, position: &PositionState) {

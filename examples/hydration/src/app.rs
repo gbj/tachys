@@ -8,11 +8,12 @@ use tachydom::html::element::*;
 use tachydom::html::event;
 use tachydom::html::event::on;
 use tachydom::hydration::Cursor;
+use tachydom::view::template::ViewTemplate;
 use tachydom::view::Position;
+use tachydom::view::Render;
 use tachydom::view::ToTemplate;
-use tachydom::view::View;
 
-pub fn my_app() -> impl View {
+pub fn my_app() -> impl Render {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
     view! {
@@ -36,7 +37,7 @@ pub fn my_app() -> impl View {
         })}
         <button
             on:click=move |ev| {
-                tachydom::log("click");
+                //tachydom::log("click");
                 set_count.update(|n| *n += 1)
             }
         >

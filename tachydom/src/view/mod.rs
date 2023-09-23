@@ -11,10 +11,11 @@ pub mod iterators;
 #[cfg(feature = "nightly")]
 pub mod static_types;
 pub mod strings;
+pub mod template;
 pub mod tuples;
 
 /// Allows data to be rendered to the UI, as either HTML or DOM nodes.
-pub trait View {
+pub trait Render {
     /// The “view state” for this type, which can be retained between updates.
     ///
     /// For example, for a text node, `State` might be the actual DOM text node

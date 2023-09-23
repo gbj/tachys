@@ -1,14 +1,14 @@
 use web_sys::Node;
 
-use super::{Mountable, Position, PositionState, View};
+use super::{Mountable, Position, PositionState, Render};
 use crate::{dom::comment, hydration::Cursor};
 use std::fmt::Debug;
 use wasm_bindgen::JsCast;
 use web_sys::Element;
 
-impl<T> View for Option<T>
+impl<T> Render for Option<T>
 where
-    T: View,
+    T: Render,
 {
     type State = OptionState<T>;
 
@@ -29,20 +29,17 @@ where
         match self {
             // if None, pull the text node and store it
             None => {
-                crate::log("Option<_> hydrate A");
                 if position.get() == Position::FirstChild {
                     cursor.child();
                 } else {
                     cursor.sibling();
                 }
                 let node = cursor.current().to_owned();
-                crate::log("Setting position to next child");
                 position.set(Position::NextChild);
                 OptionState::None(node)
             }
             // if Some(_), just hydrate the child
             Some(value) => {
-                crate::log("Option<_> hydrate B");
                 let state = value.hydrate::<FROM_SERVER>(cursor, position);
                 position.set(Position::NextChild);
                 OptionState::Some(state)
@@ -63,7 +60,6 @@ where
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        crate::log(&format!("rebuilding with {state:?}"));
         match (&mut *state, self) {
             // both None: no need to do anything
             (OptionState::None(_), None) => {}
@@ -99,7 +95,7 @@ where
 /// View state for an optional view.
 pub enum OptionState<T>
 where
-    T: View,
+    T: Render,
 {
     /// Contains a marker node that will be replaced when the
     /// state switches to `Some(T)`.
@@ -110,7 +106,7 @@ where
 
 impl<T> Mountable for OptionState<T>
 where
-    T: View,
+    T: Render,
 {
     fn unmount(&mut self) {
         match self {
@@ -129,7 +125,7 @@ where
     }
 }
 
-impl<T: View> Debug for OptionState<T> {
+impl<T: Render> Debug for OptionState<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::None(arg0) => f.debug_tuple("None").field(arg0).finish(),

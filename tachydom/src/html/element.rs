@@ -2,7 +2,7 @@ use crate::dom::document;
 use crate::html::attribute::Attribute;
 use crate::hydration::Cursor;
 use crate::view::{Mountable, Position, PositionState};
-use crate::view::{ToTemplate, View};
+use crate::view::{Render, ToTemplate};
 use once_cell::unsync::Lazy;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -13,7 +13,7 @@ pub struct HtmlElement<E, At, Ch>
 where
     E: ElementType,
     At: Attribute,
-    Ch: View,
+    Ch: Render,
 {
     ty: PhantomData<E>,
     attributes: At,
@@ -27,11 +27,11 @@ pub trait ElementType {
     fn create_element() -> Element;
 }
 
-impl<E, At, Ch> View for HtmlElement<E, At, Ch>
+impl<E, At, Ch> Render for HtmlElement<E, At, Ch>
 where
     E: ElementType,
     At: Attribute,
-    Ch: View,
+    Ch: Render,
 {
     type State = (Element, At::State, Ch::State);
 
@@ -89,12 +89,9 @@ where
         cursor: &Cursor,
         position: &PositionState,
     ) -> Self::State {
-        crate::log(&format!("Hydrating {} at {:?}", E::TAG, position));
         if position.get() == Position::FirstChild {
-            crate::log("Position::FirstChild");
             cursor.child();
         } else {
-            crate::log("look for sibling");
             cursor.sibling();
         }
         let el = cursor.current().to_owned();
@@ -102,7 +99,6 @@ where
         let attrs = self.attributes.hydrate::<FROM_SERVER>(el.unchecked_ref());
 
         // hydrate children
-        crate::log("setting back to FirstChild for children");
         position.set(Position::FirstChild);
         let children = self.children.hydrate::<FROM_SERVER>(cursor, position);
         cursor.set(el.clone());
@@ -144,7 +140,7 @@ impl<E, At, Ch> ToTemplate for HtmlElement<E, At, Ch>
 where
     E: ElementType,
     At: Attribute + ToTemplate,
-    Ch: View + ToTemplate,
+    Ch: Render + ToTemplate,
 {
     fn to_template(buf: &mut String, position: &mut Position) {
         // opening tag and attributes
@@ -172,7 +168,7 @@ macro_rules! html_elements {
                 pub fn $tag<At, Ch>(attributes: At, children: Ch) -> HtmlElement<[<$tag:camel>], At, Ch>
                 where
                     At: Attribute ,
-                    Ch: View
+                    Ch: Render
                 {
                     HtmlElement {
                         ty: PhantomData,
@@ -381,7 +377,7 @@ html_elements! {
 pub fn option<At, Ch>(attributes: At, children: Ch) -> HtmlElement<Option_, At, Ch>
 where
     At: Attribute,
-    Ch: View,
+    Ch: Render,
 {
     HtmlElement {
         ty: PhantomData,

@@ -3,7 +3,7 @@ use web_sys::Node;
 
 use crate::hydration::Cursor;
 
-use super::{Mountable, PositionState, ToTemplate, View};
+use super::{Mountable, PositionState, Render, ToTemplate};
 
 impl<F, V> ToTemplate for F
 where
@@ -15,10 +15,10 @@ where
     }
 }
 
-impl<F, V> View for F
+impl<F, V> Render for F
 where
     F: Fn() -> V + 'static,
-    V: View,
+    V: Render,
     V::State: 'static,
 {
     type State = Effect<V::State>;
@@ -41,11 +41,6 @@ where
                 value.rebuild(&mut state);
                 state
             } else {
-                web_sys::console::log_3(
-                    &wasm_bindgen::JsValue::from_str("dynamic hydration starting at "),
-                    &cursor.current(),
-                    &wasm_bindgen::JsValue::from_str(&format!("and position {:?}", position.get())),
-                );
                 value.hydrate::<FROM_SERVER>(&cursor, &position)
             }
         })

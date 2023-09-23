@@ -243,7 +243,7 @@ where
 mod tests {
     use crate::{
         html::{class::class, element::p},
-        view::{Position, PositionState, View},
+        view::{Position, PositionState, Render},
     };
 
     #[test]

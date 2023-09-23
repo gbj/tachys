@@ -2,9 +2,9 @@ use web_sys::Node;
 
 use crate::hydration::Cursor;
 
-use super::{Mountable, Position, PositionState, ToTemplate, View};
+use super::{Mountable, Position, PositionState, Render, ToTemplate};
 
-impl View for () {
+impl Render for () {
     type State = ();
 
     fn to_html(&self, _buf: &mut String, _position: &PositionState) {}
@@ -33,7 +33,7 @@ impl ToTemplate for () {
     fn to_template(buf: &mut String, position: &mut Position) {}
 }
 
-impl<A: View> View for (A,) {
+impl<A: Render> Render for (A,) {
     type State = A::State;
 
     fn to_html(&self, buf: &mut String, position: &PositionState) {
@@ -65,10 +65,10 @@ impl<A: ToTemplate> ToTemplate for (A,) {
 
 macro_rules! impl_view_for_tuples {
 	($first:ident, $($ty:ident),* $(,)?) => {
-		impl<$first, $($ty),*> View for ($first, $($ty,)*)
+		impl<$first, $($ty),*> Render for ($first, $($ty,)*)
 		where
-			$first: View,
-			$($ty: View),*
+			$first: Render,
+			$($ty: Render),*
 		{
 			type State = ($first::State, $($ty::State,)*);
 
@@ -87,7 +87,7 @@ macro_rules! impl_view_for_tuples {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					(
 						[<$first:lower>].hydrate::<FROM_SERVER>(cursor, position),
-						$({$crate::log(&format!("position is {position:?}")); [<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)}),*
+						$([<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)),*
 					)
 				}
 			}

@@ -1,10 +1,10 @@
-use super::{Mountable, Position, PositionState, ToTemplate, View};
+use super::{Mountable, Position, PositionState, Render, ToTemplate};
 use crate::dom::document;
 use crate::hydration::Cursor;
 use wasm_bindgen::JsCast;
 use web_sys::{Comment, Node, Text};
 
-impl<'a> View for &'a str {
+impl<'a> Render for &'a str {
     type State = (Text, &'a str);
 
     fn to_html(&self, buf: &mut String, position: &PositionState) {
@@ -62,7 +62,7 @@ impl<'a> ToTemplate for &'a str {
     }
 }
 
-impl View for String {
+impl Render for String {
     type State = (Text, String);
 
     fn to_html(&self, buf: &mut String, position: &PositionState) {

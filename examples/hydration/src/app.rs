@@ -8,6 +8,7 @@ use tachydom::html::element::*;
 use tachydom::html::event;
 use tachydom::html::event::on;
 use tachydom::hydration::Cursor;
+use tachydom::view::any_view::IntoAny;
 use tachydom::view::template::ViewTemplate;
 use tachydom::view::Position;
 use tachydom::view::Render;
@@ -16,6 +17,7 @@ use tachydom::view::ToTemplate;
 pub fn my_app() -> impl Render {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
+
     view! {
         <p
             class:bar=move || count.get() % 2 == 0
@@ -32,9 +34,11 @@ pub fn my_app() -> impl Render {
         >
             This is <strong>"very"</strong> cool stuff.<span></span>
         </p>
-        {move || (count() % 2 == 1).then(|| view! {
-            <p>"Odd"</p>
-        })}
+        {move || if count() % 2 == 0 {
+            view! { <div>"even"</div> }.into_any()
+        } else {
+            view! { <span>"odd"</span> }.into_any()
+        }}
         <button
             on:click=move |ev| {
                 //tachydom::log("click");

@@ -6,6 +6,7 @@ use std::{
 use crate::hydration::Cursor;
 use web_sys::{HtmlElement, Node};
 
+pub mod any_view;
 pub mod dynamic;
 pub mod iterators;
 #[cfg(feature = "nightly")]

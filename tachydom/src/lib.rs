@@ -1,11 +1,12 @@
 #![cfg_attr(feature = "nightly", feature(adt_const_params))]
 
 use wasm_bindgen::JsValue;
-use web_sys::Element;
+use web_sys::Node;
 
 pub mod dom;
 pub mod html;
 pub mod hydration;
+pub mod renderer;
 pub mod view;
 
 pub fn log(text: &str) {
@@ -15,14 +16,16 @@ pub fn log(text: &str) {
 pub(crate) trait UnwrapOrDebug {
     type Output;
 
-    fn or_debug(self, el: &Element, label: &'static str) -> Self::Output;
+    fn or_debug(self, el: &Node, label: &'static str);
+
+    fn ok_or_debug(self, el: &Node, label: &'static str) -> Option<Self::Output>;
 }
 
-impl UnwrapOrDebug for Result<(), JsValue> {
-    type Output = ();
+impl<T> UnwrapOrDebug for Result<T, JsValue> {
+    type Output = T;
 
     #[track_caller]
-    fn or_debug(self, el: &Element, name: &'static str) -> Self::Output {
+    fn or_debug(self, el: &Node, name: &'static str) {
         #[cfg(debug_assertions)]
         {
             if let Err(err) = self {
@@ -41,6 +44,28 @@ impl UnwrapOrDebug for Result<(), JsValue> {
             _ = self;
         }
     }
+
+    #[track_caller]
+    fn ok_or_debug(self, el: &Node, name: &'static str) -> Option<Self::Output> {
+        #[cfg(debug_assertions)]
+        {
+            if let Err(err) = &self {
+                let location = std::panic::Location::caller();
+                web_sys::console::warn_3(
+                    &JsValue::from_str(&format!(
+                        "[WARNING] Non-fatal error at {location}, while calling {name} on "
+                    )),
+                    el,
+                    err,
+                );
+            }
+            self.ok()
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.ok()
+        }
+    }
 }
 
 #[macro_export]
@@ -50,6 +75,17 @@ macro_rules! or_debug {
             $crate::UnwrapOrDebug::or_debug($action, $el, $label);
         } else {
             _ = $action;
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! ok_or_debug {
+    ($action:expr, $el:expr, $label:literal) => {
+        if cfg!(debug_assertions) {
+            $crate::UnwrapOrDebug::ok_or_debug($action, $el, $label)
+        } else {
+            $action.ok()
         }
     };
 }

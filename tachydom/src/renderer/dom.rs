@@ -1,4 +1,4 @@
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{intern, JsCast};
 use web_sys::{Element, Text};
 
 use super::Renderer;
@@ -23,9 +23,19 @@ impl Renderer for Dom {
 
     fn set_attribute(node: &Self::Node, name: &str, value: &str) {
         or_debug!(
-            node.unchecked_ref::<Element>().set_attribute(name, value),
+            node.unchecked_ref::<Element>()
+                .set_attribute(intern(name), value),
             node,
             "setAttribute"
+        );
+    }
+
+    fn remove_attribute(node: &Self::Node, name: &str) {
+        or_debug!(
+            node.unchecked_ref::<Element>()
+                .remove_attribute(intern(name)),
+            node,
+            "removeAttribute"
         );
     }
 
@@ -41,7 +51,7 @@ impl Renderer for Dom {
         )
     }
 
-    fn remove_node(parent: &Self::Node, child: &Self::Node) {
+    fn remove_node(parent: &Self::Node, child: &Self::Node) -> Option<Self::Node> {
         ok_or_debug!(parent.remove_child(child), parent, "removeNode")
     }
 

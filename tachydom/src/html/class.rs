@@ -1,7 +1,10 @@
 use leptos_reactive::{create_render_effect, Effect};
 use web_sys::{DomTokenList, Element};
 
-use crate::view::ToTemplate;
+use crate::{
+    renderer::{dom::Dom, Renderer},
+    view::ToTemplate,
+};
 
 use super::attribute::Attribute;
 
@@ -71,14 +74,14 @@ impl<'a> IntoClass for &'a str {
     }
 
     fn build(self, el: &Element) -> Self::State {
-        el.set_attribute("class", self);
+        Dom::set_attribute(el, "class", self);
         (el.to_owned(), self)
     }
 
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
         if self != *prev {
-            el.set_attribute("class", self);
+            Dom::set_attribute(el, "class", self);
         }
         *prev = self;
     }

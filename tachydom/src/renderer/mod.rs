@@ -23,6 +23,9 @@ pub trait Renderer {
     /// Sets the given attribute on the given node by key and value.
     fn set_attribute(node: &Self::Node, name: &str, value: &str);
 
+    /// Removes the given attribute on the given node.
+    fn remove_attribute(node: &Self::Node, name: &str);
+
     /// Appends the new child to the parent, before the anchor node. If `anchor` is `None`,
     /// append to the end of the parent's children.
     ///
@@ -34,7 +37,7 @@ pub trait Renderer {
     ) -> Option<Self::Node>;
 
     /// Removes the child node from the parents, and returns the removed node.
-    fn remove_node(parent: &Self::Node, child: &Self::Node);
+    fn remove_node(parent: &Self::Node, child: &Self::Node) -> Option<Self::Node>;
 
     /// Gets the parent of the given node, if any.
     fn get_parent(node: &Self::Node) -> Option<Self::Node>;

@@ -1,6 +1,7 @@
 use super::{Mountable, Position, PositionState, Render, ToTemplate};
-use crate::dom::document;
 use crate::hydration::Cursor;
+use crate::renderer::Renderer;
+use crate::{dom::document, renderer::dom::Dom};
 use wasm_bindgen::JsCast;
 use web_sys::{Comment, Node, Text};
 
@@ -49,7 +50,7 @@ impl<'a> Render for &'a str {
     fn rebuild(self, state: &mut Self::State) {
         let (node, prev) = state;
         if &self != prev {
-            node.set_data(self);
+            Dom::set_text(node, self);
             *prev = self;
         }
     }
@@ -86,7 +87,7 @@ impl Render for String {
     fn rebuild(self, state: &mut Self::State) {
         let (node, prev) = state;
         if &self != prev {
-            node.set_data(&self);
+            Dom::set_text(node, &self);
             *prev = self;
         }
     }

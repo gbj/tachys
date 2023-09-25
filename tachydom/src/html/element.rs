@@ -1,6 +1,8 @@
 use crate::dom::document;
 use crate::html::attribute::Attribute;
 use crate::hydration::Cursor;
+use crate::renderer::dom::Dom;
+use crate::renderer::Renderer;
 use crate::view::{Mountable, Position, PositionState};
 use crate::view::{Render, ToTemplate};
 use once_cell::unsync::Lazy;
@@ -120,7 +122,7 @@ where
         let at = self.attributes.build(&el);
         let children = self.children.build();
         if let Some(child) = children.as_mountable() {
-            el.append_child(&child);
+            Dom::insert_node(&el, &child, None);
         }
         (el, at, children)
     }

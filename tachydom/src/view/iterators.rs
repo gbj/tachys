@@ -133,3 +133,45 @@ impl<T: Render> Debug for OptionState<T> {
         }
     }
 }
+
+impl<T> Render for Vec<T>
+where
+    T: Render,
+{
+    type State = Vec<T::State>;
+
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
+        for item in self {
+            item.to_html(buf, position);
+        }
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor,
+        position: &PositionState,
+    ) -> Self::State {
+        todo!()
+    }
+
+    fn build(self) -> Self::State {
+        todo!()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
+impl<T> Mountable for Vec<T>
+where
+    T: Mountable,
+{
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn as_mountable(&self) -> Option<Node> {
+        todo!()
+    }
+}

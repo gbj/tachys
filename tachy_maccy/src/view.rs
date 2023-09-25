@@ -251,21 +251,28 @@ fn attribute_to_tokens(
             } else {
                 let key = &node.key;
                 let key = quote! {
-                    ::tachydom::html::attribute::key::#key
+                    ::tachydom::html::attribute::#key
                 };
                 let value = attribute_value(node);
-                todo!()
-                /* if let Expr::Lit(ExprLit::Lit(Lit::Str(s))) = value {
+                Some(quote! {
+                    #key(#value)
+                })
+                // TODO fix static attrs
+                /* if let Expr::Lit(lit) = value {
                     if cfg!(feature = "nightly") {
-                        quote! {
-                            ::tachydom::view::static_types::static_attr<#key, #s>()
-                        }
+                        Some(quote! {
+                            ::tachydom::view::static_types::static_attr::<#key::<#lit>, #lit>()
+                        })
                     } else {
-                        todo!()
-                    }
+                    Some(quote! {
+                        #key(#value)
+                    })
+                    //}
                 } else {
-                    todo!()
-                } */
+                    Some(quote! {
+                        #key(#value)
+                    })
+                }*/
             }
         }
     }

@@ -51,15 +51,20 @@ where
     /// Renders a view to HTML.
     fn to_html(&mut self, buf: &mut String, position: &PositionState);
 
-    /// Makes a set of DOM nodes rendered from HTML interactive. If `FROM_SERVER` is
-    /// `true`, this HTML was rendered on the server. If `FROM_SERVER` is `false`, the
-    /// HTML was in a client-side `<template>` element.
+    /// Makes a set of DOM nodes rendered from HTML interactive.
+    ///
+    /// If `FROM_SERVER` is `true`, this HTML was rendered using [`RenderHtml::to_html`]
+    /// (e.g., during server-side rendering ).
+    ///
+    /// If `FROM_SERVER` is `false`, the HTML was rendered using [`ToTemplate::to_template`]
+    /// (e.g., into a `<template>` element).
     fn hydrate<const FROM_SERVER: bool>(
         self,
         cursor: &Cursor,
         position: &PositionState,
     ) -> Self::State;
 
+    /// Hydrates using [`RenderHtml::hydrate`], beginning at the given element.
     fn hydrate_from<const FROM_SERVER: bool>(
         self,
         el: &HtmlElement,

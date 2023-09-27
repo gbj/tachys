@@ -15,7 +15,10 @@ pub mod strings;
 pub mod template;
 pub mod tuples;
 
-/// Allows data to be rendered to the UI, as either HTML or DOM nodes.
+/// The `Render` trait allows rendering something as part of the user interface.
+///
+/// It is generic over the renderer itself, as long as that implements the [`Renderer`]
+/// trait.
 pub trait Render {
     /// The “view state” for this type, which can be retained between updates.
     ///

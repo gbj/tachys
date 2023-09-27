@@ -1,9 +1,8 @@
+use super::{PositionState, Render, RenderHtml, ToTemplate};
+use crate::{dom::document, hydration::Cursor};
 use once_cell::unsync::{Lazy, OnceCell};
 use wasm_bindgen::JsCast;
 use web_sys::HtmlTemplateElement;
-
-use super::{PositionState, Render, ToTemplate};
-use crate::{dom::document, hydration::Cursor};
 
 thread_local! {
     static TEMPLATE_ELEMENT: Lazy<HtmlTemplateElement> =
@@ -39,9 +38,30 @@ impl<V: Render + ToTemplate> ViewTemplate<V> {
     }
 }
 
-impl<V: Render + ToTemplate> Render for ViewTemplate<V> {
+impl<V> Render for ViewTemplate<V>
+where
+    V: RenderHtml + ToTemplate,
+{
     type State = V::State;
 
+    fn build(self) -> Self::State {
+        let tpl = Self::to_template();
+        let contents = tpl.content().clone_node_with_deep(true).unwrap();
+        self.0.hydrate::<false>(
+            &Cursor::new(contents.unchecked_into()),
+            &Default::default(),
+        )
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        self.0.rebuild(state)
+    }
+}
+
+impl<V> RenderHtml for ViewTemplate<V>
+where
+    V: RenderHtml + ToTemplate,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position)
     }
@@ -52,16 +72,5 @@ impl<V: Render + ToTemplate> Render for ViewTemplate<V> {
         position: &PositionState,
     ) -> Self::State {
         self.0.hydrate::<FROM_SERVER>(cursor, position)
-    }
-
-    fn build(self) -> Self::State {
-        let tpl = Self::to_template();
-        let contents = tpl.content().clone_node_with_deep(true).unwrap();
-        self.0
-            .hydrate::<false>(&Cursor::new(contents.unchecked_into()), &Default::default())
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        self.0.rebuild(state)
     }
 }

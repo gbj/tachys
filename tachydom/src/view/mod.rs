@@ -1,12 +1,11 @@
+use crate::hydration::Cursor;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-
-use crate::hydration::Cursor;
 use web_sys::{HtmlElement, Node};
 
-pub mod any_view;
+// pub mod any_view; // TODO
 pub mod dynamic;
 pub mod iterators;
 #[cfg(feature = "nightly")]
@@ -26,6 +25,29 @@ pub trait Render {
     /// and the previous string, to allow for diffing between updates.
     type State: Mountable;
 
+    /// Creates the view for the first time, without hydrating from existing HTML.
+    fn build(self) -> Self::State;
+
+    /// Updates the view with new data.
+    fn rebuild(self, state: &mut Self::State);
+}
+
+/// The `RenderHtml` trait allows rendering something to HTML, and transforming
+/// that HTML into an interactive interface.
+///
+/// This process is traditionally called “server rendering” and “hydration.” As a
+/// metaphor, this means that the structure of the view is created on the server, then
+/// “dehydrated” to HTML, sent across the network, and “rehydrated” with interactivity
+/// in the browser.
+///
+/// However, the same process can be done entirely in the browser: for example, a view
+/// can be transformed into some HTML that is used to create a `<template>` node, which
+/// can be cloned many times and “hydrated,” which is more efficient than creating the
+/// whole view piece by piece.
+pub trait RenderHtml
+where
+    Self: Render,
+{
     /// Renders a view to HTML.
     fn to_html(&mut self, buf: &mut String, position: &PositionState);
 
@@ -38,7 +60,10 @@ pub trait Render {
         position: &PositionState,
     ) -> Self::State;
 
-    fn hydrate_from<const FROM_SERVER: bool>(self, el: &HtmlElement) -> Self::State
+    fn hydrate_from<const FROM_SERVER: bool>(
+        self,
+        el: &HtmlElement,
+    ) -> Self::State
     where
         Self: Sized,
     {
@@ -46,12 +71,6 @@ pub trait Render {
         let position = PositionState::default();
         self.hydrate::<FROM_SERVER>(&cursor, &position)
     }
-
-    /// Creates the view for the first time, without hydrating from existing HTML.
-    fn build(self) -> Self::State;
-
-    /// Updates the view with new data.
-    fn rebuild(self, state: &mut Self::State);
 }
 
 /// Allows a type to be mounted to the DOM.

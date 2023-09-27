@@ -1,12 +1,18 @@
-use web_sys::Node;
-
+use super::{
+    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+};
 use crate::hydration::Cursor;
-
-use super::{Mountable, Position, PositionState, Render, ToTemplate};
+use web_sys::Node;
 
 impl Render for () {
     type State = ();
 
+    fn build(self) -> Self::State {}
+
+    fn rebuild(self, state: &mut Self::State) {}
+}
+
+impl RenderHtml for () {
     fn to_html(&mut self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -15,10 +21,6 @@ impl Render for () {
         position: &PositionState,
     ) -> Self::State {
     }
-
-    fn build(self) -> Self::State {}
-
-    fn rebuild(self, state: &mut Self::State) {}
 }
 
 impl Mountable for () {
@@ -36,6 +38,16 @@ impl ToTemplate for () {
 impl<A: Render> Render for (A,) {
     type State = A::State;
 
+    fn build(self) -> Self::State {
+        self.0.build()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        self.0.rebuild(state)
+    }
+}
+
+impl<A: RenderHtml> RenderHtml for (A,) {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position);
     }
@@ -46,14 +58,6 @@ impl<A: Render> Render for (A,) {
         position: &PositionState,
     ) -> Self::State {
         self.0.hydrate::<FROM_SERVER>(cursor, position)
-    }
-
-    fn build(self) -> Self::State {
-        self.0.build()
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        self.0.rebuild(state)
     }
 }
 
@@ -72,26 +76,6 @@ macro_rules! impl_view_for_tuples {
 		{
 			type State = ($first::State, $($ty::State,)*);
 
-			fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-				paste::paste! {
-					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
-					[<$first:lower>].to_html(buf, position);
-					position.set(Position::NextChild);
-					$([<$ty:lower>].to_html(buf, position));*
-				}
-			}
-
-			////#[tracing::instrument]
-			fn hydrate<const FROM_SERVER: bool>(self, cursor: &Cursor, position: &PositionState) -> Self::State {
-				paste::paste! {
-					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
-					(
-						[<$first:lower>].hydrate::<FROM_SERVER>(cursor, position),
-						$([<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)),*
-					)
-				}
-			}
-
 			fn build(self) -> Self::State {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
@@ -108,6 +92,31 @@ macro_rules! impl_view_for_tuples {
 					let ([<view_ $first:lower>], $([<view_ $ty:lower>],)*) = state;
 					[<$first:lower>].rebuild([<view_ $first:lower>]);
 					$([<$ty:lower>].rebuild([<view_ $ty:lower>]));*
+				}
+			}
+		}
+
+		impl<$first, $($ty),*> RenderHtml for ($first, $($ty,)*)
+		where
+			$first: RenderHtml,
+			$($ty: RenderHtml),*
+		{
+			fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					[<$first:lower>].to_html(buf, position);
+					position.set(Position::NextChild);
+					$([<$ty:lower>].to_html(buf, position));*
+				}
+			}
+
+			fn hydrate<const FROM_SERVER: bool>(self, cursor: &Cursor, position: &PositionState) -> Self::State {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					(
+						[<$first:lower>].hydrate::<FROM_SERVER>(cursor, position),
+						$([<$ty:lower>].hydrate::<FROM_SERVER>(cursor, position)),*
+					)
 				}
 			}
 		}
@@ -162,10 +171,25 @@ impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
 impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
 impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
-impl_view_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
+);
+impl_view_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y,
+    Z
+);

@@ -1,13 +1,32 @@
-use super::{Mountable, Position, PositionState, Render, ToTemplate};
-use crate::hydration::Cursor;
-use crate::renderer::Renderer;
-use crate::{dom::document, renderer::dom::Dom};
+use super::{
+    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+};
+use crate::{
+    dom::document,
+    hydration::Cursor,
+    renderer::{dom::Dom, Renderer},
+};
 use wasm_bindgen::JsCast;
 use web_sys::{Comment, Node, Text};
 
 impl<'a> Render for &'a str {
     type State = (Text, &'a str);
 
+    fn build(self) -> Self::State {
+        let node = document().create_text_node(self);
+        (node, self)
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        let (node, prev) = state;
+        if &self != prev {
+            Dom::set_text(node, self);
+            *prev = self;
+        }
+    }
+}
+
+impl<'a> RenderHtml for &'a str {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
@@ -28,7 +47,12 @@ impl<'a> Render for &'a str {
         }
         let mut node = cursor.current().to_owned().unchecked_into::<Text>();
 
-        if FROM_SERVER && matches!(position.get(), Position::NextChild | Position::LastChild) {
+        if FROM_SERVER
+            && matches!(
+                position.get(),
+                Position::NextChild | Position::LastChild
+            )
+        {
             cursor.sibling();
         }
         if !FROM_SERVER {
@@ -40,19 +64,6 @@ impl<'a> Render for &'a str {
         position.set(Position::NextChild);
 
         (node, self)
-    }
-
-    fn build(self) -> Self::State {
-        let node = document().create_text_node(self);
-        (node, self)
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        let (node, prev) = state;
-        if &self != prev {
-            Dom::set_text(node, self);
-            *prev = self;
-        }
     }
 }
 
@@ -66,19 +77,6 @@ impl<'a> ToTemplate for &'a str {
 impl Render for String {
     type State = (Text, String);
 
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        self.as_str().to_html(buf, position)
-    }
-
-    fn hydrate<const FROM_SERVER: bool>(
-        self,
-        cursor: &Cursor,
-        position: &PositionState,
-    ) -> Self::State {
-        let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
-        (node, self)
-    }
-
     fn build(self) -> Self::State {
         let node = document().create_text_node(&self);
         (node, self)
@@ -90,6 +88,21 @@ impl Render for String {
             Dom::set_text(node, &self);
             *prev = self;
         }
+    }
+}
+
+impl RenderHtml for String {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+        self.as_str().to_html(buf, position)
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor,
+        position: &PositionState,
+    ) -> Self::State {
+        let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
+        (node, self)
     }
 }
 

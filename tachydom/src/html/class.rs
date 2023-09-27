@@ -1,12 +1,10 @@
-use leptos_reactive::{create_render_effect, Effect};
-use web_sys::{DomTokenList, Element};
-
+use super::attribute::Attribute;
 use crate::{
     renderer::{dom::Dom, Renderer},
     view::ToTemplate,
 };
-
-use super::attribute::Attribute;
+use leptos_reactive::{create_render_effect, Effect};
+use web_sys::{DomTokenList, Element};
 
 #[inline(always)]
 pub fn class(c: impl IntoClass) -> impl Attribute {
@@ -23,7 +21,12 @@ where
 {
     type State = C::State;
 
-    fn to_html(&mut self, _buf: &mut String, class: &mut String, _style: &mut String) {
+    fn to_html(
+        &mut self,
+        _buf: &mut String,
+        class: &mut String,
+        _style: &mut String,
+    ) {
         class.push(' ');
         self.0.to_html(class);
     }
@@ -246,7 +249,7 @@ where
 mod tests {
     use crate::{
         html::{class::class, element::p},
-        view::{Position, PositionState, Render},
+        view::{Position, PositionState, RenderHtml},
     };
 
     #[test]

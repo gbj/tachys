@@ -1,18 +1,13 @@
-use std::borrow::Cow;
-
+use super::attribute::Attribute;
+use crate::{or_debug, view::ToTemplate};
 use leptos_reactive::{create_render_effect, Effect};
+use std::borrow::Cow;
 use wasm_bindgen::JsCast;
 use web_sys::{CssStyleDeclaration, Element, HtmlElement};
-
-use crate::or_debug;
-use crate::view::ToTemplate;
-
-use super::attribute::Attribute;
 
 /// Adds to the style attribute of the parent element.
 ///
 /// This can take a plain string value, which will be assigned to the `style`
-///
 #[inline(always)]
 pub fn style<S>(s: S) -> Style<S>
 where
@@ -31,7 +26,12 @@ where
 {
     type State = S::State;
 
-    fn to_html(&mut self, _buf: &mut String, _class: &mut String, style: &mut String) {
+    fn to_html(
+        &mut self,
+        _buf: &mut String,
+        _class: &mut String,
+        style: &mut String,
+    ) {
         self.0.to_html(style);
     }
 
@@ -76,8 +76,11 @@ pub trait StylePropertyValue {
 
     fn to_html(&mut self, name: &str, class: &mut String);
 
-    fn hydrate<const FROM_SERVER: bool>(self, name: Cow<'static, str>, el: &Element)
-        -> Self::State;
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        name: Cow<'static, str>,
+        el: &Element,
+    ) -> Self::State;
 
     fn rebuild(self, name: Cow<'static, str>, state: &mut Self::State);
 }
@@ -223,7 +226,10 @@ where
         create_render_effect(move |prev| {
             let value = f().into();
             if let Some(mut state) = prev {
-                let (style, prev): &mut (CssStyleDeclaration, Cow<'static, str>) = &mut state;
+                let (style, prev): &mut (
+                    CssStyleDeclaration,
+                    Cow<'static, str>,
+                ) = &mut state;
                 if &value != prev {
                     style.set_property(name, &value);
                 }
@@ -279,7 +285,7 @@ where
 mod tests {
     use crate::{
         html::{element::p, style::style},
-        view::{Position, PositionState, Render},
+        view::{Position, PositionState, RenderHtml},
     };
 
     #[test]

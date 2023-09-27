@@ -1,13 +1,14 @@
-use crate::dom::document;
-use crate::html::attribute::Attribute;
-use crate::hydration::Cursor;
-use crate::renderer::dom::Dom;
-use crate::renderer::Renderer;
-use crate::view::{Mountable, Position, PositionState};
-use crate::view::{Render, ToTemplate};
+use crate::{
+    dom::document,
+    html::attribute::Attribute,
+    hydration::Cursor,
+    renderer::{dom::Dom, Renderer},
+    view::{
+        Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+    },
+};
 use once_cell::unsync::Lazy;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 use wasm_bindgen::JsCast;
 use web_sys::{Element, Node};
 
@@ -37,6 +38,29 @@ where
 {
     type State = (Element, At::State, Ch::State);
 
+    fn rebuild(self, state: &mut Self::State) {
+        let (_, attributes, children) = state;
+        self.attributes.rebuild(attributes);
+        self.children.rebuild(children);
+    }
+
+    fn build(self) -> Self::State {
+        let el = E::create_element();
+        let at = self.attributes.build(&el);
+        let children = self.children.build();
+        if let Some(child) = children.as_mountable() {
+            Dom::insert_node(&el, &child, None);
+        }
+        (el, at, children)
+    }
+}
+
+impl<E, At, Ch> RenderHtml for HtmlElement<E, At, Ch>
+where
+    E: ElementType,
+    At: Attribute,
+    Ch: RenderHtml,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
@@ -109,22 +133,6 @@ where
         position.set(Position::NextChild);
 
         (el.unchecked_into(), attrs, children)
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        let (_, attributes, children) = state;
-        self.attributes.rebuild(attributes);
-        self.children.rebuild(children);
-    }
-
-    fn build(self) -> Self::State {
-        let el = E::create_element();
-        let at = self.attributes.build(&el);
-        let children = self.children.build();
-        if let Some(child) = children.as_mountable() {
-            Dom::insert_node(&el, &child, None);
-        }
-        (el, at, children)
     }
 }
 
@@ -376,7 +384,10 @@ html_elements! {
     xmp
 }
 
-pub fn option<At, Ch>(attributes: At, children: Ch) -> HtmlElement<Option_, At, Ch>
+pub fn option<At, Ch>(
+    attributes: At,
+    children: Ch,
+) -> HtmlElement<Option_, At, Ch>
 where
     At: Attribute,
     Ch: Render,

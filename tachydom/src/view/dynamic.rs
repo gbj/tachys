@@ -1,9 +1,7 @@
+use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
+use crate::hydration::Cursor;
 use leptos_reactive::{create_render_effect, Effect};
 use web_sys::Node;
-
-use crate::hydration::Cursor;
-
-use super::{Mountable, PositionState, Render, ToTemplate};
 
 impl<F, V> ToTemplate for F
 where
@@ -23,6 +21,29 @@ where
 {
     type State = Effect<V::State>;
 
+    fn build(self) -> Self::State {
+        create_render_effect(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&mut state);
+                state
+            } else {
+                value.build()
+            }
+        })
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
+impl<F, V> RenderHtml for F
+where
+    F: Fn() -> V + 'static,
+    V: RenderHtml,
+    V::State: 'static,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         let mut value = self();
         value.to_html(buf, position)
@@ -45,22 +66,6 @@ where
             }
         })
     }
-
-    fn build(self) -> Self::State {
-        create_render_effect(move |prev| {
-            let value = self();
-            if let Some(mut state) = prev {
-                value.rebuild(&mut state);
-                state
-            } else {
-                value.build()
-            }
-        })
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        todo!()
-    }
 }
 
 impl<M: Mountable + 'static> Mountable for Effect<M> {
@@ -73,7 +78,9 @@ impl<M: Mountable + 'static> Mountable for Effect<M> {
     }
 
     fn as_mountable(&self) -> Option<Node> {
-        self.with_value_mut(|value| value.as_ref().and_then(|n| n.as_mountable()))
-            .flatten()
+        self.with_value_mut(|value| {
+            value.as_ref().and_then(|n| n.as_mountable())
+        })
+        .flatten()
     }
 }

@@ -1,51 +1,14 @@
-use web_sys::Node;
-
-use super::{Mountable, Position, PositionState, Render};
+use super::{Mountable, Position, PositionState, Render, RenderHtml};
 use crate::{dom::comment, hydration::Cursor};
 use std::fmt::Debug;
 use wasm_bindgen::JsCast;
-use web_sys::Element;
+use web_sys::{Element, Node};
 
 impl<T> Render for Option<T>
 where
     T: Render,
 {
     type State = OptionState<T>;
-
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        match self {
-            // pass Some(_) through directly
-            Some(value) => value.to_html(buf, position),
-            // otherwise render a marker that can be picked up during hydration
-            None => buf.push_str("<!--Option-->"),
-        }
-    }
-
-    fn hydrate<const FROM_SERVER: bool>(
-        self,
-        cursor: &Cursor,
-        position: &PositionState,
-    ) -> Self::State {
-        match self {
-            // if None, pull the text node and store it
-            None => {
-                if position.get() == Position::FirstChild {
-                    cursor.child();
-                } else {
-                    cursor.sibling();
-                }
-                let node = cursor.current().to_owned();
-                position.set(Position::NextChild);
-                OptionState::None(node)
-            }
-            // if Some(_), just hydrate the child
-            Some(value) => {
-                let state = value.hydrate::<FROM_SERVER>(cursor, position);
-                position.set(Position::NextChild);
-                OptionState::Some(state)
-            }
-        }
-    }
 
     fn build(self) -> Self::State {
         match self {
@@ -87,6 +50,46 @@ where
                         .replace_with_with_node_1(&mountable);
                 }
                 *state = OptionState::Some(new_state);
+            }
+        }
+    }
+}
+
+impl<T> RenderHtml for Option<T>
+where
+    T: RenderHtml,
+{
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+        match self {
+            // pass Some(_) through directly
+            Some(value) => value.to_html(buf, position),
+            // otherwise render a marker that can be picked up during hydration
+            None => buf.push_str("<!--Option-->"),
+        }
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor,
+        position: &PositionState,
+    ) -> Self::State {
+        match self {
+            // if None, pull the text node and store it
+            None => {
+                if position.get() == Position::FirstChild {
+                    cursor.child();
+                } else {
+                    cursor.sibling();
+                }
+                let node = cursor.current().to_owned();
+                position.set(Position::NextChild);
+                OptionState::None(node)
+            }
+            // if Some(_), just hydrate the child
+            Some(value) => {
+                let state = value.hydrate::<FROM_SERVER>(cursor, position);
+                position.set(Position::NextChild);
+                OptionState::Some(state)
             }
         }
     }
@@ -140,6 +143,19 @@ where
 {
     type State = Vec<T::State>;
 
+    fn build(self) -> Self::State {
+        todo!()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
+impl<T> RenderHtml for Vec<T>
+where
+    T: RenderHtml,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         for item in self {
             item.to_html(buf, position);
@@ -151,14 +167,6 @@ where
         cursor: &Cursor,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
-    }
-
-    fn build(self) -> Self::State {
-        todo!()
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
         todo!()
     }
 }
@@ -208,6 +216,20 @@ where
 {
     type State = ();
 
+    fn build(self) -> Self::State {
+        todo!()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
+impl<I, V> RenderHtml for RenderIter<I, V>
+where
+    I: Iterator<Item = V>,
+    V: RenderHtml,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         for mut next in self.0.by_ref() {
             next.to_html(buf, position);
@@ -221,20 +243,12 @@ where
     ) -> Self::State {
         todo!()
     }
-
-    fn build(self) -> Self::State {
-        todo!()
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        todo!()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::IterView;
-    use crate::view::Render;
+    use crate::view::{Render, RenderHtml};
 
     #[test]
     fn iter_view_takes_iterator() {

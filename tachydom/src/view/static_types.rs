@@ -1,20 +1,20 @@
-use web_sys::{Element, Text};
-
+use super::{Position, PositionState, Render, RenderHtml, ToTemplate};
 use crate::{
     dom::document,
     html::attribute::{Attribute, AttributeKey, AttributeValue},
     hydration::Cursor,
 };
 use std::marker::PhantomData;
-
-use super::{Position, PositionState, Render, ToTemplate};
+use web_sys::{Element, Text};
 
 /// An attribute for which both the key and the value are known at compile time,
 /// i.e., as `&'static str`s.
 ///
 /// ```
-/// use tachydom::view::static_types::{StaticAttr, static_attr};
-/// use tachydom::html::attribute::{Attribute, Type};
+/// use tachydom::{
+///     html::attribute::{Attribute, Type},
+///     view::static_types::{static_attr, StaticAttr},
+/// };
 /// let input_type = static_attr::<Type, "text">();
 /// let mut buf = String::new();
 /// let mut classes = String::new();
@@ -27,7 +27,8 @@ pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
     ty: PhantomData<K>,
 }
 
-pub fn static_attr<K: AttributeKey, const V: &'static str>() -> StaticAttr<K, V> {
+pub fn static_attr<K: AttributeKey, const V: &'static str>() -> StaticAttr<K, V>
+{
     StaticAttr { ty: PhantomData }
 }
 
@@ -50,7 +51,12 @@ where
 {
     type State = ();
 
-    fn to_html(&mut self, buf: &mut String, _class: &mut String, _style: &mut String) {
+    fn to_html(
+        &mut self,
+        buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+    ) {
         AttributeValue::to_html(&mut V, K::KEY, buf)
     }
 
@@ -69,6 +75,16 @@ pub struct Static<const V: &'static str>;
 impl<const V: &'static str> Render for Static<V> {
     type State = Option<Text>;
 
+    fn build(self) -> Self::State {
+        // a view state has to be returned so it can be mounted
+        Some(document().create_text_node(V))
+    }
+
+    // This type is specified as static, so no rebuilding is done.
+    fn rebuild(self, _state: &mut Self::State) {}
+}
+
+impl<const V: &'static str> RenderHtml for Static<V> {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
@@ -92,14 +108,6 @@ impl<const V: &'static str> Render for Static<V> {
         // no view state is created when hydrating, because this is static
         None
     }
-
-    fn build(self) -> Self::State {
-        // a view state has to be returned so it can be mounted
-        Some(document().create_text_node(V))
-    }
-
-    // This type is specified as static, so no rebuilding is done.
-    fn rebuild(self, _state: &mut Self::State) {}
 }
 
 impl<const V: &'static str> ToTemplate for Static<V> {

@@ -5,7 +5,7 @@ use web_sys::Element;
 pub trait AttributeValue {
     type State;
 
-    fn to_html(&self, key: &str, buf: &mut String);
+    fn to_html(&mut self, key: &str, buf: &mut String);
 
     fn to_template(key: &str, buf: &mut String);
 
@@ -18,7 +18,7 @@ pub trait AttributeValue {
 
 impl AttributeValue for () {
     type State = ();
-    fn to_html(&self, _key: &str, _buf: &mut String) {}
+    fn to_html(&mut self, _key: &str, _buf: &mut String) {}
 
     fn to_template(_key: &str, _buf: &mut String) {}
 
@@ -32,7 +32,7 @@ impl AttributeValue for () {
 impl<'a> AttributeValue for &'a str {
     type State = (Element, &'a str);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(&mut self, key: &str, buf: &mut String) {
         buf.push(' ');
         buf.push_str(key);
         buf.push_str("=\"");
@@ -70,7 +70,7 @@ impl<'a> AttributeValue for &'a str {
 impl AttributeValue for String {
     type State = (Element, String);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(&mut self, key: &str, buf: &mut String) {
         self.as_str().to_html(key, buf);
     }
 
@@ -100,7 +100,7 @@ impl AttributeValue for String {
 impl AttributeValue for bool {
     type State = (Element, bool);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(&mut self, key: &str, buf: &mut String) {
         if *self {
             buf.push(' ');
             buf.push_str(key);
@@ -143,7 +143,7 @@ impl AttributeValue for bool {
 impl<V: AttributeValue> AttributeValue for Option<V> {
     type State = (Element, Option<V::State>);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(&mut self, key: &str, buf: &mut String) {
         if let Some(v) = self {
             v.to_html(key, buf);
         }

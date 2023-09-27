@@ -31,7 +31,7 @@ where
 {
     type State = S::State;
 
-    fn to_html(&self, _buf: &mut String, _class: &mut String, style: &mut String) {
+    fn to_html(&mut self, _buf: &mut String, _class: &mut String, style: &mut String) {
         self.0.to_html(style);
     }
 
@@ -62,7 +62,7 @@ where
 pub trait IntoStyle {
     type State;
 
-    fn to_html(&self, class: &mut String);
+    fn to_html(&mut self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
@@ -74,7 +74,7 @@ pub trait IntoStyle {
 pub trait StylePropertyValue {
     type State;
 
-    fn to_html(&self, name: &str, class: &mut String);
+    fn to_html(&mut self, name: &str, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, name: Cow<'static, str>, el: &Element)
         -> Self::State;
@@ -85,7 +85,7 @@ pub trait StylePropertyValue {
 impl<'a> IntoStyle for &'a str {
     type State = (Element, &'a str);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(&mut self, style: &mut String) {
         style.push_str(self);
         style.push(';');
     }
@@ -111,7 +111,7 @@ impl<'a> IntoStyle for &'a str {
 impl IntoStyle for String {
     type State = (Element, String);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(&mut self, style: &mut String) {
         style.push_str(self);
         style.push(';');
     }
@@ -137,7 +137,7 @@ impl IntoStyle for String {
 impl<'a> IntoStyle for (&'a str, &'a str) {
     type State = (CssStyleDeclaration, &'a str);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(&mut self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push(':');
@@ -170,7 +170,7 @@ impl<'a> IntoStyle for (&'a str, &'a str) {
 impl<'a> IntoStyle for (&'a str, String) {
     type State = (CssStyleDeclaration, String);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(&mut self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push_str(":");
@@ -207,7 +207,7 @@ where
 {
     type State = Effect<(CssStyleDeclaration, Cow<'static, str>)>;
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(&mut self, style: &mut String) {
         let (name, f) = self;
         let value = f();
         style.push_str(name);
@@ -249,8 +249,8 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&self, class: &mut String) {
-        let value = self();
+    fn to_html(&mut self, class: &mut String) {
+        let mut value = self();
         value.to_html(class);
     }
 
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn adds_simple_style() {
         let mut html = String::new();
-        let el = p(style("display: block"), ());
+        let mut el = p(style("display: block"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;"></p>"#);
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn mixes_plain_and_specific_styles() {
         let mut html = String::new();
-        let el = p((style("display: block"), style(("color", "blue"))), ());
+        let mut el = p((style("display: block"), style(("color", "blue"))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;color:blue;"></p>"#);
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn handles_dynamic_styles() {
         let mut html = String::new();
-        let el = p(
+        let mut el = p(
             (
                 style("display: block"),
                 style(("color", "blue")),

@@ -30,7 +30,7 @@ impl Attribute for On {
     type State = ();
 
     #[inline(always)]
-    fn to_html(&self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
+    fn to_html(&mut self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
 
     #[inline(always)]
     fn hydrate<const FROM_SERVER: bool>(self, el: &web_sys::Element) {

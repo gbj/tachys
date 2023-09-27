@@ -23,7 +23,7 @@ where
 {
     type State = C::State;
 
-    fn to_html(&self, _buf: &mut String, class: &mut String, _style: &mut String) {
+    fn to_html(&mut self, _buf: &mut String, class: &mut String, _style: &mut String) {
         class.push(' ');
         self.0.to_html(class);
     }
@@ -53,7 +53,7 @@ where
 pub trait IntoClass {
     type State;
 
-    fn to_html(&self, class: &mut String);
+    fn to_html(&mut self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
@@ -65,7 +65,7 @@ pub trait IntoClass {
 impl<'a> IntoClass for &'a str {
     type State = (Element, &'a str);
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(&mut self, class: &mut String) {
         class.push_str(self);
     }
 
@@ -90,7 +90,7 @@ impl<'a> IntoClass for &'a str {
 impl IntoClass for String {
     type State = (Element, String);
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(&mut self, class: &mut String) {
         IntoClass::to_html(self, class);
     }
 
@@ -115,7 +115,7 @@ impl IntoClass for String {
 impl IntoClass for (&'static str, bool) {
     type State = (DomTokenList, bool);
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(&mut self, class: &mut String) {
         let (name, include) = self;
         if *include {
             class.push_str(name);
@@ -157,8 +157,8 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&self, class: &mut String) {
-        let value = self();
+    fn to_html(&mut self, class: &mut String) {
+        let mut value = self();
         value.to_html(class);
     }
 
@@ -198,7 +198,7 @@ where
 {
     type State = Effect<bool>;
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(&mut self, class: &mut String) {
         let (name, f) = self;
         let include = f();
         if include {
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn adds_simple_class() {
         let mut html = String::new();
-        let el = p(class("foo bar"), ());
+        let mut el = p(class("foo bar"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar"></p>"#);
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic() {
         let mut html = String::new();
-        let el = p((class("foo bar"), class(("baz", true))), ());
+        let mut el = p((class("foo bar"), class(("baz", true))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic_and_function() {
         let mut html = String::new();
-        let el = p(
+        let mut el = p(
             (
                 class("foo bar"),
                 class(("baz", || true)),

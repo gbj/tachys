@@ -7,7 +7,7 @@ use web_sys::{Element, Node};
 pub struct AnyView {
     type_id: TypeId,
     value: Box<dyn Any>,
-    to_html: fn(&dyn Any, &mut String, &PositionState),
+    to_html: fn(&mut dyn Any, &mut String, &PositionState),
     build: fn(Box<dyn Any>) -> AnyViewState,
     rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState),
     hydrate_from_server: fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
@@ -33,9 +33,9 @@ where
     fn into_any(self) -> AnyView {
         let value = Box::new(self) as Box<dyn Any>;
 
-        let to_html = |value: &dyn Any, buf: &mut String, position: &PositionState| {
-            let value = value
-                .downcast_ref::<T>()
+        let to_html = |value: &mut dyn Any, buf: &mut String, position: &PositionState| {
+            let mut value = value
+                .downcast_mut::<T>()
                 .expect("AnyView::to_html could not be downcast");
             value.to_html(buf, position)
         };
@@ -155,8 +155,8 @@ where
 impl Render for AnyView {
     type State = AnyViewState;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
-        (self.to_html)(&*self.value, buf, position)
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+        (self.to_html)(&mut *self.value, buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -203,7 +203,7 @@ mod tests {
     fn should_handle_html_creation() {
         let x = 1;
         let mut buf = String::new();
-        let view = if x == 0 {
+        let mut view = if x == 0 {
             p((), "foo").into_any()
         } else {
             span((), "bar").into_any()

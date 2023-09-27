@@ -42,7 +42,7 @@ impl<V: Render + ToTemplate> ViewTemplate<V> {
 impl<V: Render + ToTemplate> Render for ViewTemplate<V> {
     type State = V::State;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position)
     }
 

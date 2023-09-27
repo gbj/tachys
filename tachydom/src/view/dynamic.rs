@@ -23,8 +23,8 @@ where
 {
     type State = Effect<V::State>;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
-        let value = self();
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+        let mut value = self();
         value.to_html(buf, position)
     }
 

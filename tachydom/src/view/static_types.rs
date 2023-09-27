@@ -50,8 +50,8 @@ where
 {
     type State = ();
 
-    fn to_html(&self, buf: &mut String, _class: &mut String, _style: &mut String) {
-        AttributeValue::to_html(&V, K::KEY, buf)
+    fn to_html(&mut self, buf: &mut String, _class: &mut String, _style: &mut String) {
+        AttributeValue::to_html(&mut V, K::KEY, buf)
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {}
@@ -69,7 +69,7 @@ pub struct Static<const V: &'static str>;
 impl<const V: &'static str> Render for Static<V> {
     type State = Option<Text>;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")

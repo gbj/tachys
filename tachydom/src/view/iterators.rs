@@ -12,7 +12,7 @@ where
 {
     type State = OptionState<T>;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         match self {
             // pass Some(_) through directly
             Some(value) => value.to_html(buf, position),
@@ -140,7 +140,7 @@ where
 {
     type State = Vec<T::State>;
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         for item in self {
             item.to_html(buf, position);
         }
@@ -173,5 +173,78 @@ where
 
     fn as_mountable(&self) -> Option<Node> {
         todo!()
+    }
+}
+
+pub trait IterView {
+    type Iterator: Iterator<Item = Self::View>;
+    type View: Render;
+
+    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View>;
+}
+
+impl<I, V> IterView for I
+where
+    I: Iterator<Item = V>,
+    V: Render,
+{
+    type Iterator = I;
+    type View = V;
+
+    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View> {
+        RenderIter(self)
+    }
+}
+
+pub struct RenderIter<I, V>(I)
+where
+    I: Iterator<Item = V>,
+    V: Render;
+
+impl<I, V> Render for RenderIter<I, V>
+where
+    I: Iterator<Item = V>,
+    V: Render,
+{
+    type State = ();
+
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+        for mut next in self.0.by_ref() {
+            next.to_html(buf, position);
+        }
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor,
+        position: &PositionState,
+    ) -> Self::State {
+        todo!()
+    }
+
+    fn build(self) -> Self::State {
+        todo!()
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IterView;
+    use crate::view::Render;
+
+    #[test]
+    fn iter_view_takes_iterator() {
+        let strings = vec!["a", "b", "c"];
+        let mut iter_view = strings
+            .into_iter()
+            .map(|n| n.to_ascii_uppercase())
+            .iter_view();
+        let mut buf = String::new();
+        iter_view.to_html(&mut buf, &Default::default());
+        assert_eq!(buf, "ABC");
     }
 }

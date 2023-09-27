@@ -8,7 +8,7 @@ use web_sys::{Comment, Node, Text};
 impl<'a> Render for &'a str {
     type State = (Text, &'a str);
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
@@ -66,7 +66,7 @@ impl<'a> ToTemplate for &'a str {
 impl Render for String {
     type State = (Text, String);
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         self.as_str().to_html(buf, position)
     }
 

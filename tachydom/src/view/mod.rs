@@ -24,7 +24,7 @@ pub trait Render {
     type State: Mountable;
 
     /// Renders a view to HTML.
-    fn to_html(&self, buf: &mut String, position: &PositionState);
+    fn to_html(&mut self, buf: &mut String, position: &PositionState);
 
     /// Makes a set of DOM nodes rendered from HTML interactive. If `FROM_SERVER` is
     /// `true`, this HTML was rendered on the server. If `FROM_SERVER` is `false`, the

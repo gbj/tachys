@@ -37,7 +37,7 @@ where
 {
     type State = (Element, At::State, Ch::State);
 
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);

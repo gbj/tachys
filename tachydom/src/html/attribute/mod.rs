@@ -9,7 +9,7 @@ use web_sys::Element;
 pub trait Attribute {
     type State;
 
-    fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String);
+    fn to_html(&mut self, buf: &mut String, class: &mut String, style: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
@@ -21,7 +21,7 @@ pub trait Attribute {
 impl Attribute for () {
     type State = ();
 
-    fn to_html(&self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
+    fn to_html(&mut self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &Element) -> Self::State {}
 
@@ -53,7 +53,7 @@ where
 {
     type State = V::State;
 
-    fn to_html(&self, buf: &mut String, _class: &mut String, _style: &mut String) {
+    fn to_html(&mut self, buf: &mut String, _class: &mut String, _style: &mut String) {
         self.1.to_html(K::KEY, buf);
     }
 
@@ -79,7 +79,7 @@ macro_rules! impl_attr_for_tuples {
 		{
 			type State = ($first::State, $($ty::State,)*);
 
-			fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String) {
+			fn to_html(&mut self, buf: &mut String, class: &mut String, style: &mut String) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html(buf, class, style);

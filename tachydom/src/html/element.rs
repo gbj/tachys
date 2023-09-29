@@ -9,16 +9,16 @@ use crate::{
 };
 use once_cell::unsync::Lazy;
 use std::{fmt::Debug, marker::PhantomData};
-use wasm_bindgen::JsCast;
-use web_sys::{Element, Node};
 
-pub struct HtmlElement<E, At, Ch>
+pub struct HtmlElement<E, At, Ch, Rndr>
 where
     E: ElementType,
-    At: Attribute,
-    Ch: Render,
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
 {
     ty: PhantomData<E>,
+    rndr: PhantomData<Rndr>,
     attributes: At,
     children: Ch,
 }
@@ -26,40 +26,54 @@ where
 pub trait ElementType {
     const TAG: &'static str;
     const SELF_CLOSING: bool;
-
-    fn create_element() -> Element;
 }
 
-impl<E, At, Ch> Render for HtmlElement<E, At, Ch>
+pub trait CreateElement<R: Renderer> {
+    fn create_element() -> R::Element;
+}
+
+impl<E, At, Ch, Rndr> Render<Rndr> for HtmlElement<E, At, Ch, Rndr>
 where
     E: ElementType,
-    At: Attribute,
-    Ch: Render,
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
+    Rndr::Node: Clone,
 {
-    type State = (Element, At::State, Ch::State);
+    type State = ElementState<At::State, Ch::State, Rndr>;
 
     fn rebuild(self, state: &mut Self::State) {
-        let (_, attributes, children) = state;
-        self.attributes.rebuild(attributes);
+        let ElementState {
+            attrs, children, ..
+        } = state;
+        self.attributes.rebuild(attrs);
         self.children.rebuild(children);
     }
 
     fn build(self) -> Self::State {
-        let el = E::create_element();
-        let at = self.attributes.build(&el);
+        let el = Rndr::create_element::<E>();
+        let attrs = self.attributes.build(&el);
         let children = self.children.build();
         if let Some(child) = children.as_mountable() {
-            Dom::insert_node(&el, &child, None);
+            Rndr::insert_node(&el, &child, None);
         }
-        (el, at, children)
+        ElementState {
+            el,
+            attrs,
+            children,
+            rndr: PhantomData,
+        }
     }
 }
 
-impl<E, At, Ch> RenderHtml for HtmlElement<E, At, Ch>
+impl<E, At, Ch, Rndr> RenderHtml<Rndr> for HtmlElement<E, At, Ch, Rndr>
 where
     E: ElementType,
-    At: Attribute,
-    Ch: RenderHtml,
+    At: Attribute<Rndr>,
+    Ch: RenderHtml<Rndr>,
+    Rndr: Renderer,
+    Rndr::Node: Clone,
+    Rndr::Element: Clone,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // opening tag
@@ -112,10 +126,11 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        if position.get() == Position::FirstChild {
+        todo!()
+        /* if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
@@ -132,25 +147,38 @@ where
         // go to next sibling
         position.set(Position::NextChild);
 
-        (el.unchecked_into(), attrs, children)
+        (el.unchecked_into(), attrs, children) */
     }
 }
 
-impl<At, Ch> Mountable for (Element, At, Ch) {
+pub struct ElementState<At, Ch, R: Renderer> {
+    pub el: R::Element,
+    pub attrs: At,
+    pub children: Ch,
+    rndr: PhantomData<R>,
+}
+
+impl<At, Ch, R> Mountable<R> for ElementState<At, Ch, R>
+where
+    R: Renderer,
+    R::Node: Clone,
+{
     fn unmount(&mut self) {
-        self.0.remove()
+        todo!()
+        //self.el.remove()
     }
 
-    fn as_mountable(&self) -> Option<Node> {
-        Some(self.0.clone().unchecked_into())
+    fn as_mountable(&self) -> Option<R::Node> {
+        Some(self.el.as_ref().clone())
     }
 }
 
-impl<E, At, Ch> ToTemplate for HtmlElement<E, At, Ch>
+impl<E, At, Ch, Rndr> ToTemplate for HtmlElement<E, At, Ch, Rndr>
 where
     E: ElementType,
-    At: Attribute + ToTemplate,
-    Ch: Render + ToTemplate,
+    At: Attribute<Rndr> + ToTemplate,
+    Ch: Render<Rndr> + ToTemplate,
+    Rndr: Renderer,
 {
     fn to_template(buf: &mut String, position: &mut Position) {
         // opening tag and attributes
@@ -175,13 +203,15 @@ macro_rules! html_elements {
 	($($tag:ident),* $(,)?) => {
         paste::paste! {
             $(
-                pub fn $tag<At, Ch>(attributes: At, children: Ch) -> HtmlElement<[<$tag:camel>], At, Ch>
+                pub fn $tag<At, Ch, Rndr>(attributes: At, children: Ch) -> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
                 where
-                    At: Attribute ,
-                    Ch: Render
+                    At: Attribute<Rndr>,
+                    Ch: Render<Rndr>,
+                    Rndr: Renderer
                 {
                     HtmlElement {
                         ty: PhantomData,
+                        rndr: PhantomData,
                         attributes,
                         children
                     }
@@ -193,15 +223,6 @@ macro_rules! html_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
-
-                    fn create_element() -> Element {
-                        thread_local! {
-                            static ELEMENT: Lazy<Element> = Lazy::new(|| {
-                                document().create_element(stringify!($tag)).unwrap()
-                            });
-                        }
-                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
-                    }
                 }
             )*
 		}
@@ -212,12 +233,14 @@ macro_rules! html_self_closing_elements {
 	($($tag:ident),* $(,)?) => {
         paste::paste! {
             $(
-                pub fn $tag<At>(attributes: At) -> HtmlElement<[<$tag:camel>], At, ()>
+                pub fn $tag<At, Rndr>(attributes: At) -> HtmlElement<[<$tag:camel>], At, (), Rndr>
                 where
-                    At: Attribute ,
+                    At: Attribute<Rndr>,
+                    Rndr: Renderer
                 {
                     HtmlElement {
                         ty: PhantomData,
+                        rndr: PhantomData,
                         attributes,
                         children: ()
                     }
@@ -229,15 +252,6 @@ macro_rules! html_self_closing_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = true;
-
-                    fn create_element() -> Element {
-                        thread_local! {
-                            static ELEMENT: Lazy<Element> = Lazy::new(|| {
-                                document().create_element(stringify!($tag)).unwrap()
-                            });
-                        }
-                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
-                    }
                 }
             )*
 		}
@@ -384,18 +398,20 @@ html_elements! {
     xmp
 }
 
-pub fn option<At, Ch>(
+pub fn option<At, Ch, Rndr>(
     attributes: At,
     children: Ch,
-) -> HtmlElement<Option_, At, Ch>
+) -> HtmlElement<Option_, At, Ch, Rndr>
 where
-    At: Attribute,
-    Ch: Render,
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
 {
     HtmlElement {
         ty: PhantomData,
         attributes,
         children,
+        rndr: PhantomData,
     }
 }
 
@@ -405,13 +421,29 @@ pub struct Option_;
 impl ElementType for Option_ {
     const TAG: &'static str = "option";
     const SELF_CLOSING: bool = false;
+}
 
-    fn create_element() -> Element {
-        thread_local! {
-            static ELEMENT: Lazy<Element> = Lazy::new(|| {
-                document().create_element("option").unwrap()
-            });
-        }
-        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+#[cfg(test)]
+mod tests {
+    use super::{main, p, HtmlElement};
+    use crate::{html::element::em, renderer::mock_dom::MockDom, view::Render};
+
+    #[test]
+    fn mock_dom_creates_element() {
+        let el: HtmlElement<_, _, _, MockDom> =
+            main((), p((), "Hello, world!"));
+        let el = el.build();
+        assert_eq!(el.el.to_debug_html(), "<main><p>Hello, world!</p></main>");
+    }
+
+    #[test]
+    fn mock_dom_creates_element_with_several_children() {
+        let el: HtmlElement<_, _, _, MockDom> =
+            main((), p((), ("Hello, ", em((), "beautiful"), " world!")));
+        let el = el.build();
+        assert_eq!(
+            el.el.to_debug_html(),
+            "<main><p>Hello, <em>beautiful</em> world!</p></main>"
+        );
     }
 }

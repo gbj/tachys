@@ -1,29 +1,26 @@
-use crate::hydration::Cursor;
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use crate::{hydration::Cursor, renderer::Renderer};
+use std::{cell::Cell, rc::Rc};
 use web_sys::{HtmlElement, Node};
 
 // pub mod any_view; // TODO
 pub mod dynamic;
-pub mod iterators;
+//pub mod iterators;
 #[cfg(feature = "nightly")]
 pub mod static_types;
 pub mod strings;
-pub mod template;
+//pub mod template;
 pub mod tuples;
 
 /// The `Render` trait allows rendering something as part of the user interface.
 ///
 /// It is generic over the renderer itself, as long as that implements the [`Renderer`]
 /// trait.
-pub trait Render {
+pub trait Render<R: Renderer> {
     /// The “view state” for this type, which can be retained between updates.
     ///
     /// For example, for a text node, `State` might be the actual DOM text node
     /// and the previous string, to allow for diffing between updates.
-    type State: Mountable;
+    type State: Mountable<R>;
 
     /// Creates the view for the first time, without hydrating from existing HTML.
     fn build(self) -> Self::State;
@@ -44,9 +41,11 @@ pub trait Render {
 /// can be transformed into some HTML that is used to create a `<template>` node, which
 /// can be cloned many times and “hydrated,” which is more efficient than creating the
 /// whole view piece by piece.
-pub trait RenderHtml
+pub trait RenderHtml<R: Renderer>
 where
-    Self: Render,
+    Self: Render<R>,
+    R::Node: Clone,
+    R::Element: Clone,
 {
     /// Renders a view to HTML.
     fn to_html(&mut self, buf: &mut String, position: &PositionState);
@@ -60,14 +59,14 @@ where
     /// (e.g., into a `<template>` element).
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State;
 
     /// Hydrates using [`RenderHtml::hydrate`], beginning at the given element.
     fn hydrate_from<const FROM_SERVER: bool>(
         self,
-        el: &HtmlElement,
+        el: &R::Element,
     ) -> Self::State
     where
         Self: Sized,
@@ -79,17 +78,18 @@ where
 }
 
 /// Allows a type to be mounted to the DOM.
-pub trait Mountable {
+pub trait Mountable<R: Renderer> {
     /// Detaches the view from the DOM.
     fn unmount(&mut self);
 
     /// Returns a node that can be mounted anywhere in the DOM.
-    fn as_mountable(&self) -> Option<Node>;
+    fn as_mountable(&self) -> Option<R::Node>;
 }
 
-impl<T> Mountable for Option<T>
+impl<T, R> Mountable<R> for Option<T>
 where
-    T: Mountable,
+    T: Mountable<R>,
+    R: Renderer,
 {
     fn unmount(&mut self) {
         if let Some(ref mut mounted) = self {
@@ -97,7 +97,7 @@ where
         }
     }
 
-    fn as_mountable(&self) -> Option<Node> {
+    fn as_mountable(&self) -> Option<R::Node> {
         self.as_ref().and_then(Mountable::as_mountable)
     }
 }

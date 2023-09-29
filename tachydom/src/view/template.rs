@@ -1,6 +1,11 @@
-use super::{PositionState, Render, RenderHtml, ToTemplate};
-use crate::{dom::document, hydration::Cursor};
+use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
+use crate::{
+    dom::document,
+    hydration::Cursor,
+    renderer::{dom::Dom, Renderer},
+};
 use once_cell::unsync::{Lazy, OnceCell};
+use std::marker::PhantomData;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlTemplateElement;
 
@@ -9,11 +14,17 @@ thread_local! {
         Lazy::new(|| document().create_element("template").unwrap().unchecked_into());
 }
 
-pub struct ViewTemplate<V: Render + ToTemplate>(V);
+pub struct ViewTemplate<V: Render<R> + ToTemplate, R: Renderer> {
+    view: V,
+    rndr: PhantomData<R>,
+}
 
-impl<V: Render + ToTemplate> ViewTemplate<V> {
+impl<V: Render<R> + ToTemplate, R: Renderer> ViewTemplate<V, R> {
     pub fn new(view: V) -> Self {
-        Self(view)
+        Self {
+            view,
+            rndr: PhantomData,
+        }
     }
 
     fn to_template() -> HtmlTemplateElement {
@@ -38,39 +49,48 @@ impl<V: Render + ToTemplate> ViewTemplate<V> {
     }
 }
 
-impl<V> Render for ViewTemplate<V>
+impl<V, R> Render<Dom> for ViewTemplate<V, R>
 where
-    V: RenderHtml + ToTemplate,
+    V: RenderHtml<R> + ToTemplate,
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+    V::State: Mountable<R>,
 {
     type State = V::State;
 
     fn build(self) -> Self::State {
-        let tpl = Self::to_template();
+        todo!()
+        /* let tpl = Self::to_template();
         let contents = tpl.content().clone_node_with_deep(true).unwrap();
-        self.0.hydrate::<false>(
+        self.view.hydrate::<false>(
             &Cursor::new(contents.unchecked_into()),
             &Default::default(),
-        )
+        ) */
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        self.0.rebuild(state)
+        self.view.rebuild(state)
     }
 }
 
-impl<V> RenderHtml for ViewTemplate<V>
+impl<V, R> RenderHtml<R> for ViewTemplate<V, R>
 where
-    V: RenderHtml + ToTemplate,
+    V: RenderHtml<R> + ToTemplate,
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+    V::State: Mountable<R>,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        self.0.to_html(buf, position)
+        self.view.to_html(buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        self.0.hydrate::<FROM_SERVER>(cursor, position)
+        self.view.hydrate::<FROM_SERVER>(cursor, position)
     }
 }

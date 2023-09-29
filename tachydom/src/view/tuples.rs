@@ -1,10 +1,10 @@
 use super::{
-    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+    Mountable, Position, PositionState, Render, RenderHtml, Renderer,
+    ToTemplate,
 };
 use crate::hydration::Cursor;
-use web_sys::Node;
 
-impl Render for () {
+impl<R: Renderer> Render<R> for () {
     type State = ();
 
     fn build(self) -> Self::State {}
@@ -12,21 +12,26 @@ impl Render for () {
     fn rebuild(self, state: &mut Self::State) {}
 }
 
-impl RenderHtml for () {
+impl<R> RenderHtml<R> for ()
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
     fn to_html(&mut self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
     }
 }
 
-impl Mountable for () {
+impl<R: Renderer> Mountable<R> for () {
     fn unmount(&mut self) {}
 
-    fn as_mountable(&self) -> Option<Node> {
+    fn as_mountable(&self) -> Option<R::Node> {
         None
     }
 }
@@ -35,7 +40,7 @@ impl ToTemplate for () {
     fn to_template(buf: &mut String, position: &mut Position) {}
 }
 
-impl<A: Render> Render for (A,) {
+impl<A: Render<R>, R: Renderer> Render<R> for (A,) {
     type State = A::State;
 
     fn build(self) -> Self::State {
@@ -47,14 +52,20 @@ impl<A: Render> Render for (A,) {
     }
 }
 
-impl<A: RenderHtml> RenderHtml for (A,) {
+impl<A, R> RenderHtml<R> for (A,)
+where
+    A: RenderHtml<R>,
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         self.0.hydrate::<FROM_SERVER>(cursor, position)
@@ -69,10 +80,11 @@ impl<A: ToTemplate> ToTemplate for (A,) {
 
 macro_rules! impl_view_for_tuples {
 	($first:ident, $($ty:ident),* $(,)?) => {
-		impl<$first, $($ty),*> Render for ($first, $($ty,)*)
+		impl<$first, $($ty),*, Rndr> Render<Rndr> for ($first, $($ty,)*)
 		where
-			$first: Render,
-			$($ty: Render),*
+			$first: Render<Rndr>,
+			$($ty: Render<Rndr>),*,
+			Rndr: Renderer
 		{
 			type State = ($first::State, $($ty::State,)*);
 
@@ -96,10 +108,13 @@ macro_rules! impl_view_for_tuples {
 			}
 		}
 
-		impl<$first, $($ty),*> RenderHtml for ($first, $($ty,)*)
+		impl<$first, $($ty),*, Rndr> RenderHtml<Rndr> for ($first, $($ty,)*)
 		where
-			$first: RenderHtml,
-			$($ty: RenderHtml),*
+			$first: RenderHtml<Rndr>,
+			$($ty: RenderHtml<Rndr>),*,
+			Rndr: Renderer,
+			Rndr::Node: Clone,
+			Rndr::Element: Clone
 		{
 			fn to_html(&mut self, buf: &mut String, position: &PositionState) {
 				paste::paste! {
@@ -110,7 +125,7 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			fn hydrate<const FROM_SERVER: bool>(self, cursor: &Cursor, position: &PositionState) -> Self::State {
+			fn hydrate<const FROM_SERVER: bool>(self, cursor: &Cursor<Rndr>, position: &PositionState) -> Self::State {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					(
@@ -134,9 +149,10 @@ macro_rules! impl_view_for_tuples {
 			}
 		}
 
-		impl<$first, $($ty),*> Mountable for ($first, $($ty,)*) where
-			$first: Mountable,
-			$($ty: Mountable),*
+		impl<$first, $($ty),*, Rndr> Mountable<Rndr> for ($first, $($ty,)*) where
+			$first: Mountable<Rndr>,
+			$($ty: Mountable<Rndr>),*,
+			Rndr: Renderer
 		{
 			fn unmount(&mut self) {
 				paste::paste! {
@@ -146,8 +162,19 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			fn as_mountable(&self) -> Option<Node> {
+			fn as_mountable(&self) -> Option<Rndr::Node> {
 				todo!()
+				/* let fragment = Rndr::create_fragment();
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					if let Some(node) = [<$first:lower>].as_mountable() {
+						Rndr::insert_node(fragment.as_ref(), &node, None);
+					}
+					$(if let Some(node) = [<$ty:lower>].as_mountable() {
+						Rndr::insert_node(fragment.as_ref(), &node, None);
+					});*
+				}
+				Some(fragment) */
 			}
 		}
 	};

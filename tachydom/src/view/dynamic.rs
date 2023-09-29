@@ -1,5 +1,5 @@
 use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
-use crate::hydration::Cursor;
+use crate::{hydration::Cursor, renderer::Renderer};
 use leptos_reactive::{create_render_effect, Effect};
 use web_sys::Node;
 
@@ -13,11 +13,12 @@ where
     }
 }
 
-impl<F, V> Render for F
+impl<F, V, R> Render<R> for F
 where
     F: Fn() -> V + 'static,
-    V: Render,
+    V: Render<R>,
     V::State: 'static,
+    R: Renderer,
 {
     type State = Effect<V::State>;
 
@@ -38,11 +39,14 @@ where
     }
 }
 
-impl<F, V> RenderHtml for F
+impl<F, V, R> RenderHtml<R> for F
 where
     F: Fn() -> V + 'static,
-    V: RenderHtml,
+    V: RenderHtml<R>,
     V::State: 'static,
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         let mut value = self();
@@ -51,10 +55,11 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        let cursor = cursor.clone();
+        todo!()
+        /* let cursor = cursor.clone();
         let position = position.clone();
         create_render_effect(move |prev| {
             let value = self();
@@ -64,11 +69,15 @@ where
             } else {
                 value.hydrate::<FROM_SERVER>(&cursor, &position)
             }
-        })
+        }) */
     }
 }
 
-impl<M: Mountable + 'static> Mountable for Effect<M> {
+impl<M, R> Mountable<R> for Effect<M>
+where
+    M: Mountable<R> + 'static,
+    R: Renderer,
+{
     fn unmount(&mut self) {
         self.with_value_mut(|value| {
             if let Some(value) = value {
@@ -77,10 +86,44 @@ impl<M: Mountable + 'static> Mountable for Effect<M> {
         });
     }
 
-    fn as_mountable(&self) -> Option<Node> {
+    fn as_mountable(&self) -> Option<R::Node> {
         self.with_value_mut(|value| {
             value.as_ref().and_then(|n| n.as_mountable())
         })
         .flatten()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        html::element::{button, em, main, p, HtmlElement},
+        renderer::mock_dom::MockDom,
+        view::Render,
+    };
+    use leptos_reactive::{create_runtime, RwSignal, SignalGet, SignalSet};
+
+    #[test]
+    fn create_dynamic_element() {
+        let rt = create_runtime();
+        let count = RwSignal::new(0);
+        let app: HtmlElement<_, _, _, MockDom> =
+            button((), move || count.get().to_string());
+        let el = app.build();
+        assert_eq!(el.el.to_debug_html(), "<button>0</button>");
+        rt.dispose();
+    }
+
+    #[test]
+    fn update_dynamic_element() {
+        let rt = create_runtime();
+        let count = RwSignal::new(0);
+        let app: HtmlElement<_, _, _, MockDom> =
+            button((), move || count.get().to_string());
+        let el = app.build();
+        assert_eq!(el.el.to_debug_html(), "<button>0</button>");
+        count.set(1);
+        assert_eq!(el.el.to_debug_html(), "<button>1</button>");
+        rt.dispose();
     }
 }

@@ -284,14 +284,18 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        html::{element::p, style::style},
+        html::{
+            element::{p, HtmlElement},
+            style::style,
+        },
+        renderer::dom::Dom,
         view::{Position, PositionState, RenderHtml},
     };
 
     #[test]
     fn adds_simple_style() {
         let mut html = String::new();
-        let mut el = p(style("display: block"), ());
+        let mut el: HtmlElement<_, _, _, Dom> = p(style("display: block"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;"></p>"#);
@@ -300,7 +304,8 @@ mod tests {
     #[test]
     fn mixes_plain_and_specific_styles() {
         let mut html = String::new();
-        let mut el = p((style("display: block"), style(("color", "blue"))), ());
+        let mut el: HtmlElement<_, _, _, Dom> =
+            p((style("display: block"), style(("color", "blue"))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;color:blue;"></p>"#);
@@ -309,7 +314,7 @@ mod tests {
     #[test]
     fn handles_dynamic_styles() {
         let mut html = String::new();
-        let mut el = p(
+        let mut el: HtmlElement<_, _, _, Dom> = p(
             (
                 style("display: block"),
                 style(("color", "blue")),
@@ -324,29 +329,4 @@ mod tests {
             r#"<p style="display: block;color:blue;font-weight:bold;"></p>"#
         );
     }
-
-    /* #[test]
-    fn adds_class_with_dynamic() {
-        let mut html = String::new();
-        let el = p((class("foo bar"), class(("baz", true))), ());
-        el.to_html(&mut html, &mut Position::FirstChild);
-
-        assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
-    }
-
-    #[test]
-    fn adds_class_with_dynamic_and_function() {
-        let mut html = String::new();
-        let el = p(
-            (
-                class("foo bar"),
-                class(("baz", || true)),
-                class(("boo", false)),
-            ),
-            (),
-        );
-        el.to_html(&mut html, &mut Position::FirstChild);
-
-        assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
-    } */
 }

@@ -2,31 +2,33 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
 };
 use crate::{
-    dom::document,
     hydration::Cursor,
     renderer::{dom::Dom, Renderer},
 };
-use wasm_bindgen::JsCast;
-use web_sys::{Comment, Node, Text};
 
-impl<'a> Render for &'a str {
-    type State = (Text, &'a str);
+impl<'a, R: Renderer> Render<R> for &'a str {
+    type State = StrState<'a, R>;
 
     fn build(self) -> Self::State {
-        let node = document().create_text_node(self);
-        (node, self)
+        let node = R::create_text_node(self);
+        StrState { node, str: self }
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        let (node, prev) = state;
-        if &self != prev {
-            Dom::set_text(node, self);
-            *prev = self;
+        let StrState { node, str } = state;
+        if &self != str {
+            R::set_text(node, self);
+            *str = self;
         }
     }
 }
 
-impl<'a> RenderHtml for &'a str {
+impl<'a, R> RenderHtml<R> for &'a str
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
@@ -37,15 +39,16 @@ impl<'a> RenderHtml for &'a str {
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        if position.get() == Position::FirstChild {
+        todo!()
+        /* if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
         }
-        let mut node = cursor.current().to_owned().unchecked_into::<Text>();
+        let mut node = cursor.current();
 
         if FROM_SERVER
             && matches!(
@@ -56,14 +59,13 @@ impl<'a> RenderHtml for &'a str {
             cursor.sibling();
         }
         if !FROM_SERVER {
-            let new = document().create_text_node(self);
-            node.unchecked_ref::<Comment>()
-                .replace_with_with_node_1(&new);
+            let new = R::create_text_node(self);
+            R::replace_node(&node, new);
             node = new;
         }
         position.set(Position::NextChild);
 
-        (node, self)
+        (node, self) */
     }
 }
 
@@ -74,35 +76,42 @@ impl<'a> ToTemplate for &'a str {
     }
 }
 
-impl Render for String {
-    type State = (Text, String);
+impl<R: Renderer> Render<R> for String {
+    type State = StringState<R>;
 
     fn build(self) -> Self::State {
-        let node = document().create_text_node(&self);
-        (node, self)
+        let node = R::create_text_node(&self);
+        StringState { node, str: self }
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        let (node, prev) = state;
-        if &self != prev {
-            Dom::set_text(node, &self);
-            *prev = self;
+        let StringState { node, str } = state;
+        if &self != str {
+            R::set_text(node, &self);
+            *str = self;
         }
     }
 }
 
-impl RenderHtml for String {
+impl<R> RenderHtml<R> for String
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        self.as_str().to_html(buf, position)
+        todo!()
+        //self.as_str().to_html(buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
-        (node, self)
+        todo!()
+        /* let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
+        (node, self) */
     }
 }
 
@@ -112,32 +121,37 @@ impl ToTemplate for String {
     }
 }
 
-impl Mountable for Text {
+pub struct StringState<R: Renderer> {
+    node: R::Text,
+    str: String,
+}
+
+pub struct StrState<'a, R: Renderer> {
+    node: R::Text,
+    str: &'a str,
+}
+
+impl<R: Renderer> Mountable<R> for StringState<R> {
     fn unmount(&mut self) {
-        self.remove()
+        todo!()
+        //self.node.unmount()
     }
 
-    fn as_mountable(&self) -> Option<Node> {
-        Some(self.clone().unchecked_into())
+    fn as_mountable(&self) -> Option<R::Node> {
+        self.node.as_mountable()
     }
 }
 
-impl Mountable for (Text, String) {
+impl<'a, R> Mountable<R> for StrState<'a, R>
+where
+    R: Renderer,
+{
     fn unmount(&mut self) {
-        self.0.unmount()
+        todo!()
+        //self.node.unmount()
     }
 
-    fn as_mountable(&self) -> Option<Node> {
-        self.0.as_mountable()
-    }
-}
-
-impl<'a> Mountable for (Text, &'a str) {
-    fn unmount(&mut self) {
-        self.0.unmount()
-    }
-
-    fn as_mountable(&self) -> Option<Node> {
-        self.0.as_mountable()
+    fn as_mountable(&self) -> Option<R::Node> {
+        self.node.as_mountable()
     }
 }

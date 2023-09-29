@@ -7,17 +7,18 @@ use leptos_reactive::{create_render_effect, Effect};
 use web_sys::{DomTokenList, Element};
 
 #[inline(always)]
-pub fn class(c: impl IntoClass) -> impl Attribute {
+pub fn class<R>(c: impl IntoClass<R>) -> impl Attribute<R> {
     Class(c)
 }
 
-struct Class<C>(C)
+struct Class<C, R>(C)
 where
-    C: IntoClass;
+    C: IntoClass<R>;
 
-impl<C> Attribute for Class<C>
+impl<C, R> Attribute<R> for Class<C, R>
 where
-    C: IntoClass,
+    C: IntoClass<R>,
+    R: Renderer,
 {
     type State = C::State;
 
@@ -44,28 +45,32 @@ where
     }
 }
 
-impl<C> ToTemplate for Class<C>
+impl<C, R> ToTemplate for Class<C, R>
 where
-    C: IntoClass,
+    C: IntoClass<R>,
+    R: Renderer,
 {
     fn to_template(buf: &mut String, position: &mut crate::view::Position) {
         todo!()
     }
 }
 
-pub trait IntoClass {
+pub trait IntoClass<R: Renderer> {
     type State;
 
     fn to_html(&mut self, class: &mut String);
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
-    fn build(self, el: &Element) -> Self::State;
+    fn build(self, el: &R::Element) -> Self::State;
 
     fn rebuild(self, state: &mut Self::State);
 }
 
-impl<'a> IntoClass for &'a str {
+impl<'a, R> IntoClass<R> for &'a str
+where
+    R: Renderer,
+{
     type State = (Element, &'a str);
 
     fn to_html(&mut self, class: &mut String) {
@@ -90,18 +95,21 @@ impl<'a> IntoClass for &'a str {
     }
 }
 
-impl IntoClass for String {
+impl<R> IntoClass<R> for String
+where
+    R: Renderer,
+{
     type State = (Element, String);
 
     fn to_html(&mut self, class: &mut String) {
         IntoClass::to_html(self, class);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
         (el.to_owned(), self)
     }
 
-    fn build(self, el: &Element) -> Self::State {
+    fn build(self, el: &R::Element) -> Self::State {
         el.set_attribute("class", &self);
         (el.to_owned(), self)
     }
@@ -248,14 +256,18 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        html::{class::class, element::p},
+        html::{
+            class::class,
+            element::{p, HtmlElement},
+        },
+        renderer::dom::Dom,
         view::{Position, PositionState, RenderHtml},
     };
 
     #[test]
     fn adds_simple_class() {
         let mut html = String::new();
-        let mut el = p(class("foo bar"), ());
+        let mut el: HtmlElement<_, _, _, Dom> = p(class("foo bar"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar"></p>"#);
@@ -264,7 +276,8 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic() {
         let mut html = String::new();
-        let mut el = p((class("foo bar"), class(("baz", true))), ());
+        let mut el: HtmlElement<_, _, _, Dom> =
+            p((class("foo bar"), class(("baz", true))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar baz"></p>"#);
@@ -273,7 +286,7 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic_and_function() {
         let mut html = String::new();
-        let mut el = p(
+        let mut el: HtmlElement<_, _, _, Dom> = p(
             (
                 class("foo bar"),
                 class(("baz", || true)),

@@ -1,8 +1,11 @@
-use super::{Position, PositionState, Render, RenderHtml, ToTemplate};
+use super::{
+    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+};
 use crate::{
     dom::document,
     html::attribute::{Attribute, AttributeKey, AttributeValue},
     hydration::Cursor,
+    renderer::Renderer,
 };
 use std::marker::PhantomData;
 use web_sys::{Element, Text};
@@ -45,9 +48,10 @@ where
     }
 }
 
-impl<K, const V: &'static str> Attribute for StaticAttr<K, V>
+impl<K, const V: &'static str, R> Attribute<R> for StaticAttr<K, V>
 where
     K: AttributeKey,
+    R: Renderer,
 {
     type State = ();
 
@@ -57,13 +61,14 @@ where
         _class: &mut String,
         _style: &mut String,
     ) {
-        AttributeValue::to_html(&mut V, K::KEY, buf)
+        todo!()
+        //AttributeValue::to_html(&mut V, K::KEY, buf)
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {}
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {}
 
-    fn build(self, el: &Element) -> Self::State {
-        el.set_attribute(K::KEY, V);
+    fn build(self, el: &R::Element) -> Self::State {
+        R::set_attribute(el, K::KEY, V);
     }
 
     fn rebuild(self, state: &mut Self::State) {}
@@ -72,19 +77,28 @@ where
 #[derive(Debug)]
 pub struct Static<const V: &'static str>;
 
-impl<const V: &'static str> Render for Static<V> {
-    type State = Option<Text>;
+impl<const V: &'static str, R: Renderer> Render<R> for Static<V>
+where
+    R::Text: Mountable<R>,
+{
+    type State = Option<R::Text>;
 
     fn build(self) -> Self::State {
         // a view state has to be returned so it can be mounted
-        Some(document().create_text_node(V))
+        Some(R::create_text_node(V))
     }
 
     // This type is specified as static, so no rebuilding is done.
     fn rebuild(self, _state: &mut Self::State) {}
 }
 
-impl<const V: &'static str> RenderHtml for Static<V> {
+impl<const V: &'static str, R> RenderHtml<R> for Static<V>
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+    R::Text: Mountable<R>,
+{
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
@@ -95,7 +109,7 @@ impl<const V: &'static str> RenderHtml for Static<V> {
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         if position.get() == Position::FirstChild {

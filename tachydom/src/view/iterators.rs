@@ -1,14 +1,15 @@
 use super::{Mountable, Position, PositionState, Render, RenderHtml};
-use crate::{dom::comment, hydration::Cursor};
-use std::fmt::Debug;
+use crate::{dom::comment, hydration::Cursor, renderer::Renderer};
+use std::{fmt::Debug, marker::PhantomData};
 use wasm_bindgen::JsCast;
 use web_sys::{Element, Node};
 
-impl<T> Render for Option<T>
+impl<T, R> Render<R> for Option<T>
 where
-    T: Render,
+    T: Render<R>,
+    R: Renderer,
 {
-    type State = OptionState<T>;
+    type State = OptionState<T, R>;
 
     fn build(self) -> Self::State {
         match self {
@@ -55,9 +56,11 @@ where
     }
 }
 
-impl<T> RenderHtml for Option<T>
+impl<T, R> RenderHtml<R> for Option<T>
 where
-    T: RenderHtml,
+    T: RenderHtml<R>,
+    R: Renderer,
+    R::Node: Clone,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         match self {
@@ -70,7 +73,7 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         match self {
@@ -96,20 +99,22 @@ where
 }
 
 /// View state for an optional view.
-pub enum OptionState<T>
+pub enum OptionState<T, R>
 where
-    T: Render,
+    T: Render<R>,
+    R: Renderer,
 {
     /// Contains a marker node that will be replaced when the
     /// state switches to `Some(T)`.
-    None(Node),
+    None(R::Node),
     /// The view state.
     Some(T::State),
 }
 
-impl<T> Mountable for OptionState<T>
+impl<T, R> Mountable<R> for OptionState<T, R>
 where
-    T: Render,
+    T: Render<R>,
+    R: Renderer,
 {
     fn unmount(&mut self) {
         match self {
@@ -128,7 +133,7 @@ where
     }
 }
 
-impl<T: Render> Debug for OptionState<T> {
+impl<T: Render<R>, R: Renderer> Debug for OptionState<T, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::None(arg0) => f.debug_tuple("None").field(arg0).finish(),
@@ -137,9 +142,10 @@ impl<T: Render> Debug for OptionState<T> {
     }
 }
 
-impl<T> Render for Vec<T>
+impl<T, R> Render<R> for Vec<T>
 where
-    T: Render,
+    T: Render<R>,
+    R: Renderer,
 {
     type State = Vec<T::State>;
 
@@ -152,9 +158,11 @@ where
     }
 }
 
-impl<T> RenderHtml for Vec<T>
+impl<T, R> RenderHtml<R> for Vec<T>
 where
-    T: RenderHtml,
+    T: RenderHtml<R>,
+    R: Renderer,
+    R::Node: Clone,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         for item in self {
@@ -164,16 +172,17 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         todo!()
     }
 }
 
-impl<T> Mountable for Vec<T>
+impl<T, R> Mountable<R> for Vec<T>
 where
-    T: Mountable,
+    T: Mountable<R>,
+    R: Renderer,
 {
     fn unmount(&mut self) {
         todo!()
@@ -184,35 +193,45 @@ where
     }
 }
 
-pub trait IterView {
+pub trait IterView<R: Renderer> {
     type Iterator: Iterator<Item = Self::View>;
-    type View: Render;
+    type View: Render<R>;
 
-    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View>;
+    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View, R>;
 }
 
-impl<I, V> IterView for I
+impl<I, V, R> IterView<R> for I
 where
     I: Iterator<Item = V>,
-    V: Render,
+    V: Render<R>,
+    R: Renderer,
 {
     type Iterator = I;
     type View = V;
 
-    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View> {
-        RenderIter(self)
+    fn iter_view(self) -> RenderIter<Self::Iterator, Self::View, R> {
+        RenderIter {
+            inner: self,
+            rndr: PhantomData,
+        }
     }
 }
 
-pub struct RenderIter<I, V>(I)
+pub struct RenderIter<I, V, R>
 where
     I: Iterator<Item = V>,
-    V: Render;
+    V: Render<R>,
+    R: Renderer,
+{
+    inner: I,
+    rndr: PhantomData<R>,
+}
 
-impl<I, V> Render for RenderIter<I, V>
+impl<I, V, R> Render<R> for RenderIter<I, V, R>
 where
     I: Iterator<Item = V>,
-    V: Render,
+    V: Render<R>,
+    R: Renderer,
 {
     type State = ();
 
@@ -225,10 +244,12 @@ where
     }
 }
 
-impl<I, V> RenderHtml for RenderIter<I, V>
+impl<I, V, R> RenderHtml<R> for RenderIter<I, V, R>
 where
     I: Iterator<Item = V>,
-    V: RenderHtml,
+    V: RenderHtml<R>,
+    R: Renderer,
+    R::Node: Clone,
 {
     fn to_html(&mut self, buf: &mut String, position: &PositionState) {
         for mut next in self.0.by_ref() {
@@ -238,7 +259,7 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         todo!()

@@ -3,10 +3,9 @@
 //! Do not use this for anything real.
 
 use super::Renderer;
-use crate::{html::element::ElementType, ok_or_debug, or_debug};
+use crate::{html::element::ElementType, view::Mountable};
 use slotmap::{new_key_type, SlotMap};
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
-use wasm_bindgen::intern;
 
 pub struct MockDom;
 
@@ -22,6 +21,9 @@ pub struct Element(Node);
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Text(Node);
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Fragment(Node);
 
 impl AsRef<Node> for Node {
     fn as_ref(&self) -> &Node {
@@ -41,6 +43,12 @@ impl AsRef<Node> for Text {
     }
 }
 
+impl AsRef<Node> for Fragment {
+    fn as_ref(&self) -> &Node {
+        &self.0
+    }
+}
+
 pub fn node_eq(a: impl AsRef<Node>, b: impl AsRef<Node>) -> bool {
     a.as_ref() == b.as_ref()
 }
@@ -54,6 +62,20 @@ impl From<Text> for Node {
 impl From<Element> for Node {
     fn from(value: Element) -> Self {
         Node(value.0 .0)
+    }
+}
+
+impl From<Fragment> for Node {
+    fn from(value: Fragment) -> Self {
+        Node(value.0 .0)
+    }
+}
+
+impl Element {
+    pub fn to_debug_html(&self) -> String {
+        let mut buf = String::new();
+        self.debug_html(&mut buf);
+        buf
     }
 }
 
@@ -119,6 +141,11 @@ impl DebugHtml for NodeData {
                 buf.push_str(tag);
                 buf.push('>');
             }
+            NodeType::Fragment(nodes) => {
+                for node in nodes {
+                    node.debug_html(buf);
+                }
+            }
         }
     }
 }
@@ -171,6 +198,13 @@ impl Document {
             ty: NodeType::Text(data.to_string()),
         })))
     }
+
+    fn create_fragment(&self) -> Fragment {
+        Fragment(Node(self.0.borrow_mut().insert(NodeData {
+            parent: None,
+            ty: NodeType::Fragment(Vec::new()),
+        })))
+    }
 }
 
 thread_local! {
@@ -189,15 +223,61 @@ pub enum NodeType {
         attrs: HashMap<String, String>,
         children: Vec<Node>,
     },
+    Fragment(Vec<Node>),
+}
+
+impl Mountable<MockDom> for Node {
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
+        Some(self.clone())
+    }
+}
+
+impl Mountable<MockDom> for Text {
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
+        Some(self.as_ref().clone())
+    }
+}
+
+impl Mountable<MockDom> for Element {
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
+        Some(self.as_ref().clone())
+    }
+}
+
+impl Mountable<MockDom> for Fragment {
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
+        Some(self.as_ref().clone())
+    }
 }
 
 impl Renderer for MockDom {
     type Node = Node;
     type Text = Text;
     type Element = Element;
+    type Fragment = Fragment;
 
     fn create_element<E: ElementType>() -> Self::Element {
         document().create_element(E::TAG)
+    }
+
+    fn create_fragment() -> Self::Fragment {
+        document().create_fragment()
     }
 
     fn create_text_node(data: &str) -> Self::Text {
@@ -296,6 +376,7 @@ impl Renderer for MockDom {
         Document::with_node(node.0, |node| match &node.ty {
             NodeType::Text(_) => None,
             NodeType::Element { children, .. } => children.get(0).cloned(),
+            NodeType::Fragment(nodes) => nodes.get(0).cloned(),
         })
         .flatten()
     }
@@ -312,30 +393,26 @@ impl Renderer for MockDom {
                             .position(|check| check == &Node(node_id))?;
                         children.get(this + 1).cloned()
                     }
+                    NodeType::Fragment(_) => todo!(),
                 })
             })
         })
         .flatten()
         .flatten()
     }
+
+    fn replace_node(old: &Self::Node, new: &Self::Node) {
+        todo!()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Element, MockDom};
+    use super::MockDom;
     use crate::{
         html::element,
-        renderer::{
-            mock_dom::{node_eq, DebugHtml},
-            Renderer,
-        },
+        renderer::{mock_dom::node_eq, Renderer},
     };
-
-    fn html(el: Element) -> String {
-        let mut buf = String::new();
-        el.debug_html(&mut buf);
-        buf
-    }
 
     #[test]
     fn html_debugging_works() {
@@ -345,7 +422,10 @@ mod tests {
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&p, text.as_ref(), None);
-        assert_eq!(html(main), "<main><p id=\"foo\">Hello, world!</p></main>");
+        assert_eq!(
+            main.to_debug_html(),
+            "<main><p id=\"foo\">Hello, world!</p></main>"
+        );
     }
 
     #[test]
@@ -357,7 +437,7 @@ mod tests {
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&p, text.as_ref(), None);
         MockDom::remove_attribute(&p, "id");
-        assert_eq!(html(main), "<main><p>Hello, world!</p></main>");
+        assert_eq!(main.to_debug_html(), "<main><p>Hello, world!</p></main>");
     }
 
     #[test]
@@ -369,7 +449,7 @@ mod tests {
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&p, text.as_ref(), None);
         MockDom::remove_node(&main, p.as_ref());
-        assert_eq!(html(main), "<main></main>");
+        assert_eq!(main.to_debug_html(), "<main></main>");
     }
 
     #[test]
@@ -382,7 +462,7 @@ mod tests {
         MockDom::insert_node(&span, text.as_ref(), None);
         MockDom::insert_node(&main, span.as_ref(), Some(p.as_ref()));
         assert_eq!(
-            html(main),
+            main.to_debug_html(),
             "<main><span>Hello, world!</span><p></p></main>"
         );
     }
@@ -408,7 +488,7 @@ mod tests {
         MockDom::insert_node(&main, span.as_ref(), Some(p.as_ref()));
         MockDom::insert_node(&main, p.as_ref(), Some(span.as_ref()));
         assert_eq!(
-            html(main),
+            main.to_debug_html(),
             "<main><p></p><span>Hello, world!</span></main>"
         );
     }

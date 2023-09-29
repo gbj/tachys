@@ -1,4 +1,4 @@
-use crate::html::element::ElementType;
+use crate::{html::element::ElementType, view::Mountable};
 
 pub mod dom;
 #[cfg(feature = "testing")]
@@ -8,16 +8,21 @@ pub mod mock_dom;
 /// By default, this is implemented for the Document Object Model (DOM) in a Web
 /// browser, but implementing this trait for some other platform allows you to use
 /// the library to render any tree-based UI.
-pub trait Renderer {
+pub trait Renderer: Sized {
     /// The basic type of node in the view tree.
-    type Node;
+    type Node: Mountable<Self>;
     /// A visible element in the view tree.
-    type Element;
+    type Element: AsRef<Self::Node> + Mountable<Self>;
     /// A text node in the view tree.
-    type Text;
+    type Text: AsRef<Self::Node> + Mountable<Self>;
+    /// A collection of nodes in the view tree.
+    type Fragment: AsRef<Self::Node> + Mountable<Self>;
 
     /// Creates a new element node.
     fn create_element<E: ElementType>() -> Self::Element;
+
+    /// Creates a new fragment.
+    fn create_fragment() -> Self::Fragment;
 
     /// Creates a new text node.
     fn create_text_node(text: &str) -> Self::Text;
@@ -38,6 +43,9 @@ pub trait Renderer {
         new_child: &Self::Node,
         anchor: Option<&Self::Node>,
     );
+
+    /// Replaces the previous node with the new node.
+    fn replace_node(old: &Self::Node, new: &Self::Node);
 
     /// Removes the child node from the parents, and returns the removed node.
     fn remove_node(

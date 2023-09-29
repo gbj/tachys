@@ -1,5 +1,7 @@
 use super::{Attr, AttributeValue};
+use crate::renderer::Renderer;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 pub trait AttributeKey {
     const KEY: &'static str;
@@ -9,10 +11,11 @@ macro_rules! attributes {
 	($($key:ident $html:literal),* $(,)?) => {
         paste::paste! {
             $(
-                pub fn $key<V>(value: V) -> Attr<[<$key:camel>], V>
-				where V: AttributeValue + std::fmt::Debug
+                pub fn $key<V, R>(value: V) -> Attr<[<$key:camel>], V, R>
+				where V: AttributeValue<R> + std::fmt::Debug,
+                  R: Renderer
                 {
-                    Attr([<$key:camel>], value)
+                    Attr([<$key:camel>], value, PhantomData)
                 }
 
 				#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

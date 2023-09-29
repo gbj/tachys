@@ -1,67 +1,92 @@
 mod key;
 mod value;
-use crate::view::{Position, ToTemplate};
+use crate::{
+    renderer::Renderer,
+    view::{Position, RenderHtml, ToTemplate},
+};
 pub use key::*;
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 pub use value::*;
-use web_sys::Element;
 
-pub trait Attribute {
+pub trait Attribute<R: Renderer> {
     type State;
 
-    fn to_html(&mut self, buf: &mut String, class: &mut String, style: &mut String);
+    fn to_html(
+        &mut self,
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+    );
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
-    fn build(self, el: &Element) -> Self::State;
+    fn build(self, el: &R::Element) -> Self::State;
 
     fn rebuild(self, state: &mut Self::State);
 }
 
-impl Attribute for () {
+impl<R> Attribute<R> for ()
+where
+    R: Renderer,
+{
     type State = ();
 
-    fn to_html(&mut self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
+    fn to_html(
+        &mut self,
+        _buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+    ) {
+    }
 
-    fn hydrate<const FROM_SERVER: bool>(self, _el: &Element) -> Self::State {}
+    fn hydrate<const FROM_SERVER: bool>(self, _el: &R::Element) -> Self::State {
+    }
 
-    fn build(self, el: &Element) -> Self::State {}
+    fn build(self, el: &R::Element) -> Self::State {}
 
     fn rebuild(self, _state: &mut Self::State) {}
 }
 
 #[derive(Debug)]
-pub struct Attr<K, V>(pub K, pub V)
+pub struct Attr<K, V, R>(pub K, pub V, PhantomData<R>)
 where
     K: AttributeKey,
-    V: AttributeValue;
+    V: AttributeValue<R>,
+    R: Renderer;
 
-impl<K, V> ToTemplate for Attr<K, V>
+impl<K, V, R> ToTemplate for Attr<K, V, R>
 where
     K: AttributeKey,
-    V: AttributeValue,
+    V: AttributeValue<R>,
+    R: Renderer,
 {
     fn to_template(buf: &mut String, _position: &mut Position) {
         V::to_template(K::KEY, buf);
     }
 }
 
-impl<K, V> Attribute for Attr<K, V>
+impl<K, V, R> Attribute<R> for Attr<K, V, R>
 where
     K: AttributeKey,
-    V: AttributeValue,
+    V: AttributeValue<R>,
+    R: Renderer,
 {
     type State = V::State;
 
-    fn to_html(&mut self, buf: &mut String, _class: &mut String, _style: &mut String) {
+    fn to_html(
+        &mut self,
+        buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+    ) {
         self.1.to_html(K::KEY, buf);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
         self.1.hydrate::<FROM_SERVER>(K::KEY, el)
     }
 
-    fn build(self, el: &Element) -> Self::State {
+    fn build(self, el: &R::Element) -> Self::State {
         V::build(self.1, el, K::KEY)
     }
 
@@ -72,10 +97,11 @@ where
 
 macro_rules! impl_attr_for_tuples {
 	($first:ident, $($ty:ident),* $(,)?) => {
-		impl<$first, $($ty),*> Attribute for ($first, $($ty,)*)
+		impl<$first, $($ty),*, Rndr> Attribute<Rndr> for ($first, $($ty,)*)
 		where
-			$first: Attribute,
-			$($ty: Attribute),*
+			$first: Attribute<Rndr>,
+			$($ty: Attribute<Rndr>),*,
+            Rndr: Renderer
 		{
 			type State = ($first::State, $($ty::State,)*);
 
@@ -87,7 +113,7 @@ macro_rules! impl_attr_for_tuples {
 				}
 			}
 
-			fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+			fn hydrate<const FROM_SERVER: bool>(self, el: &Rndr::Element) -> Self::State {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					(
@@ -97,7 +123,7 @@ macro_rules! impl_attr_for_tuples {
 				}
 			}
 
-            fn build(self, el: &Element) -> Self::State {
+            fn build(self, el: &Rndr::Element) -> Self::State {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
                     (
@@ -137,10 +163,25 @@ impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
 impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
 impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
-impl_attr_for_tuples!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
+);
+impl_attr_for_tuples!(
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y,
+    Z
+);

@@ -10,8 +10,10 @@ pub struct AnyView {
     to_html: fn(&mut dyn Any, &mut String, &PositionState),
     build: fn(Box<dyn Any>) -> AnyViewState,
     rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState),
-    hydrate_from_server: fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
-    hydrate_from_template: fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
+    hydrate_from_server:
+        fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
+    hydrate_from_template:
+        fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
 }
 
 pub struct AnyViewState {
@@ -33,7 +35,9 @@ where
     fn into_any(self) -> AnyView {
         let value = Box::new(self) as Box<dyn Any>;
 
-        let to_html = |value: &mut dyn Any, buf: &mut String, position: &PositionState| {
+        let to_html = |value: &mut dyn Any,
+                       buf: &mut String,
+                       position: &PositionState| {
             let mut value = value
                 .downcast_mut::<T>()
                 .expect("AnyView::to_html could not be downcast");
@@ -51,9 +55,9 @@ where
                 state.unmount();
             };
             let as_mountable = |state: &dyn Any| {
-                let state = state
-                    .downcast_ref::<T::State>()
-                    .expect("AnyViewState::as_mountable couldn't downcast state");
+                let state = state.downcast_ref::<T::State>().expect(
+                    "AnyViewState::as_mountable couldn't downcast state",
+                );
                 state.as_mountable()
             };
             AnyViewState {
@@ -64,21 +68,23 @@ where
             }
         };
         let hydrate_from_server =
-            |value: Box<dyn Any>, cursor: &Cursor, position: &PositionState| {
+            |value: Box<dyn Any>,
+             cursor: &Cursor<R>,
+             position: &PositionState| {
                 let value = value
                     .downcast::<T>()
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
                 let unmount = |state: &mut dyn Any| {
-                    let state = state
-                        .downcast_mut::<T::State>()
-                        .expect("AnyViewState::unmount couldn't downcast state");
+                    let state = state.downcast_mut::<T::State>().expect(
+                        "AnyViewState::unmount couldn't downcast state",
+                    );
                     state.unmount();
                 };
                 let as_mountable = |state: &dyn Any| {
-                    let state = state
-                        .downcast_ref::<T::State>()
-                        .expect("AnyViewState::as_mountable couldn't downcast state");
+                    let state = state.downcast_ref::<T::State>().expect(
+                        "AnyViewState::as_mountable couldn't downcast state",
+                    );
                     state.as_mountable()
                 };
                 AnyViewState {
@@ -89,22 +95,24 @@ where
                 }
             };
         let hydrate_from_template =
-            |value: Box<dyn Any>, cursor: &Cursor, position: &PositionState| {
+            |value: Box<dyn Any>,
+             cursor: &Cursor<R>,
+             position: &PositionState| {
                 let value = value
                     .downcast::<T>()
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
 
                 let unmount = |state: &mut dyn Any| {
-                    let state = state
-                        .downcast_mut::<T::State>()
-                        .expect("AnyViewState::unmount couldn't downcast state");
+                    let state = state.downcast_mut::<T::State>().expect(
+                        "AnyViewState::unmount couldn't downcast state",
+                    );
                     state.unmount();
                 };
                 let as_mountable = |state: &dyn Any| {
-                    let state = state
-                        .downcast_ref::<T::State>()
-                        .expect("AnyViewState::as_mountable couldn't downcast state");
+                    let state = state.downcast_ref::<T::State>().expect(
+                        "AnyViewState::as_mountable couldn't downcast state",
+                    );
                     state.as_mountable()
                 };
                 AnyViewState {
@@ -114,7 +122,9 @@ where
                     as_mountable,
                 }
             };
-        let rebuild = |new_type_id: TypeId, value: Box<dyn Any>, state: &mut AnyViewState| {
+        let rebuild = |new_type_id: TypeId,
+                       value: Box<dyn Any>,
+                       state: &mut AnyViewState| {
             let value = value
                 .downcast::<T>()
                 .expect("AnyView::rebuild couldn't downcast value");
@@ -161,7 +171,7 @@ impl Render for AnyView {
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor,
+        cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
         if FROM_SERVER {
@@ -192,12 +202,11 @@ impl Mountable for AnyViewState {
 
 #[cfg(test)]
 mod tests {
+    use super::IntoAny;
     use crate::{
         html::element::{p, span},
         view::Render,
     };
-
-    use super::IntoAny;
 
     #[test]
     fn should_handle_html_creation() {

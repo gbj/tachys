@@ -1,42 +1,45 @@
+use crate::renderer::Renderer;
 use std::{cell::RefCell, rc::Rc};
 
-use wasm_bindgen::JsCast;
-use web_sys::{HtmlElement, Node};
-
 #[derive(Debug, Clone)]
-pub struct Cursor(Rc<RefCell<Node>>);
+pub struct Cursor<R: Renderer>(Rc<RefCell<R::Node>>);
 
-impl Cursor {
-    pub fn new(root: HtmlElement) -> Self {
-        Self(Rc::new(RefCell::new(root.unchecked_into())))
+impl<R> Cursor<R>
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: AsRef<R::Node>,
+{
+    pub fn new(root: R::Element) -> Self {
+        Self(Rc::new(RefCell::new(root.as_ref().clone())))
     }
 
-    pub fn current(&self) -> Node {
+    pub fn current(&self) -> R::Node {
         self.0.borrow().clone()
     }
 
     pub fn child(&self) {
         let mut inner = self.0.borrow_mut();
-        if let Some(node) = inner.first_child() {
+        if let Some(node) = R::first_child(&*inner) {
             *inner = node;
         }
     }
 
     pub fn sibling(&self) {
         let mut inner = self.0.borrow_mut();
-        if let Some(node) = inner.next_sibling() {
+        if let Some(node) = R::next_sibling(&*inner) {
             *inner = node;
         }
     }
 
     pub fn parent(&self) {
         let mut inner = self.0.borrow_mut();
-        if let Some(node) = inner.parent_node() {
+        if let Some(node) = R::get_parent(&*inner) {
             *inner = node;
         }
     }
 
-    pub fn set(&self, node: Node) {
+    pub fn set(&self, node: R::Node) {
         *self.0.borrow_mut() = node;
     }
 }

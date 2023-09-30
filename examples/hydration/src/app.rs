@@ -1,20 +1,19 @@
-use leptos_reactive::create_effect;
-use leptos_reactive::create_runtime;
-use leptos_reactive::create_signal;
-use leptos_reactive::SignalGet;
-use leptos_reactive::SignalUpdate;
+use leptos_reactive::{
+    create_effect, create_runtime, create_signal, SignalGet, SignalUpdate,
+};
 use tachy_maccy::view;
-use tachydom::html::element::*;
-use tachydom::html::event;
-use tachydom::html::event::on;
-use tachydom::hydration::Cursor;
-use tachydom::view::any_view::IntoAny;
-use tachydom::view::template::ViewTemplate;
-use tachydom::view::Position;
-use tachydom::view::Render;
-use tachydom::view::ToTemplate;
+use tachydom::{
+    html::{element::*, event, event::on},
+    hydration::Cursor,
+    renderer::dom::Dom,
+    renderer::DomRenderer,
+    view::{
+        /* any_view::IntoAny, template::ViewTemplate, */ Position, Render,
+        RenderHtml, ToTemplate,
+    },
+};
 
-pub fn my_app() -> impl Render {
+pub fn my_app() -> impl RenderHtml<Dom> {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
 
@@ -34,11 +33,11 @@ pub fn my_app() -> impl Render {
         >
             This is <strong>"very"</strong> cool stuff.<span></span>
         </p>
-        {move || if count() % 2 == 0 {
+        /* {move || if count() % 2 == 0 {
             view! { <div>"even"</div> }.into_any()
         } else {
             view! { <span>"odd"</span> }.into_any()
-        }}
+        }} */
         <button
             on:click=move |ev| {
                 //tachydom::log("click");
@@ -47,9 +46,9 @@ pub fn my_app() -> impl Render {
         >
             {move || count.get().to_string()}
         </button>
-        {move || (count() % 2 == 0).then(|| view! {
+        /* {move || (count() % 2 == 0).then(|| view! {
             <p>"Even"</p>
-        })}
+        })} */
     }
 }
 /*

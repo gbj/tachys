@@ -3,7 +3,8 @@
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
-    use tachydom::view::{Position, PositionState, Render};
+    use tachydom::view::{Position, PositionState, Render, RenderHtml};
+    use tachydom::renderer::dom::Dom;
 
     HttpServer::new(move || {
         App::new()

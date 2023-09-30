@@ -61,6 +61,42 @@ pub trait Renderer: Sized {
     fn next_sibling(node: &Self::Node) -> Option<Self::Node>;
 }
 
+/// Additional rendering behavior that applies only to DOM nodes.
+pub trait DomRenderer: Renderer {
+    /// Generic event type, from which any specific event can be converted.
+    type Event;
+    /// The list of CSS classes for an element.
+    type ClassList;
+    /// The CSS styles for an element.
+    type CssStyleDeclaration;
+
+    /// Adds an event listener to an element.
+    fn add_event_listener(
+        el: &Self::Element,
+        name: &str,
+        cb: Box<dyn FnMut(Self::Event)>,
+    );
+
+    /// The list of CSS classes for an element.
+    fn class_list(el: &Self::Element) -> Self::ClassList;
+
+    /// Add a class to the list.
+    fn add_class(class_list: &Self::ClassList, name: &str);
+
+    /// Remove a class from the list.
+    fn remove_class(class_list: &Self::ClassList, name: &str);
+
+    /// The set of styles for an element.
+    fn style(el: &Self::Element) -> Self::CssStyleDeclaration;
+
+    /// Sets a CSS property.
+    fn set_css_property(
+        style: &Self::CssStyleDeclaration,
+        name: &str,
+        value: &str,
+    );
+}
+
 /// Attempts to cast from one type to another.
 ///
 /// This works in a similar way to `TryFrom`. We implement it as a separate trait

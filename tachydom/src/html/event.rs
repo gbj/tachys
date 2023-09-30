@@ -1,34 +1,50 @@
 use crate::{
     html::attribute::Attribute,
+    renderer::DomRenderer,
     view::{Position, ToTemplate},
 };
 use std::{borrow::Cow, fmt::Debug};
-use wasm_bindgen::{convert::FromWasmAbi, JsCast, JsValue};
+use wasm_bindgen::convert::FromWasmAbi;
 
-pub fn on<E>(event: E, cb: impl FnMut(E::EventType) + 'static) -> On
+pub fn on<E, R>(event: E, mut cb: impl FnMut(E::EventType) + 'static) -> On<R>
 where
-    E: EventDescriptor,
+    E: EventDescriptor + 'static,
     E::EventType: 'static,
+    R: DomRenderer,
+    E::EventType: From<R::Event>,
 {
-    On(
-        event.name(),
-        Box::new(move || {
-            wasm_bindgen::closure::Closure::wrap(
-                Box::new(cb) as Box<dyn FnMut(E::EventType)>
+    On {
+        name: event.name(),
+        setup: Box::new(move |el| {
+            R::add_event_listener(
+                el,
+                &event.name(),
+                Box::new(move |ev: R::Event| {
+                    let specific_event = ev.into();
+                    cb(specific_event);
+                }) as Box<dyn FnMut(R::Event)>,
             )
-            .into_js_value()
         }),
-    )
+    }
 }
-pub struct On(Cow<'static, str>, Box<dyn FnOnce() -> JsValue>);
+pub struct On<R: DomRenderer> {
+    name: Cow<'static, str>,
+    setup: Box<dyn FnOnce(&R::Element)>,
+}
 
-impl Debug for On {
+impl<R> Debug for On<R>
+where
+    R: DomRenderer,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("On").field(&self.0).finish()
+        f.debug_tuple("On").field(&self.name).finish()
     }
 }
 
-impl Attribute for On {
+impl<R> Attribute<R> for On<R>
+where
+    R: DomRenderer,
+{
     type State = ();
 
     #[inline(always)]
@@ -41,26 +57,23 @@ impl Attribute for On {
     }
 
     #[inline(always)]
-    fn hydrate<const FROM_SERVER: bool>(self, el: &web_sys::Element) {
-        el.add_event_listener_with_callback(
-            &self.0,
-            (self.1)().as_ref().unchecked_ref(),
-        );
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) {
+        (self.setup)(el);
     }
 
     #[inline(always)]
-    fn build(self, el: &web_sys::Element) {
-        el.add_event_listener_with_callback(
-            &self.0,
-            (self.1)().as_ref().unchecked_ref(),
-        );
+    fn build(self, el: &R::Element) {
+        (self.setup)(el);
     }
 
     #[inline(always)]
     fn rebuild(self, _state: &mut Self::State) {}
 }
 
-impl ToTemplate for On {
+impl<R> ToTemplate for On<R>
+where
+    R: DomRenderer,
+{
     #[inline(always)]
     fn to_template(_buf: &mut String, _position: &mut Position) {}
 }

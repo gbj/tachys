@@ -1,61 +1,72 @@
 use super::attribute::Attribute;
 use crate::{
-    renderer::{dom::Dom, Renderer},
+    renderer::{dom::Dom, DomRenderer, Renderer},
     view::ToTemplate,
 };
 use leptos_reactive::{create_render_effect, Effect};
-use web_sys::{DomTokenList, Element};
+use std::marker::PhantomData;
 
 #[inline(always)]
-pub fn class<R>(c: impl IntoClass<R>) -> impl Attribute<R> {
-    Class(c)
+pub fn class<R>(class: impl IntoClass<R>) -> impl Attribute<R>
+where
+    R: DomRenderer,
+{
+    Class {
+        class,
+        rndr: PhantomData,
+    }
 }
 
-struct Class<C, R>(C)
+struct Class<C, R>
 where
-    C: IntoClass<R>;
+    C: IntoClass<R>,
+    R: DomRenderer,
+{
+    class: C,
+    rndr: PhantomData<R>,
+}
 
 impl<C, R> Attribute<R> for Class<C, R>
 where
     C: IntoClass<R>,
-    R: Renderer,
+    R: DomRenderer,
 {
     type State = C::State;
 
     fn to_html(
-        &mut self,
+        &self,
         _buf: &mut String,
         class: &mut String,
         _style: &mut String,
     ) {
         class.push(' ');
-        self.0.to_html(class);
+        self.class.to_html(class);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
-        self.0.hydrate::<FROM_SERVER>(el)
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        self.class.hydrate::<FROM_SERVER>(el)
     }
 
-    fn build(self, el: &Element) -> Self::State {
-        self.0.build(el)
+    fn build(self, el: &R::Element) -> Self::State {
+        self.class.build(el)
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        self.0.rebuild(state)
+        self.class.rebuild(state)
     }
 }
 
 impl<C, R> ToTemplate for Class<C, R>
 where
     C: IntoClass<R>,
-    R: Renderer,
+    R: DomRenderer,
 {
     fn to_template(buf: &mut String, position: &mut crate::view::Position) {
         todo!()
     }
 }
 
-pub trait IntoClass<R: Renderer> {
+pub trait IntoClass<R: DomRenderer> {
     type State;
 
     fn to_html(&self, class: &mut String);
@@ -69,27 +80,28 @@ pub trait IntoClass<R: Renderer> {
 
 impl<'a, R> IntoClass<R> for &'a str
 where
-    R: Renderer,
+    R: DomRenderer,
+    R::Element: Clone,
 {
-    type State = (Element, &'a str);
+    type State = (R::Element, &'a str);
 
     fn to_html(&self, class: &mut String) {
         class.push_str(self);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
-        (el.to_owned(), self)
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        (el.clone(), self)
     }
 
-    fn build(self, el: &Element) -> Self::State {
-        Dom::set_attribute(el, "class", self);
-        (el.to_owned(), self)
+    fn build(self, el: &R::Element) -> Self::State {
+        R::set_attribute(el, "class", self);
+        (el.clone(), self)
     }
 
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
         if self != *prev {
-            Dom::set_attribute(el, "class", self);
+            R::set_attribute(el, "class", self);
         }
         *prev = self;
     }
@@ -97,34 +109,38 @@ where
 
 impl<R> IntoClass<R> for String
 where
-    R: Renderer,
+    R: DomRenderer,
+    R::Element: Clone,
 {
-    type State = (Element, String);
+    type State = (R::Element, String);
 
     fn to_html(&self, class: &mut String) {
-        IntoClass::to_html(self, class);
+        IntoClass::<R>::to_html(self, class);
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
-        (el.to_owned(), self)
+        (el.clone(), self)
     }
 
     fn build(self, el: &R::Element) -> Self::State {
-        el.set_attribute("class", &self);
-        (el.to_owned(), self)
+        R::set_attribute(el, "class", &self);
+        (el.clone(), self)
     }
 
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
         if &self != &*prev {
-            el.set_attribute("class", &self);
+            R::set_attribute(el, "class", &self);
         }
         *prev = self;
     }
 }
 
-impl IntoClass for (&'static str, bool) {
-    type State = (DomTokenList, bool);
+impl<R> IntoClass<R> for (&'static str, bool)
+where
+    R: DomRenderer,
+{
+    type State = (R::ClassList, bool);
 
     fn to_html(&self, class: &mut String) {
         let (name, include) = self;
@@ -133,16 +149,16 @@ impl IntoClass for (&'static str, bool) {
         }
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
-        let class_list = el.class_list();
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        let class_list = R::class_list(el);
         (class_list, self.1)
     }
 
-    fn build(self, el: &Element) -> Self::State {
+    fn build(self, el: &R::Element) -> Self::State {
         let (name, include) = self;
-        let class_list = el.class_list();
+        let class_list = R::class_list(el);
         if include {
-            class_list.add_1(name);
+            R::add_class(&class_list, name);
         }
         (class_list, self.1)
     }
@@ -152,30 +168,34 @@ impl IntoClass for (&'static str, bool) {
         let (class_list, prev_include) = state;
         if include != *prev_include {
             if include {
-                class_list.add_1(name);
+                R::add_class(class_list, name);
             } else {
-                class_list.remove_1(name);
+                R::remove_class(class_list, name);
             }
         }
         *prev_include = include;
     }
 }
 
-impl<F, C> IntoClass for F
+impl<F, C, R> IntoClass<R> for F
 where
     F: Fn() -> C + 'static,
-    C: IntoClass + 'static,
+    C: IntoClass<R> + 'static,
+    C::State: 'static,
+    R: DomRenderer,
+    R::ClassList: 'static,
+    R::Element: Clone + 'static,
 {
     type State = Effect<C::State>;
 
     fn to_html(&self, class: &mut String) {
-        let mut value = self();
+        let value = self();
         value.to_html(class);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
         // TODO FROM_SERVER vs template
-        let el = el.to_owned();
+        let el = el.clone();
         create_render_effect(move |prev| {
             let value = self();
             if let Some(mut state) = prev {
@@ -187,7 +207,7 @@ where
         })
     }
 
-    fn build(self, el: &Element) -> Self::State {
+    fn build(self, el: &R::Element) -> Self::State {
         let el = el.to_owned();
         create_render_effect(move |prev| {
             let value = self();
@@ -203,9 +223,12 @@ where
     fn rebuild(self, state: &mut Self::State) {}
 }
 
-impl<F> IntoClass for (&'static str, F)
+impl<F, R> IntoClass<R> for (&'static str, F)
 where
     F: Fn() -> bool + 'static,
+    R: DomRenderer,
+    R::ClassList: 'static,
+    R::Element: Clone,
 {
     type State = Effect<bool>;
 
@@ -213,37 +236,37 @@ where
         let (name, f) = self;
         let include = f();
         if include {
-            name.to_html(class);
+            <&str as IntoClass<R>>::to_html(name, class);
         }
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State {
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
         // TODO FROM_SERVER vs template
         let (name, f) = self;
-        let class_list = el.class_list();
+        let class_list = R::class_list(el);
         create_render_effect(move |prev| {
             let include = f();
             if Some(include) != prev {
                 if include {
-                    class_list.add_1(name);
+                    R::add_class(&class_list, name);
                 } else {
-                    class_list.remove_1(name);
+                    R::remove_class(&class_list, name);
                 }
             }
             include
         })
     }
 
-    fn build(self, el: &Element) -> Self::State {
+    fn build(self, el: &R::Element) -> Self::State {
         let (name, f) = self;
-        let class_list = el.class_list();
+        let class_list = R::class_list(el);
         create_render_effect(move |prev| {
             let include = f();
             if Some(include) != prev {
                 if include {
-                    class_list.add_1(name);
+                    R::add_class(&class_list, name);
                 } else {
-                    class_list.remove_1(name);
+                    R::remove_class(&class_list, name);
                 }
             }
             include

@@ -1,4 +1,4 @@
-use super::{CastFrom, Renderer};
+use super::{CastFrom, DomRenderer, Renderer};
 use crate::{
     dom::document,
     html::element::{CreateElement, ElementType},
@@ -6,8 +6,11 @@ use crate::{
     view::Mountable,
 };
 use once_cell::unsync::Lazy;
-use wasm_bindgen::{intern, JsCast};
-use web_sys::{DocumentFragment, Element, Node, Text};
+use wasm_bindgen::{intern, JsCast, JsValue};
+use web_sys::{
+    CssStyleDeclaration, DocumentFragment, DomTokenList, Element, HtmlElement,
+    Node, Text,
+};
 
 pub struct Dom;
 
@@ -80,6 +83,49 @@ impl Renderer for Dom {
             old.unchecked_ref::<Element>().replace_with_with_node_1(new),
             old,
             "replaceWith"
+        );
+    }
+}
+
+impl DomRenderer for Dom {
+    type Event = JsValue;
+    type ClassList = DomTokenList;
+    type CssStyleDeclaration = CssStyleDeclaration;
+
+    fn add_event_listener(
+        el: &Self::Element,
+        name: &str,
+        cb: Box<dyn FnMut(Self::Event)>,
+    ) {
+        let cb = wasm_bindgen::closure::Closure::wrap(cb).into_js_value();
+        el.add_event_listener_with_callback(name, cb.as_ref().unchecked_ref());
+    }
+
+    fn class_list(el: &Self::Element) -> Self::ClassList {
+        el.class_list()
+    }
+
+    fn add_class(list: &Self::ClassList, name: &str) {
+        or_debug!(list.add_1(name), list.unchecked_ref(), "add()");
+    }
+
+    fn remove_class(list: &Self::ClassList, name: &str) {
+        or_debug!(list.remove_1(name), list.unchecked_ref(), "remove()");
+    }
+
+    fn style(el: &Self::Element) -> Self::CssStyleDeclaration {
+        el.unchecked_ref::<HtmlElement>().style()
+    }
+
+    fn set_css_property(
+        style: &Self::CssStyleDeclaration,
+        name: &str,
+        value: &str,
+    ) {
+        or_debug!(
+            style.set_property(name, value),
+            style.unchecked_ref(),
+            "setProperty"
         );
     }
 }

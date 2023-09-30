@@ -1,16 +1,16 @@
 use crate::{
     html::attribute::Attribute,
     hydration::Cursor,
-    renderer::{CastFrom, Renderer},
+    renderer::{dom::Dom, CastFrom, Renderer},
     view::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
+use once_cell::unsync::Lazy;
 use std::{fmt::Debug, marker::PhantomData};
 
 pub struct HtmlElement<E, At, Ch, Rndr>
 where
-    E: ElementType,
     At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
@@ -32,7 +32,7 @@ pub trait CreateElement<R: Renderer> {
 
 impl<E, At, Ch, Rndr> Render<Rndr> for HtmlElement<E, At, Ch, Rndr>
 where
-    E: ElementType,
+    E: CreateElement<Rndr>,
     At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
@@ -51,7 +51,7 @@ where
     fn build(self) -> Self::State {
         let el = Rndr::create_element::<E>();
         let attrs = self.attributes.build(&el);
-        let children = self.children.build();
+        let mut children = self.children.build();
         children.mount(&el, None);
         ElementState {
             el,
@@ -64,7 +64,7 @@ where
 
 impl<E, At, Ch, Rndr> RenderHtml<Rndr> for HtmlElement<E, At, Ch, Rndr>
 where
-    E: ElementType,
+    E: ElementType + CreateElement<Rndr>,
     At: Attribute<Rndr>,
     Ch: RenderHtml<Rndr>,
     Rndr: Renderer,
@@ -166,7 +166,7 @@ where
         R::remove(self.el.as_ref());
     }
 
-    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>) {
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
         R::insert_node(parent, self.el.as_ref(), marker);
     }
 }
@@ -222,6 +222,19 @@ macro_rules! html_elements {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
                 }
+
+                impl CreateElement<Dom> for [<$tag:camel>] {
+                    fn create_element() -> <Dom as Renderer>::Element {
+                        use wasm_bindgen::JsCast;
+
+                        thread_local! {
+                            static ELEMENT: Lazy<<Dom as Renderer>::Element> = Lazy::new(|| {
+                                crate::dom::document().create_element(stringify!($tag)).unwrap()
+                            });
+                        }
+                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+                    }
+                }
             )*
 		}
     }
@@ -250,6 +263,19 @@ macro_rules! html_self_closing_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = true;
+                }
+
+                impl CreateElement<Dom> for [<$tag:camel>] {
+                    fn create_element() -> <Dom as Renderer>::Element {
+                        use wasm_bindgen::JsCast;
+
+                        thread_local! {
+                            static ELEMENT: Lazy<<Dom as Renderer>::Element> = Lazy::new(|| {
+                                crate::dom::document().create_element(stringify!($tag)).unwrap()
+                            });
+                        }
+                        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
+                    }
                 }
             )*
 		}

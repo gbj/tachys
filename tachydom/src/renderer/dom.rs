@@ -8,8 +8,8 @@ use crate::{
 use once_cell::unsync::Lazy;
 use wasm_bindgen::{intern, JsCast, JsValue};
 use web_sys::{
-    CssStyleDeclaration, DocumentFragment, DomTokenList, Element, HtmlElement,
-    Node, Text,
+    Comment, CssStyleDeclaration, DocumentFragment, DomTokenList, Element,
+    HtmlElement, Node, Text,
 };
 
 pub struct Dom;
@@ -18,13 +18,14 @@ impl Renderer for Dom {
     type Node = Node;
     type Text = Text;
     type Element = Element;
-
-    fn create_element<E: ElementType + CreateElement<Dom>>() -> Self::Element {
-        E::create_element()
-    }
+    type Placeholder = Comment;
 
     fn create_text_node(text: &str) -> Self::Text {
         document().create_text_node(text)
+    }
+
+    fn create_placeholder() -> Self::Placeholder {
+        document().create_comment("")
     }
 
     fn set_text(node: &Self::Text, text: &str) {
@@ -85,6 +86,10 @@ impl Renderer for Dom {
             "replaceWith"
         );
     }
+
+    fn log_node(node: &Self::Node) {
+        web_sys::console::log_1(node);
+    }
 }
 
 impl DomRenderer for Dom {
@@ -130,23 +135,12 @@ impl DomRenderer for Dom {
     }
 }
 
-impl<E: ElementType> CreateElement<Dom> for E {
-    fn create_element() -> Element {
-        thread_local! {
-            static ELEMENT: Lazy<Element> = Lazy::new(|| {
-                document().create_element(stringify!($tag)).unwrap()
-            });
-        }
-        ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
-    }
-}
-
 impl Mountable<Dom> for Node {
     fn unmount(&mut self) {
         todo!()
     }
 
-    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
 }
@@ -156,7 +150,17 @@ impl Mountable<Dom> for Text {
         todo!()
     }
 
-    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
+        Dom::insert_node(parent, self, marker);
+    }
+}
+
+impl Mountable<Dom> for Comment {
+    fn unmount(&mut self) {
+        todo!()
+    }
+
+    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
 }
@@ -166,7 +170,7 @@ impl Mountable<Dom> for Element {
         todo!()
     }
 
-    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
 }
@@ -176,13 +180,19 @@ impl Mountable<Dom> for DocumentFragment {
         todo!()
     }
 
-    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
 }
 
 impl CastFrom<Node> for Text {
     fn cast_from(node: Node) -> Option<Text> {
+        node.clone().dyn_into().ok()
+    }
+}
+
+impl CastFrom<Node> for Comment {
+    fn cast_from(node: Node) -> Option<Comment> {
         node.clone().dyn_into().ok()
     }
 }

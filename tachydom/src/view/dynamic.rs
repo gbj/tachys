@@ -91,7 +91,7 @@ where
     }
 
     fn mount(
-        &self,
+        &mut self,
         parent: &<R as Renderer>::Element,
         marker: Option<&<R as Renderer>::Node>,
     ) {

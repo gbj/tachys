@@ -1,4 +1,7 @@
-use crate::{html::element::ElementType, view::Mountable};
+use crate::{
+    html::element::{CreateElement, ElementType},
+    view::Mountable,
+};
 
 pub mod dom;
 #[cfg(feature = "testing")]
@@ -15,12 +18,23 @@ pub trait Renderer: Sized {
     type Element: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
     /// A text node in the view tree.
     type Text: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
+    /// A placeholder node, which can be inserted into the tree but does not
+    /// appear (e.g., a comment node in the DOM).
+    type Placeholder: AsRef<Self::Node>
+        + CastFrom<Self::Node>
+        + Mountable<Self>
+        + Clone;
 
     /// Creates a new element node.
-    fn create_element<E: ElementType>() -> Self::Element;
+    fn create_element<E: CreateElement<Self>>() -> Self::Element {
+        E::create_element()
+    }
 
     /// Creates a new text node.
     fn create_text_node(text: &str) -> Self::Text;
+
+    /// Creates a new placeholder node.
+    fn create_placeholder() -> Self::Placeholder;
 
     /// Sets the text content of the node. If it's not a text node, this does nothing.
     fn set_text(node: &Self::Text, text: &str);
@@ -59,6 +73,8 @@ pub trait Renderer: Sized {
 
     /// Returns the next sibling of the given node, if any.
     fn next_sibling(node: &Self::Node) -> Option<Self::Node>;
+
+    fn log_node(node: &Self::Node);
 }
 
 /// Additional rendering behavior that applies only to DOM nodes.

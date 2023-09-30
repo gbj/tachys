@@ -137,7 +137,7 @@ impl<R: Renderer> Mountable<R> for StringState<R> {
     }
 
     fn mount(
-        &self,
+        &mut self,
         parent: &<R as Renderer>::Element,
         marker: Option<&<R as Renderer>::Node>,
     ) {
@@ -154,7 +154,7 @@ where
     }
 
     fn mount(
-        &self,
+        &mut self,
         parent: &<R as Renderer>::Element,
         marker: Option<&<R as Renderer>::Node>,
     ) {

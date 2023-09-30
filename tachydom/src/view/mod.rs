@@ -1,7 +1,7 @@
 use crate::{hydration::Cursor, renderer::Renderer};
 use std::{cell::Cell, rc::Rc};
 
-// pub mod any_view; // TODO
+pub mod any_view;
 pub mod dynamic;
 //pub mod iterators;
 #[cfg(feature = "nightly")]
@@ -82,7 +82,7 @@ pub trait Mountable<R: Renderer> {
     fn unmount(&mut self);
 
     /// Mounts a node to the interface.
-    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>);
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>);
 }
 
 /// Indicates where a node should be mounted to its parent.
@@ -107,8 +107,8 @@ where
         }
     }
 
-    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>) {
-        if let Some(inner) = &self {
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
+        if let Some(ref mut inner) = self {
             inner.mount(parent, marker);
         }
     }

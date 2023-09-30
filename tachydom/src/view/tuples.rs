@@ -31,7 +31,7 @@ where
 impl<R: Renderer> Mountable<R> for () {
     fn unmount(&mut self) {}
 
-    fn mount(&self, _parent: &R::Element, _marker: Option<&R::Node>) {}
+    fn mount(&mut self, _parent: &R::Element, _marker: Option<&R::Node>) {}
 }
 
 impl ToTemplate for () {
@@ -161,7 +161,7 @@ macro_rules! impl_view_for_tuples {
 			}
 
 			fn mount(
-				&self,
+				&mut self,
 				parent: &Rndr::Element,
 				marker: Option<&Rndr::Node>,
 			) {

@@ -8,7 +8,7 @@ use tachydom::{
     renderer::dom::Dom,
     renderer::DomRenderer,
     view::{
-        /* any_view::IntoAny, template::ViewTemplate, */ Position, Render,
+        any_view::IntoAny, /* template::ViewTemplate, */ Position, Render,
         RenderHtml, ToTemplate,
     },
 };
@@ -33,11 +33,11 @@ pub fn my_app() -> impl RenderHtml<Dom> {
         >
             This is <strong>"very"</strong> cool stuff.<span></span>
         </p>
-        /* {move || if count() % 2 == 0 {
+        {move || if count() % 2 == 0 {
             view! { <div>"even"</div> }.into_any()
         } else {
             view! { <span>"odd"</span> }.into_any()
-        }} */
+        }}
         <button
             on:click=move |ev| {
                 //tachydom::log("click");

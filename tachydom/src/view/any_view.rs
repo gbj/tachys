@@ -1,48 +1,67 @@
-use super::{Mountable, PositionState, Render};
-use crate::hydration::Cursor;
-use std::any::{Any, TypeId};
-use wasm_bindgen::JsCast;
-use web_sys::{Element, Node};
+use super::{Mountable, PositionState, Render, RenderHtml};
+use crate::{
+    hydration::Cursor,
+    renderer::{CastFrom, Renderer},
+};
+use std::{
+    any::{Any, TypeId},
+    marker::PhantomData,
+};
 
-pub struct AnyView {
+pub struct AnyView<R>
+where
+    R: Renderer,
+{
     type_id: TypeId,
     value: Box<dyn Any>,
-    to_html: fn(&mut dyn Any, &mut String, &PositionState),
-    build: fn(Box<dyn Any>) -> AnyViewState,
-    rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState),
+    to_html: fn(&dyn Any, &mut String, &PositionState),
+    build: fn(Box<dyn Any>) -> AnyViewState<R>,
+    rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState<R>),
     hydrate_from_server:
-        fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
+        fn(Box<dyn Any>, &Cursor<R>, &PositionState) -> AnyViewState<R>,
     hydrate_from_template:
-        fn(Box<dyn Any>, &Cursor, &PositionState) -> AnyViewState,
+        fn(Box<dyn Any>, &Cursor<R>, &PositionState) -> AnyViewState<R>,
 }
 
-pub struct AnyViewState {
+pub struct AnyViewState<R>
+where
+    R: Renderer,
+{
     type_id: TypeId,
+    placeholder: R::Placeholder,
     state: Box<dyn Any>,
     unmount: fn(&mut dyn Any),
-    as_mountable: fn(&dyn Any) -> Option<Node>,
+    mount: fn(&mut dyn Any, parent: &R::Element, marker: Option<&R::Node>),
+    rndr: PhantomData<R>,
 }
 
-pub trait IntoAny {
-    fn into_any(self) -> AnyView;
-}
-
-impl<T> IntoAny for T
+pub trait IntoAny<R>
 where
-    T: Render + 'static,
-    T::State: 'static,
+    R: Renderer,
 {
-    fn into_any(self) -> AnyView {
+    fn into_any(self) -> AnyView<R>;
+}
+
+impl<T, R> IntoAny<R> for T
+where
+    T: RenderHtml<R> + 'static,
+    T::State: 'static,
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
+    fn into_any(self) -> AnyView<R> {
         let value = Box::new(self) as Box<dyn Any>;
 
-        let to_html = |value: &mut dyn Any,
-                       buf: &mut String,
-                       position: &PositionState| {
-            let mut value = value
-                .downcast_mut::<T>()
-                .expect("AnyView::to_html could not be downcast");
-            value.to_html(buf, position)
-        };
+        let to_html =
+            |value: &dyn Any, buf: &mut String, position: &PositionState| {
+                let value = value
+                    .downcast_ref::<T>()
+                    .expect("AnyView::to_html could not be downcast");
+                value.to_html(buf, position);
+                // insert marker node
+                buf.push_str("<!>");
+            };
         let build = |value: Box<dyn Any>| {
             let value = value
                 .downcast::<T>()
@@ -54,17 +73,21 @@ where
                     .expect("AnyViewState::unmount couldn't downcast state");
                 state.unmount();
             };
-            let as_mountable = |state: &dyn Any| {
-                let state = state.downcast_ref::<T::State>().expect(
+            let mount = |state: &mut dyn Any,
+                         parent: &R::Element,
+                         marker: Option<&R::Node>| {
+                let state = state.downcast_mut::<T::State>().expect(
                     "AnyViewState::as_mountable couldn't downcast state",
                 );
-                state.as_mountable()
+                state.mount(parent, marker)
             };
             AnyViewState {
                 type_id: TypeId::of::<T>(),
                 state,
                 unmount,
-                as_mountable,
+                mount,
+                placeholder: R::create_placeholder(),
+                rndr: PhantomData,
             }
         };
         let hydrate_from_server =
@@ -75,23 +98,36 @@ where
                     .downcast::<T>()
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
+
+                // get placeholder node
+                cursor.sibling();
+                let placeholder = R::Placeholder::cast_from(cursor.current())
+                    .expect("should be a placeholder node");
+
+                // define unmount/mount functions
                 let unmount = |state: &mut dyn Any| {
                     let state = state.downcast_mut::<T::State>().expect(
                         "AnyViewState::unmount couldn't downcast state",
                     );
                     state.unmount();
                 };
-                let as_mountable = |state: &dyn Any| {
-                    let state = state.downcast_ref::<T::State>().expect(
-                        "AnyViewState::as_mountable couldn't downcast state",
-                    );
-                    state.as_mountable()
-                };
+                let mount =
+                    |state: &mut dyn Any,
+                     parent: &R::Element,
+                     marker: Option<&R::Node>| {
+                        let state = state.downcast_mut::<T::State>().expect(
+                            "AnyViewState::as_mountable couldn't downcast \
+                             state",
+                        );
+                        state.mount(parent, marker)
+                    };
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
                     unmount,
-                    as_mountable,
+                    mount,
+                    rndr: PhantomData,
+                    placeholder,
                 }
             };
         let hydrate_from_template =
@@ -103,28 +139,40 @@ where
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
 
+                // get placeholder node
+                cursor.sibling();
+                let placeholder = R::Placeholder::cast_from(cursor.current())
+                    .expect("should be a placeholder node");
+
+                // define unmount/mount functions
                 let unmount = |state: &mut dyn Any| {
                     let state = state.downcast_mut::<T::State>().expect(
                         "AnyViewState::unmount couldn't downcast state",
                     );
                     state.unmount();
                 };
-                let as_mountable = |state: &dyn Any| {
-                    let state = state.downcast_ref::<T::State>().expect(
-                        "AnyViewState::as_mountable couldn't downcast state",
-                    );
-                    state.as_mountable()
-                };
+                let mount =
+                    |state: &mut dyn Any,
+                     parent: &R::Element,
+                     marker: Option<&R::Node>| {
+                        let state = state.downcast_mut::<T::State>().expect(
+                            "AnyViewState::as_mountable couldn't downcast \
+                             state",
+                        );
+                        state.mount(parent, marker)
+                    };
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
                     unmount,
-                    as_mountable,
+                    mount,
+                    rndr: PhantomData,
+                    placeholder,
                 }
             };
         let rebuild = |new_type_id: TypeId,
                        value: Box<dyn Any>,
-                       state: &mut AnyViewState| {
+                       state: &mut AnyViewState<R>| {
             let value = value
                 .downcast::<T>()
                 .expect("AnyView::rebuild couldn't downcast value");
@@ -135,18 +183,22 @@ where
                     .expect("AnyView::rebuild couldn't downcast state");
                 value.rebuild(state);
             } else {
-                // FIXME swapping types more generally
-                // unmount previous view
-                let prev_node = state.as_mountable();
-                // build new view and mount it
-                let new = value.into_any().build();
-                match (prev_node, new.as_mountable()) {
-                    (Some(prev), Some(new)) => {
-                        prev.unchecked_ref::<Element>()
-                            .replace_with_with_node_1(&new);
-                    }
-                    _ => {} // FIXME
-                }
+                // new state will be built with its own placeholder
+                // but this is a rebuild, and we actually want to reuse
+                // the old placeholder, because it's... well, it's holding the place
+                let mut new = value.into_any().build();
+                new.placeholder = state.placeholder.clone();
+
+                // get parent based on the old placeholder
+                // we're going to unmount the previous version,
+                // and remount the new version relative to the placeholder
+                let parent = R::Element::cast_from(
+                    R::get_parent(state.placeholder.as_ref())
+                        .expect("placeholder should have parent"),
+                )
+                .expect("placeholder parent should be Element");
+                state.unmount();
+                new.mount(&parent, Some(state.placeholder.as_ref()));
                 *state = new;
             }
         };
@@ -162,11 +214,29 @@ where
     }
 }
 
-impl Render for AnyView {
-    type State = AnyViewState;
+impl<R> Render<R> for AnyView<R>
+where
+    R: Renderer,
+{
+    type State = AnyViewState<R>;
 
+    fn build(self) -> Self::State {
+        (self.build)(self.value)
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        (self.rebuild)(self.type_id, self.value, state)
+    }
+}
+
+impl<R> RenderHtml<R> for AnyView<R>
+where
+    R: Renderer,
+    R::Element: Clone,
+    R::Node: Clone,
+{
     fn to_html(&self, buf: &mut String, position: &PositionState) {
-        (self.to_html)(&mut *self.value, buf, position)
+        (self.to_html)(&*self.value, buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -180,23 +250,18 @@ impl Render for AnyView {
             (self.hydrate_from_template)(self.value, cursor, position)
         }
     }
-
-    fn build(self) -> Self::State {
-        (self.build)(self.value)
-    }
-
-    fn rebuild(self, state: &mut Self::State) {
-        (self.rebuild)(self.type_id, self.value, state)
-    }
 }
 
-impl Mountable for AnyViewState {
+impl<R> Mountable<R> for AnyViewState<R>
+where
+    R: Renderer,
+{
     fn unmount(&mut self) {
-        (self.unmount)(&mut self.state)
+        (self.unmount)(&mut *self.state)
     }
 
-    fn as_mountable(&self) -> Option<Node> {
-        (self.as_mountable)(&*self.state)
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
+        (self.mount)(&mut *self.state, parent, marker)
     }
 }
 
@@ -205,14 +270,15 @@ mod tests {
     use super::IntoAny;
     use crate::{
         html::element::{p, span},
-        view::Render,
+        renderer::mock_dom::MockDom,
+        view::{any_view::AnyView, Render, RenderHtml},
     };
 
     #[test]
     fn should_handle_html_creation() {
         let x = 1;
         let mut buf = String::new();
-        let mut view = if x == 0 {
+        let view: AnyView<MockDom> = if x == 0 {
             p((), "foo").into_any()
         } else {
             span((), "bar").into_any()

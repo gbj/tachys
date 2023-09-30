@@ -9,7 +9,7 @@ impl<R: Renderer> Render<R> for () {
 
     fn build(self) -> Self::State {}
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {}
 }
 
 impl<R> RenderHtml<R> for ()
@@ -18,12 +18,12 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&mut self, _buf: &mut String, _position: &PositionState) {}
+    fn to_html(&self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        cursor: &Cursor<R>,
-        position: &PositionState,
+        _cursor: &Cursor<R>,
+        _position: &PositionState,
     ) -> Self::State {
     }
 }
@@ -31,13 +31,11 @@ where
 impl<R: Renderer> Mountable<R> for () {
     fn unmount(&mut self) {}
 
-    fn as_mountable(&self) -> Option<R::Node> {
-        None
-    }
+    fn mount(&self, _parent: &R::Element, _marker: Option<&R::Node>) {}
 }
 
 impl ToTemplate for () {
-    fn to_template(buf: &mut String, position: &mut Position) {}
+    fn to_template(_buf: &mut String, _position: &mut Position) {}
 }
 
 impl<A: Render<R>, R: Renderer> Render<R> for (A,) {
@@ -59,7 +57,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position);
     }
 
@@ -116,7 +114,7 @@ macro_rules! impl_view_for_tuples {
 			Rndr::Node: Clone,
 			Rndr::Element: Clone
 		{
-			fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+			fn to_html(&self, buf: &mut String, position: &PositionState) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html(buf, position);
@@ -162,19 +160,16 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			fn as_mountable(&self) -> Option<Rndr::Node> {
-				todo!()
-				/* let fragment = Rndr::create_fragment();
+			fn mount(
+				&self,
+				parent: &Rndr::Element,
+				marker: Option<&Rndr::Node>,
+			) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
-					if let Some(node) = [<$first:lower>].as_mountable() {
-						Rndr::insert_node(fragment.as_ref(), &node, None);
-					}
-					$(if let Some(node) = [<$ty:lower>].as_mountable() {
-						Rndr::insert_node(fragment.as_ref(), &node, None);
-					});*
+					[<$first:lower>].mount(parent, marker);
+					$([<$ty:lower>].mount(parent, marker));*
 				}
-				Some(fragment) */
 			}
 		}
 	};

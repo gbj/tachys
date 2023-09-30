@@ -1,8 +1,14 @@
 use crate::renderer::Renderer;
 use std::{cell::RefCell, rc::Rc};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Cursor<R: Renderer>(Rc<RefCell<R::Node>>);
+
+impl<R: Renderer> Clone for Cursor<R> {
+    fn clone(&self) -> Self {
+        Self(Rc::clone(&self.0))
+    }
+}
 
 impl<R> Cursor<R>
 where

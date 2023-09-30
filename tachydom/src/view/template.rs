@@ -82,7 +82,7 @@ where
     R::Element: Clone,
     V::State: Mountable<R>,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         self.view.to_html(buf, position)
     }
 

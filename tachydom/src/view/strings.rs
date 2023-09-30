@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     hydration::Cursor,
-    renderer::{dom::Dom, Renderer},
+    renderer::{CastFrom, Renderer},
 };
 
 impl<'a, R: Renderer> Render<R> for &'a str {
@@ -29,7 +29,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
@@ -42,13 +42,14 @@ where
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
-        /* if position.get() == Position::FirstChild {
+        if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
         }
-        let mut node = cursor.current();
+
+        let node = cursor.current();
+        let mut node = R::Text::cast_from(node).unwrap();
 
         if FROM_SERVER
             && matches!(
@@ -60,12 +61,12 @@ where
         }
         if !FROM_SERVER {
             let new = R::create_text_node(self);
-            R::replace_node(&node, new);
+            R::replace_node(node.as_ref(), new.as_ref());
             node = new;
         }
         position.set(Position::NextChild);
 
-        (node, self) */
+        StrState { node, str: self }
     }
 }
 
@@ -99,9 +100,8 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        todo!()
-        //self.as_str().to_html(buf, position)
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
+        <&str as RenderHtml<R>>::to_html(&self.as_str(), buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -109,9 +109,9 @@ where
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
-        /* let (node, _) = self.as_str().hydrate::<FROM_SERVER>(cursor, position);
-        (node, self) */
+        let StrState { node, .. } =
+            self.as_str().hydrate::<FROM_SERVER>(cursor, position);
+        StringState { node, str: self }
     }
 }
 
@@ -133,12 +133,15 @@ pub struct StrState<'a, R: Renderer> {
 
 impl<R: Renderer> Mountable<R> for StringState<R> {
     fn unmount(&mut self) {
-        todo!()
-        //self.node.unmount()
+        self.node.unmount()
     }
 
-    fn as_mountable(&self) -> Option<R::Node> {
-        self.node.as_mountable()
+    fn mount(
+        &self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
+        R::insert_node(parent, self.node.as_ref(), marker);
     }
 }
 
@@ -147,11 +150,14 @@ where
     R: Renderer,
 {
     fn unmount(&mut self) {
-        todo!()
-        //self.node.unmount()
+        self.node.unmount()
     }
 
-    fn as_mountable(&self) -> Option<R::Node> {
-        self.node.as_mountable()
+    fn mount(
+        &self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
+        R::insert_node(parent, self.node.as_ref(), marker);
     }
 }

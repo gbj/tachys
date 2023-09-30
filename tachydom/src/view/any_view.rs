@@ -165,7 +165,7 @@ where
 impl Render for AnyView {
     type State = AnyViewState;
 
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         (self.to_html)(&mut *self.value, buf, position)
     }
 

@@ -58,7 +58,7 @@ where
 pub trait IntoClass<R: Renderer> {
     type State;
 
-    fn to_html(&mut self, class: &mut String);
+    fn to_html(&self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -73,7 +73,7 @@ where
 {
     type State = (Element, &'a str);
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         class.push_str(self);
     }
 
@@ -101,7 +101,7 @@ where
 {
     type State = (Element, String);
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         IntoClass::to_html(self, class);
     }
 
@@ -126,7 +126,7 @@ where
 impl IntoClass for (&'static str, bool) {
     type State = (DomTokenList, bool);
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         let (name, include) = self;
         if *include {
             class.push_str(name);
@@ -168,7 +168,7 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         let mut value = self();
         value.to_html(class);
     }
@@ -209,7 +209,7 @@ where
 {
     type State = Effect<bool>;
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         let (name, f) = self;
         let include = f();
         if include {

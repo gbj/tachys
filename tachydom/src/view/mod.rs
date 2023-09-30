@@ -1,6 +1,5 @@
 use crate::{hydration::Cursor, renderer::Renderer};
 use std::{cell::Cell, rc::Rc};
-use web_sys::{HtmlElement, Node};
 
 // pub mod any_view; // TODO
 pub mod dynamic;
@@ -48,7 +47,7 @@ where
     R::Element: Clone,
 {
     /// Renders a view to HTML.
-    fn to_html(&mut self, buf: &mut String, position: &PositionState);
+    fn to_html(&self, buf: &mut String, position: &PositionState);
 
     /// Makes a set of DOM nodes rendered from HTML interactive.
     ///
@@ -82,8 +81,19 @@ pub trait Mountable<R: Renderer> {
     /// Detaches the view from the DOM.
     fn unmount(&mut self);
 
-    /// Returns a node that can be mounted anywhere in the DOM.
-    fn as_mountable(&self) -> Option<R::Node>;
+    /// Mounts a node to the interface.
+    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>);
+}
+
+/// Indicates where a node should be mounted to its parent.
+pub enum MountKind<R>
+where
+    R: Renderer,
+{
+    /// Node should be mounted before this marker node.
+    Before(R::Node),
+    /// Node should be appended to the parent’s children.
+    Append,
 }
 
 impl<T, R> Mountable<R> for Option<T>
@@ -97,8 +107,10 @@ where
         }
     }
 
-    fn as_mountable(&self) -> Option<R::Node> {
-        self.as_ref().and_then(Mountable::as_mountable)
+    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>) {
+        if let Some(inner) = &self {
+            inner.mount(parent, marker);
+        }
     }
 }
 

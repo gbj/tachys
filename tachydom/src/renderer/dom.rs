@@ -1,4 +1,4 @@
-use super::Renderer;
+use super::{CastFrom, Renderer};
 use crate::{
     dom::document,
     html::element::{CreateElement, ElementType},
@@ -7,22 +7,17 @@ use crate::{
 };
 use once_cell::unsync::Lazy;
 use wasm_bindgen::{intern, JsCast};
-use web_sys::Element;
+use web_sys::{DocumentFragment, Element, Node, Text};
 
 pub struct Dom;
 
 impl Renderer for Dom {
-    type Node = web_sys::Node;
-    type Text = web_sys::Text;
-    type Element = web_sys::Element;
-    type Fragment = web_sys::DocumentFragment;
+    type Node = Node;
+    type Text = Text;
+    type Element = Element;
 
     fn create_element<E: ElementType + CreateElement<Dom>>() -> Self::Element {
         E::create_element()
-    }
-
-    fn create_fragment() -> Self::Fragment {
-        document().create_document_fragment()
     }
 
     fn create_text_node(text: &str) -> Self::Text {
@@ -64,6 +59,10 @@ impl Renderer for Dom {
         ok_or_debug!(parent.remove_child(child), parent, "removeNode")
     }
 
+    fn remove(node: &Self::Node) {
+        node.unchecked_ref::<Element>().remove();
+    }
+
     fn get_parent(node: &Self::Node) -> Option<Self::Node> {
         node.parent_node()
     }
@@ -86,9 +85,9 @@ impl Renderer for Dom {
 }
 
 impl<E: ElementType> CreateElement<Dom> for E {
-    fn create_element() -> <Dom as Renderer>::Element {
+    fn create_element() -> Element {
         thread_local! {
-            static ELEMENT: Lazy<<Dom as Renderer>::Element> = Lazy::new(|| {
+            static ELEMENT: Lazy<Element> = Lazy::new(|| {
                 document().create_element(stringify!($tag)).unwrap()
             });
         }
@@ -96,42 +95,54 @@ impl<E: ElementType> CreateElement<Dom> for E {
     }
 }
 
-impl Mountable<Dom> for web_sys::Node {
+impl Mountable<Dom> for Node {
     fn unmount(&mut self) {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<Dom as Renderer>::Node> {
-        Some(self.clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        Dom::insert_node(parent, self, marker);
     }
 }
 
-impl Mountable<Dom> for web_sys::Text {
+impl Mountable<Dom> for Text {
     fn unmount(&mut self) {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<Dom as Renderer>::Node> {
-        Some(self.unchecked_ref::<web_sys::Node>().clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        Dom::insert_node(parent, self, marker);
     }
 }
 
-impl Mountable<Dom> for web_sys::Element {
+impl Mountable<Dom> for Element {
     fn unmount(&mut self) {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<Dom as Renderer>::Node> {
-        Some(self.unchecked_ref::<web_sys::Node>().clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        Dom::insert_node(parent, self, marker);
     }
 }
 
-impl Mountable<Dom> for web_sys::DocumentFragment {
+impl Mountable<Dom> for DocumentFragment {
     fn unmount(&mut self) {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<Dom as Renderer>::Node> {
-        Some(self.unchecked_ref::<web_sys::Node>().clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        Dom::insert_node(parent, self, marker);
+    }
+}
+
+impl CastFrom<Node> for Text {
+    fn cast_from(node: Node) -> Option<Text> {
+        node.clone().dyn_into().ok()
+    }
+}
+
+impl CastFrom<Node> for Element {
+    fn cast_from(node: Node) -> Option<Element> {
+        node.clone().dyn_into().ok()
     }
 }

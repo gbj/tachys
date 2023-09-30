@@ -12,17 +12,12 @@ pub trait Renderer: Sized {
     /// The basic type of node in the view tree.
     type Node: Mountable<Self>;
     /// A visible element in the view tree.
-    type Element: AsRef<Self::Node> + Mountable<Self>;
+    type Element: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
     /// A text node in the view tree.
-    type Text: AsRef<Self::Node> + Mountable<Self>;
-    /// A collection of nodes in the view tree.
-    type Fragment: AsRef<Self::Node> + Mountable<Self>;
+    type Text: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
 
     /// Creates a new element node.
     fn create_element<E: ElementType>() -> Self::Element;
-
-    /// Creates a new fragment.
-    fn create_fragment() -> Self::Fragment;
 
     /// Creates a new text node.
     fn create_text_node(text: &str) -> Self::Text;
@@ -41,7 +36,7 @@ pub trait Renderer: Sized {
     fn insert_node(
         parent: &Self::Element,
         new_child: &Self::Node,
-        anchor: Option<&Self::Node>,
+        marker: Option<&Self::Node>,
     );
 
     /// Replaces the previous node with the new node.
@@ -53,6 +48,9 @@ pub trait Renderer: Sized {
         child: &Self::Node,
     ) -> Option<Self::Node>;
 
+    /// Removes the node.
+    fn remove(node: &Self::Node);
+
     /// Gets the parent of the given node, if any.
     fn get_parent(node: &Self::Node) -> Option<Self::Node>;
 
@@ -61,4 +59,17 @@ pub trait Renderer: Sized {
 
     /// Returns the next sibling of the given node, if any.
     fn next_sibling(node: &Self::Node) -> Option<Self::Node>;
+}
+
+/// Attempts to cast from one type to another.
+///
+/// This works in a similar way to `TryFrom`. We implement it as a separate trait
+/// simply so we don't have to create wrappers for the `web_sys` types; it can't be
+/// implemented on them directly because of the orphan rules.
+
+pub trait CastFrom<T>
+where
+    Self: Sized,
+{
+    fn cast_from(source: T) -> Option<Self>;
 }

@@ -2,13 +2,11 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
 };
 use crate::{
-    dom::document,
     html::attribute::{Attribute, AttributeKey, AttributeValue},
     hydration::Cursor,
     renderer::Renderer,
 };
 use std::marker::PhantomData;
-use web_sys::{Element, Text};
 
 /// An attribute for which both the key and the value are known at compile time,
 /// i.e., as `&'static str`s.
@@ -52,26 +50,27 @@ impl<K, const V: &'static str, R> Attribute<R> for StaticAttr<K, V>
 where
     K: AttributeKey,
     R: Renderer,
+    R::Element: Clone,
 {
     type State = ();
 
     fn to_html(
-        &mut self,
+        &self,
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
     ) {
-        todo!()
-        //AttributeValue::to_html(&mut V, K::KEY, buf)
+        AttributeValue::<R>::to_html(&mut V, K::KEY, buf)
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {}
+    fn hydrate<const FROM_SERVER: bool>(self, _el: &R::Element) -> Self::State {
+    }
 
     fn build(self, el: &R::Element) -> Self::State {
         R::set_attribute(el, K::KEY, V);
     }
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {}
 }
 
 #[derive(Debug)]
@@ -99,7 +98,7 @@ where
     R::Element: Clone,
     R::Text: Mountable<R>,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")

@@ -2,7 +2,7 @@
 //!
 //! Do not use this for anything real.
 
-use super::Renderer;
+use super::{CastFrom, Renderer};
 use crate::{html::element::ElementType, view::Mountable};
 use slotmap::{new_key_type, SlotMap};
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
@@ -160,7 +160,7 @@ impl Document {
 
     fn with_node<U>(id: NodeId, f: impl FnOnce(&NodeData) -> U) -> Option<U> {
         DOCUMENT.with(|d| {
-            let mut data = d.0.borrow();
+            let data = d.0.borrow();
             let data = data.get(id);
             data.map(f)
         })
@@ -177,7 +177,7 @@ impl Document {
         })
     }
 
-    fn reset(&self) {
+    pub fn reset(&self) {
         self.0.borrow_mut().clear();
     }
 
@@ -198,12 +198,11 @@ impl Document {
             ty: NodeType::Text(data.to_string()),
         })))
     }
+}
 
-    fn create_fragment(&self) -> Fragment {
-        Fragment(Node(self.0.borrow_mut().insert(NodeData {
-            parent: None,
-            ty: NodeType::Fragment(Vec::new()),
-        })))
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -231,8 +230,8 @@ impl Mountable<MockDom> for Node {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
-        Some(self.clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        MockDom::insert_node(parent, self, marker);
     }
 }
 
@@ -241,8 +240,8 @@ impl Mountable<MockDom> for Text {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
-        Some(self.as_ref().clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        MockDom::insert_node(parent, self.as_ref(), marker);
     }
 }
 
@@ -251,8 +250,8 @@ impl Mountable<MockDom> for Element {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
-        Some(self.as_ref().clone())
+    fn mount(&self, parent: &Element, marker: Option<&Node>) {
+        MockDom::insert_node(parent, self.as_ref(), marker);
     }
 }
 
@@ -261,8 +260,12 @@ impl Mountable<MockDom> for Fragment {
         todo!()
     }
 
-    fn as_mountable(&self) -> Option<<MockDom as Renderer>::Node> {
-        Some(self.as_ref().clone())
+    fn mount(
+        &self,
+        parent: &<MockDom as Renderer>::Element,
+        marker: Option<&<MockDom as Renderer>::Node>,
+    ) {
+        todo!()
     }
 }
 
@@ -270,14 +273,9 @@ impl Renderer for MockDom {
     type Node = Node;
     type Text = Text;
     type Element = Element;
-    type Fragment = Fragment;
 
     fn create_element<E: ElementType>() -> Self::Element {
         document().create_element(E::TAG)
-    }
-
-    fn create_fragment() -> Self::Fragment {
-        document().create_fragment()
     }
 
     fn create_text_node(data: &str) -> Self::Text {
@@ -366,6 +364,15 @@ impl Renderer for MockDom {
         .flatten()
     }
 
+    fn remove(node: &Self::Node) {
+        let parent = Element(Node(
+            Self::get_parent(node)
+                .expect("tried to remove a parentless node")
+                .0,
+        ));
+        Self::remove_node(&parent, node);
+    }
+
     fn get_parent(node: &Self::Node) -> Option<Self::Node> {
         Document::with_node(node.0, |node| node.parent)
             .flatten()
@@ -403,6 +410,24 @@ impl Renderer for MockDom {
 
     fn replace_node(old: &Self::Node, new: &Self::Node) {
         todo!()
+    }
+}
+
+impl CastFrom<Node> for Text {
+    fn cast_from(source: Node) -> Option<Self> {
+        Document::with_node(source.0, |node| {
+            matches!(node.ty, NodeType::Text(_))
+        })
+        .and_then(|matches| matches.then_some(Text(Node(source.0))))
+    }
+}
+
+impl CastFrom<Node> for Element {
+    fn cast_from(source: Node) -> Option<Self> {
+        Document::with_node(source.0, |node| {
+            matches!(node.ty, NodeType::Element { .. })
+        })
+        .and_then(|matches| matches.then_some(Element(Node(source.0))))
     }
 }
 

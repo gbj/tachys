@@ -1,8 +1,8 @@
-use crate::html::attribute::Attribute;
-use crate::view::Position;
-use crate::view::ToTemplate;
-use std::borrow::Cow;
-use std::fmt::Debug;
+use crate::{
+    html::attribute::Attribute,
+    view::{Position, ToTemplate},
+};
+use std::{borrow::Cow, fmt::Debug};
 use wasm_bindgen::{convert::FromWasmAbi, JsCast, JsValue};
 
 pub fn on<E>(event: E, cb: impl FnMut(E::EventType) + 'static) -> On
@@ -13,8 +13,10 @@ where
     On(
         event.name(),
         Box::new(move || {
-            wasm_bindgen::closure::Closure::wrap(Box::new(cb) as Box<dyn FnMut(E::EventType)>)
-                .into_js_value()
+            wasm_bindgen::closure::Closure::wrap(
+                Box::new(cb) as Box<dyn FnMut(E::EventType)>
+            )
+            .into_js_value()
         }),
     )
 }
@@ -30,16 +32,28 @@ impl Attribute for On {
     type State = ();
 
     #[inline(always)]
-    fn to_html(&mut self, _buf: &mut String, _class: &mut String, _style: &mut String) {}
+    fn to_html(
+        &self,
+        _buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+    ) {
+    }
 
     #[inline(always)]
     fn hydrate<const FROM_SERVER: bool>(self, el: &web_sys::Element) {
-        el.add_event_listener_with_callback(&self.0, (self.1)().as_ref().unchecked_ref());
+        el.add_event_listener_with_callback(
+            &self.0,
+            (self.1)().as_ref().unchecked_ref(),
+        );
     }
 
     #[inline(always)]
     fn build(self, el: &web_sys::Element) {
-        el.add_event_listener_with_callback(&self.0, (self.1)().as_ref().unchecked_ref());
+        el.add_event_listener_with_callback(
+            &self.0,
+            (self.1)().as_ref().unchecked_ref(),
+        );
     }
 
     #[inline(always)]
@@ -321,10 +335,11 @@ generate_event_types! {
 
 // Export `web_sys` event types
 pub use web_sys::{
-    AnimationEvent, BeforeUnloadEvent, CompositionEvent, CustomEvent, DeviceMotionEvent,
-    DeviceOrientationEvent, DragEvent, ErrorEvent, Event, FocusEvent, GamepadEvent,
-    HashChangeEvent, InputEvent, KeyboardEvent, MessageEvent, MouseEvent, PageTransitionEvent,
-    PointerEvent, PopStateEvent, ProgressEvent, PromiseRejectionEvent,
-    SecurityPolicyViolationEvent, StorageEvent, SubmitEvent, TouchEvent, TransitionEvent, UiEvent,
+    AnimationEvent, BeforeUnloadEvent, CompositionEvent, CustomEvent,
+    DeviceMotionEvent, DeviceOrientationEvent, DragEvent, ErrorEvent, Event,
+    FocusEvent, GamepadEvent, HashChangeEvent, InputEvent, KeyboardEvent,
+    MessageEvent, MouseEvent, PageTransitionEvent, PointerEvent, PopStateEvent,
+    ProgressEvent, PromiseRejectionEvent, SecurityPolicyViolationEvent,
+    StorageEvent, SubmitEvent, TouchEvent, TransitionEvent, UiEvent,
     WheelEvent,
 };

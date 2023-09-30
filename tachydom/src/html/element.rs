@@ -1,13 +1,11 @@
 use crate::{
-    dom::document,
     html::attribute::Attribute,
     hydration::Cursor,
-    renderer::{dom::Dom, Renderer},
+    renderer::{CastFrom, Renderer},
     view::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
-use once_cell::unsync::Lazy;
 use std::{fmt::Debug, marker::PhantomData};
 
 pub struct HtmlElement<E, At, Ch, Rndr>
@@ -54,9 +52,7 @@ where
         let el = Rndr::create_element::<E>();
         let attrs = self.attributes.build(&el);
         let children = self.children.build();
-        if let Some(child) = children.as_mountable() {
-            Rndr::insert_node(&el, &child, None);
-        }
+        children.mount(&el, None);
         ElementState {
             el,
             attrs,
@@ -75,7 +71,7 @@ where
     Rndr::Node: Clone,
     Rndr::Element: Clone,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);
@@ -129,25 +125,29 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
-        /* if position.get() == Position::FirstChild {
+        if position.get() == Position::FirstChild {
             cursor.child();
         } else {
             cursor.sibling();
         }
-        let el = cursor.current().to_owned();
+        let el = Rndr::Element::cast_from(cursor.current()).unwrap();
 
-        let attrs = self.attributes.hydrate::<FROM_SERVER>(el.unchecked_ref());
+        let attrs = self.attributes.hydrate::<FROM_SERVER>(&el);
 
         // hydrate children
         position.set(Position::FirstChild);
         let children = self.children.hydrate::<FROM_SERVER>(cursor, position);
-        cursor.set(el.clone());
+        cursor.set(el.as_ref().clone());
 
         // go to next sibling
         position.set(Position::NextChild);
 
-        (el.unchecked_into(), attrs, children) */
+        ElementState {
+            el,
+            attrs,
+            children,
+            rndr: PhantomData,
+        }
     }
 }
 
@@ -161,15 +161,13 @@ pub struct ElementState<At, Ch, R: Renderer> {
 impl<At, Ch, R> Mountable<R> for ElementState<At, Ch, R>
 where
     R: Renderer,
-    R::Node: Clone,
 {
     fn unmount(&mut self) {
-        todo!()
-        //self.el.remove()
+        R::remove(self.el.as_ref());
     }
 
-    fn as_mountable(&self) -> Option<R::Node> {
-        Some(self.el.as_ref().clone())
+    fn mount(&self, parent: &R::Element, marker: Option<&R::Node>) {
+        R::insert_node(parent, self.el.as_ref(), marker);
     }
 }
 

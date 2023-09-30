@@ -1,11 +1,10 @@
-use crate::renderer::{dom::Dom, Renderer};
+use crate::renderer::Renderer;
 use std::borrow::Cow;
-use web_sys::Element;
 
 pub trait AttributeValue<R: Renderer> {
     type State;
 
-    fn to_html(&mut self, key: &str, buf: &mut String);
+    fn to_html(&self, key: &str, buf: &mut String);
 
     fn to_template(key: &str, buf: &mut String);
 
@@ -25,7 +24,7 @@ where
     R: Renderer,
 {
     type State = ();
-    fn to_html(&mut self, _key: &str, _buf: &mut String) {}
+    fn to_html(&self, _key: &str, _buf: &mut String) {}
 
     fn to_template(_key: &str, _buf: &mut String) {}
 
@@ -43,7 +42,7 @@ where
 {
     type State = (R::Element, &'a str);
 
-    fn to_html(&mut self, key: &str, buf: &mut String) {
+    fn to_html(&self, key: &str, buf: &mut String) {
         buf.push(' ');
         buf.push_str(key);
         buf.push_str("=\"");
@@ -89,9 +88,8 @@ where
 {
     type State = (R::Element, String);
 
-    fn to_html(&mut self, key: &str, buf: &mut String) {
-        todo!()
-        //self.as_str().to_html(key, buf);
+    fn to_html(&self, key: &str, buf: &mut String) {
+        <&str as AttributeValue<R>>::to_html(&self.as_str(), key, buf);
     }
 
     fn to_template(key: &str, buf: &mut String) {
@@ -103,9 +101,12 @@ where
         key: &str,
         el: &R::Element,
     ) -> Self::State {
-        todo!()
-        /* let (el, _) = self.as_str().hydrate::<FROM_SERVER>(key, el);
-        (el, self) */
+        let (el, _) = <&str as AttributeValue<R>>::hydrate::<FROM_SERVER>(
+            self.as_str(),
+            key,
+            el,
+        );
+        (el, self)
     }
 
     fn build(self, el: &R::Element, key: &str) -> Self::State {
@@ -129,7 +130,7 @@ where
 {
     type State = (R::Element, bool);
 
-    fn to_html(&mut self, key: &str, buf: &mut String) {
+    fn to_html(&self, key: &str, buf: &mut String) {
         if *self {
             buf.push(' ');
             buf.push_str(key);
@@ -181,7 +182,7 @@ where
 {
     type State = (R::Element, Option<V::State>);
 
-    fn to_html(&mut self, key: &str, buf: &mut String) {
+    fn to_html(&self, key: &str, buf: &mut String) {
         if let Some(v) = self {
             v.to_html(key, buf);
         }

@@ -1,7 +1,6 @@
 use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
 use crate::{hydration::Cursor, renderer::Renderer};
-use leptos_reactive::{create_render_effect, Effect};
-use web_sys::Node;
+use leptos_reactive::{create_render_effect, Effect, SignalDispose};
 
 impl<F, V> ToTemplate for F
 where
@@ -34,8 +33,14 @@ where
         })
     }
 
+    #[track_caller]
     fn rebuild(self, state: &mut Self::State) {
-        todo!()
+        crate::log(&format!(
+            "[REBUILDING EFFECT] Is this a mistake? {}",
+            std::panic::Location::caller(),
+        ));
+        let old_effect = std::mem::replace(state, self.build());
+        old_effect.dispose();
     }
 }
 
@@ -44,12 +49,12 @@ where
     F: Fn() -> V + 'static,
     V: RenderHtml<R>,
     V::State: 'static,
-    R: Renderer,
+    R: Renderer + 'static,
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&mut self, buf: &mut String, position: &PositionState) {
-        let mut value = self();
+    fn to_html(&self, buf: &mut String, position: &PositionState) {
+        let value = self();
         value.to_html(buf, position)
     }
 
@@ -58,8 +63,7 @@ where
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
-        /* let cursor = cursor.clone();
+        let cursor = cursor.clone();
         let position = position.clone();
         create_render_effect(move |prev| {
             let value = self();
@@ -69,7 +73,7 @@ where
             } else {
                 value.hydrate::<FROM_SERVER>(&cursor, &position)
             }
-        }) */
+        })
     }
 }
 
@@ -86,18 +90,23 @@ where
         });
     }
 
-    fn as_mountable(&self) -> Option<R::Node> {
+    fn mount(
+        &self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
         self.with_value_mut(|value| {
-            value.as_ref().and_then(|n| n.as_mountable())
-        })
-        .flatten()
+            if let Some(state) = value {
+                state.mount(parent, marker);
+            }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        html::element::{button, em, main, p, HtmlElement},
+        html::element::{button, main, HtmlElement},
         renderer::mock_dom::MockDom,
         view::Render,
     };
@@ -124,6 +133,30 @@ mod tests {
         assert_eq!(el.el.to_debug_html(), "<button>0</button>");
         count.set(1);
         assert_eq!(el.el.to_debug_html(), "<button>1</button>");
+        rt.dispose();
+    }
+
+    #[test]
+    fn update_dynamic_element_among_siblings() {
+        let rt = create_runtime();
+        let count = RwSignal::new(0);
+        let app: HtmlElement<_, _, _, MockDom> = main(
+            (),
+            button(
+                (),
+                ("Hello, my ", move || count.get().to_string(), " friends."),
+            ),
+        );
+        let el = app.build();
+        assert_eq!(
+            el.el.to_debug_html(),
+            "<main><button>Hello, my 0 friends.</button></main>"
+        );
+        count.set(42);
+        assert_eq!(
+            el.el.to_debug_html(),
+            "<main><button>Hello, my 42 friends.</button></main>"
+        );
         rt.dispose();
     }
 }

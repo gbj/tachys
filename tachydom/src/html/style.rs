@@ -62,7 +62,7 @@ where
 pub trait IntoStyle {
     type State;
 
-    fn to_html(&mut self, class: &mut String);
+    fn to_html(&self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &Element) -> Self::State;
 
@@ -74,7 +74,7 @@ pub trait IntoStyle {
 pub trait StylePropertyValue {
     type State;
 
-    fn to_html(&mut self, name: &str, class: &mut String);
+    fn to_html(&self, name: &str, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -88,7 +88,7 @@ pub trait StylePropertyValue {
 impl<'a> IntoStyle for &'a str {
     type State = (Element, &'a str);
 
-    fn to_html(&mut self, style: &mut String) {
+    fn to_html(&self, style: &mut String) {
         style.push_str(self);
         style.push(';');
     }
@@ -114,7 +114,7 @@ impl<'a> IntoStyle for &'a str {
 impl IntoStyle for String {
     type State = (Element, String);
 
-    fn to_html(&mut self, style: &mut String) {
+    fn to_html(&self, style: &mut String) {
         style.push_str(self);
         style.push(';');
     }
@@ -140,7 +140,7 @@ impl IntoStyle for String {
 impl<'a> IntoStyle for (&'a str, &'a str) {
     type State = (CssStyleDeclaration, &'a str);
 
-    fn to_html(&mut self, style: &mut String) {
+    fn to_html(&self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push(':');
@@ -173,7 +173,7 @@ impl<'a> IntoStyle for (&'a str, &'a str) {
 impl<'a> IntoStyle for (&'a str, String) {
     type State = (CssStyleDeclaration, String);
 
-    fn to_html(&mut self, style: &mut String) {
+    fn to_html(&self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push_str(":");
@@ -210,7 +210,7 @@ where
 {
     type State = Effect<(CssStyleDeclaration, Cow<'static, str>)>;
 
-    fn to_html(&mut self, style: &mut String) {
+    fn to_html(&self, style: &mut String) {
         let (name, f) = self;
         let value = f();
         style.push_str(name);
@@ -255,7 +255,7 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&mut self, class: &mut String) {
+    fn to_html(&self, class: &mut String) {
         let mut value = self();
         value.to_html(class);
     }

@@ -1,3 +1,4 @@
+#![allow(incomplete_features)] // yolo
 #![cfg_attr(feature = "nightly", feature(adt_const_params))]
 
 use wasm_bindgen::JsValue;
@@ -18,7 +19,11 @@ pub(crate) trait UnwrapOrDebug {
 
     fn or_debug(self, el: &Node, label: &'static str);
 
-    fn ok_or_debug(self, el: &Node, label: &'static str) -> Option<Self::Output>;
+    fn ok_or_debug(
+        self,
+        el: &Node,
+        label: &'static str,
+    ) -> Option<Self::Output>;
 }
 
 impl<T> UnwrapOrDebug for Result<T, JsValue> {
@@ -32,7 +37,8 @@ impl<T> UnwrapOrDebug for Result<T, JsValue> {
                 let location = std::panic::Location::caller();
                 web_sys::console::warn_3(
                     &JsValue::from_str(&format!(
-                        "[WARNING] Non-fatal error at {location}, while calling {name} on "
+                        "[WARNING] Non-fatal error at {location}, while \
+                         calling {name} on "
                     )),
                     el,
                     &err,
@@ -46,14 +52,19 @@ impl<T> UnwrapOrDebug for Result<T, JsValue> {
     }
 
     #[track_caller]
-    fn ok_or_debug(self, el: &Node, name: &'static str) -> Option<Self::Output> {
+    fn ok_or_debug(
+        self,
+        el: &Node,
+        name: &'static str,
+    ) -> Option<Self::Output> {
         #[cfg(debug_assertions)]
         {
             if let Err(err) = &self {
                 let location = std::panic::Location::caller();
                 web_sys::console::warn_3(
                     &JsValue::from_str(&format!(
-                        "[WARNING] Non-fatal error at {location}, while calling {name} on "
+                        "[WARNING] Non-fatal error at {location}, while \
+                         calling {name} on "
                     )),
                     el,
                     err,

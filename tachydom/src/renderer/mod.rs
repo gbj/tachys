@@ -53,6 +53,21 @@ pub trait Renderer: Sized {
         marker: Option<&Self::Node>,
     );
 
+    /// Mounts the new child before the marker as its sibling.
+    ///
+    /// ## Panics
+    /// The default implementation panics if `before` does not have a parent [`R::Element`].
+    fn mount_before<M>(new_child: &mut M, before: &Self::Node)
+    where
+        M: Mountable<Self>,
+    {
+        let parent = Self::Element::cast_from(
+            Self::get_parent(before).expect("node should have parent"),
+        )
+        .expect("placeholder parent should be Element");
+        new_child.mount(&parent, Some(before));
+    }
+
     /// Replaces the previous node with the new node.
     fn replace_node(old: &Self::Node, new: &Self::Node);
 

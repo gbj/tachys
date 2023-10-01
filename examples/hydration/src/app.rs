@@ -46,9 +46,9 @@ pub fn my_app() -> impl RenderHtml<Dom> {
         >
             {move || count.get().to_string()}
         </button>
-        /* {move || (count() % 2 == 0).then(|| view! {
+        {move || (count() % 2 == 0).then(|| view! {
             <p>"Even"</p>
-        })} */
+        })}
     }
 }
 /*

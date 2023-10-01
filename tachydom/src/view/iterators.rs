@@ -1,8 +1,8 @@
 use super::{Mountable, Position, PositionState, Render, RenderHtml};
-use crate::{dom::comment, hydration::Cursor, renderer::Renderer};
-use std::{fmt::Debug, marker::PhantomData};
-use wasm_bindgen::JsCast;
-use web_sys::{Element, Node};
+use crate::{
+    hydration::Cursor,
+    renderer::{CastFrom, Renderer},
+};
 
 impl<T, R> Render<R> for Option<T>
 where
@@ -12,45 +12,30 @@ where
     type State = OptionState<T, R>;
 
     fn build(self) -> Self::State {
-        match self {
-            // if None, pull the text node and store it
-            None => OptionState::None(comment()),
-            // if Some(_), just hydrate the child
-            Some(value) => {
-                let state = value.build();
-                OptionState::Some(state)
-            }
+        let placeholder = R::create_placeholder();
+        OptionState {
+            placeholder,
+            state: self.map(T::build),
         }
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        match (&mut *state, self) {
+        match (&mut state.state, self) {
             // both None: no need to do anything
-            (OptionState::None(_), None) => {}
+            (None, None) => {}
             // both Some: need to rebuild child
-            (OptionState::Some(old), Some(new)) => {
+            (Some(old), Some(new)) => {
                 T::rebuild(new, old);
             }
             // Some => None: unmount replace with marker
-            (OptionState::Some(old), None) => {
-                let new_marker = comment();
-                if let Some(marker) = old.as_mountable() {
-                    marker
-                        .unchecked_ref::<Element>()
-                        .replace_with_with_node_1(&new_marker);
-                    old.unmount();
-                }
-                *state = OptionState::None(new_marker);
+            (Some(old), None) => {
+                old.unmount();
+                state.state = None;
             } // None => Some: build
-            (OptionState::None(marker), Some(new)) => {
-                let new_state = new.build();
-                let mountable = new_state.as_mountable();
-                if let Some(mountable) = mountable {
-                    marker
-                        .unchecked_ref::<Element>()
-                        .replace_with_with_node_1(&mountable);
-                }
-                *state = OptionState::Some(new_state);
+            (None, Some(new)) => {
+                let mut new_state = new.build();
+                R::mount_before(&mut new_state, state.placeholder.as_ref());
+                state.state = Some(new_state);
             }
         }
     }
@@ -61,14 +46,14 @@ where
     T: RenderHtml<R>,
     R: Renderer,
     R::Node: Clone,
+    R::Element: Clone,
 {
     fn to_html(&self, buf: &mut String, position: &PositionState) {
-        match self {
-            // pass Some(_) through directly
-            Some(value) => value.to_html(buf, position),
-            // otherwise render a marker that can be picked up during hydration
-            None => buf.push_str("<!--Option-->"),
+        if let Some(value) = self {
+            value.to_html(buf, position);
         }
+        // placeholder
+        buf.push_str("<!>");
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -76,39 +61,33 @@ where
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        match self {
-            // if None, pull the text node and store it
-            None => {
-                if position.get() == Position::FirstChild {
-                    cursor.child();
-                } else {
-                    cursor.sibling();
-                }
-                let node = cursor.current().to_owned();
-                position.set(Position::NextChild);
-                OptionState::None(node)
-            }
-            // if Some(_), just hydrate the child
-            Some(value) => {
-                let state = value.hydrate::<FROM_SERVER>(cursor, position);
-                position.set(Position::NextChild);
-                OptionState::Some(state)
-            }
+        // hydrate the state, if it exists
+        let state = self.map(|s| s.hydrate::<FROM_SERVER>(cursor, position));
+
+        // pull the placeholder
+        if position.get() == Position::FirstChild {
+            cursor.child();
+        } else {
+            cursor.sibling();
         }
+        let placeholder = cursor.current().to_owned();
+        let placeholder = R::Placeholder::cast_from(placeholder).unwrap();
+        position.set(Position::NextChild);
+
+        OptionState { placeholder, state }
     }
 }
 
 /// View state for an optional view.
-pub enum OptionState<T, R>
+pub struct OptionState<T, R>
 where
     T: Render<R>,
     R: Renderer,
 {
-    /// Contains a marker node that will be replaced when the
-    /// state switches to `Some(T)`.
-    None(R::Node),
+    /// Marks the location of this view.
+    placeholder: R::Placeholder,
     /// The view state.
-    Some(T::State),
+    state: Option<T::State>,
 }
 
 impl<T, R> Mountable<R> for OptionState<T, R>
@@ -117,31 +96,21 @@ where
     R: Renderer,
 {
     fn unmount(&mut self) {
-        match self {
-            OptionState::None(node) => {
-                node.parent_node().unwrap().remove_child(node).unwrap();
-            }
-            OptionState::Some(state) => state.unmount(),
+        if let Some(ref mut state) = self.state {
+            state.unmount();
         }
+        R::remove(self.placeholder.as_ref());
     }
 
-    fn as_mountable(&self) -> Option<Node> {
-        match self {
-            OptionState::None(node) => Some(node.clone()),
-            OptionState::Some(state) => state.as_mountable(),
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
+        if let Some(ref mut state) = self.state {
+            state.mount(parent, marker);
         }
+        self.placeholder.mount(parent, marker);
     }
 }
 
-impl<T: Render<R>, R: Renderer> Debug for OptionState<T, R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::None(arg0) => f.debug_tuple("None").field(arg0).finish(),
-            Self::Some(_) => f.debug_tuple("Some").finish(),
-        }
-    }
-}
-
+/*
 impl<T, R> Render<R> for Vec<T>
 where
     T: Render<R>,
@@ -283,3 +252,4 @@ mod tests {
         assert_eq!(buf, "ABC");
     }
 }
+*/

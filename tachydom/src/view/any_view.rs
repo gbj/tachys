@@ -192,13 +192,8 @@ where
                 // get parent based on the old placeholder
                 // we're going to unmount the previous version,
                 // and remount the new version relative to the placeholder
-                let parent = R::Element::cast_from(
-                    R::get_parent(state.placeholder.as_ref())
-                        .expect("placeholder should have parent"),
-                )
-                .expect("placeholder parent should be Element");
+                R::mount_before(&mut new, state.placeholder.as_ref());
                 state.unmount();
-                new.mount(&parent, Some(state.placeholder.as_ref()));
                 *state = new;
             }
         };

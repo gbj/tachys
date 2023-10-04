@@ -98,7 +98,9 @@ impl Renderer for TachyGtk {
     }
 
     fn create_placeholder() -> Self::Placeholder {
-        Element(Label::new(None).into())
+        let label = Label::new(None);
+        label.set_visible(false);
+        Element::from(label)
     }
 
     fn set_text(node: &Self::Text, text: &str) {

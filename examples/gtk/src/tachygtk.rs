@@ -124,10 +124,6 @@ impl Renderer for TachyGtk {
             .insert_before(&parent.0, marker.as_ref().map(|n| &n.0));
     }
 
-    fn replace_node(old: &Self::Node, new: &Self::Node) {
-        todo!()
-    }
-
     fn remove_node(
         parent: &Self::Element,
         child: &Self::Node,

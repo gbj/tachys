@@ -455,10 +455,6 @@ impl Renderer for MockDom {
         .flatten()
     }
 
-    fn replace_node(old: &Self::Node, new: &Self::Node) {
-        todo!()
-    }
-
     fn log_node(node: &Self::Node) {
         todo!()
     }

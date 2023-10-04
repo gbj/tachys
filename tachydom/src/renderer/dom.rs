@@ -79,14 +79,6 @@ impl Renderer for Dom {
         node.next_sibling()
     }
 
-    fn replace_node(old: &Self::Node, new: &Self::Node) {
-        or_debug!(
-            old.unchecked_ref::<Element>().replace_with_with_node_1(new),
-            old,
-            "replaceWith"
-        );
-    }
-
     fn log_node(node: &Self::Node) {
         web_sys::console::log_1(node);
     }

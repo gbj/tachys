@@ -60,8 +60,8 @@ where
             cursor.sibling();
         }
         if !FROM_SERVER {
-            let new = R::create_text_node(self);
-            R::replace_node(node.as_ref(), new.as_ref());
+            let mut new = R::create_text_node(self);
+            R::mount_before(&mut new, node.as_ref());
             node = new;
         }
         position.set(Position::NextChild);

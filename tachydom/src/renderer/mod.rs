@@ -68,9 +68,6 @@ pub trait Renderer: Sized {
         new_child.mount(&parent, Some(before));
     }
 
-    /// Replaces the previous node with the new node.
-    fn replace_node(old: &Self::Node, new: &Self::Node);
-
     /// Removes the child node from the parents, and returns the removed node.
     fn remove_node(
         parent: &Self::Element,

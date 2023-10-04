@@ -1,7 +1,7 @@
-use gtk::{prelude::*, Application, ApplicationWindow, Button};
+use gtk::{prelude::*, Application, ApplicationWindow, Button, Orientation};
 use leptos_reactive::*;
 use tachydom::view::{strings::StrState, Mountable, Render};
-use tachygtk::{button, Element, ElementState, TachyGtk};
+use tachygtk::{button, r#box, Element, ElementState, TachyGtk};
 mod tachygtk;
 
 const APP_ID: &str = "dev.leptos.Counter";
@@ -21,9 +21,21 @@ fn build_ui(app: &Application) {
     let _ = create_runtime();
 
     let value = RwSignal::new(0);
-    let view = button(
-        move || value.get().to_string(),
-        move |_| value.update(|n| *n += 1),
+    let view = r#box(
+        Orientation::Vertical,
+        12,
+        (
+            r#box(
+                Orientation::Horizontal,
+                12,
+                (
+                    button("-1", move |_| value.update(|n| *n -= 1)),
+                    move || value.get().to_string(),
+                    button("+1", move |_| value.update(|n| *n += 1)),
+                ),
+            ),
+            move || (value.get() % 2 == 0).then_some("Even!"),
+        ),
     );
     let state: ElementState<_> = view.build();
 

@@ -1,6 +1,6 @@
 use gtk::{
     prelude::{Cast, WidgetExt},
-    Label, Widget,
+    Label, Orientation, Widget,
 };
 use tachydom::{
     renderer::{CastFrom, Renderer},
@@ -11,6 +11,12 @@ pub struct TachyGtk;
 
 #[derive(Clone)]
 pub struct Element(pub Widget);
+
+impl Element {
+    pub fn remove(&self) {
+        self.0.unparent();
+    }
+}
 pub struct Text(pub Element);
 
 impl<T> From<T> for Element
@@ -24,7 +30,7 @@ where
 
 impl Mountable<TachyGtk> for Element {
     fn unmount(&mut self) {
-        todo!()
+        self.remove()
     }
 
     fn mount(
@@ -39,7 +45,7 @@ impl Mountable<TachyGtk> for Element {
 
 impl Mountable<TachyGtk> for Text {
     fn unmount(&mut self) {
-        todo!()
+        self.0.remove()
     }
 
     fn mount(
@@ -55,13 +61,17 @@ impl Mountable<TachyGtk> for Text {
 
 impl CastFrom<Element> for Element {
     fn cast_from(source: Element) -> Option<Self> {
-        todo!()
+        Some(source)
     }
 }
 
 impl CastFrom<Element> for Text {
     fn cast_from(source: Element) -> Option<Self> {
-        todo!()
+        source
+            .0
+            .downcast::<Label>()
+            .ok()
+            .map(|n| Text(Element::from(n)))
     }
 }
 
@@ -88,7 +98,7 @@ impl Renderer for TachyGtk {
     }
 
     fn create_placeholder() -> Self::Placeholder {
-        todo!()
+        Element(Label::new(None).into())
     }
 
     fn set_text(node: &Self::Text, text: &str) {
@@ -130,7 +140,7 @@ impl Renderer for TachyGtk {
     }
 
     fn get_parent(node: &Self::Node) -> Option<Self::Node> {
-        todo!()
+        node.0.parent().map(Element::from)
     }
 
     fn first_child(node: &Self::Node) -> Option<Self::Node> {
@@ -146,7 +156,6 @@ impl Renderer for TachyGtk {
     }
 }
 
-#[derive(Clone)]
 pub struct Button<C, F>(C, F)
 where
     C: Render<TachyGtk>,
@@ -184,7 +193,38 @@ where
     }
 }
 
-pub struct ElementState<C>(pub Element, C)
+pub struct Box_<C>(Orientation, i32, C)
+where
+    C: Render<TachyGtk>;
+
+pub fn r#box<C>(orientation: Orientation, spacing: i32, children: C) -> Box_<C>
+where
+    C: Render<TachyGtk>,
+{
+    Box_(orientation, spacing, children)
+}
+
+impl<C> Render<TachyGtk> for Box_<C>
+where
+    C: Render<TachyGtk>,
+{
+    type State = ElementState<C::State>;
+
+    fn build(self) -> Self::State {
+        let Box_(orientation, spacing, children) = self;
+        let el = Element::from(gtk::Box::new(orientation, spacing));
+        let mut children = children.build();
+        children.mount(&el, None);
+        ElementState(el, children)
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        let ElementState(el, children) = state;
+        self.2.rebuild(children);
+    }
+}
+
+pub struct ElementState<C>(pub Element, pub C)
 where
     C: Mountable<TachyGtk>;
 
@@ -193,7 +233,8 @@ where
     C: Mountable<TachyGtk>,
 {
     fn unmount(&mut self) {
-        todo!()
+        self.1.unmount();
+        self.0.remove();
     }
 
     fn mount(

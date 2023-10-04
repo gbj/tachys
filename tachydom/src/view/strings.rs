@@ -127,7 +127,7 @@ pub struct StringState<R: Renderer> {
 }
 
 pub struct StrState<'a, R: Renderer> {
-    node: R::Text,
+    pub node: R::Text,
     str: &'a str,
 }
 

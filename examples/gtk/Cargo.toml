@@ -1,0 +1,13 @@
+[package]
+name = "gtk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gtk = { version = "0.5.0", package = "gtk4" }
+leptos_reactive = { version = "0.5", features = ["csr", "nightly"] }
+tachydom = { path = "../../tachydom", features = ["nightly"] }
+
+[workspace]

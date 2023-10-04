@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 slotmap = { version = "1", optional = true }
-leptos_reactive = { path = "/Users/gjohnston/Documents/Projects/leptos-main/leptos/leptos_reactive" }
+leptos_reactive = "0.5"
 once_cell = "1.18.0"
 paste = "1.0.14"
 wasm-bindgen = "=0.2.87"

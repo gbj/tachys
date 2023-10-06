@@ -60,7 +60,7 @@ where
         _class: &mut String,
         _style: &mut String,
     ) {
-        AttributeValue::<R>::to_html(&mut V, K::KEY, buf)
+        AttributeValue::<R>::to_html(&V, K::KEY, buf)
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &R::Element) -> Self::State {

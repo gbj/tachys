@@ -184,7 +184,7 @@ where
         let (name, value) = self;
         let (style, prev) = state;
         if value != *prev {
-            R::set_css_property(&style, name, value);
+            R::set_css_property(style, name, value);
         }
         *prev = value;
     }
@@ -199,7 +199,7 @@ where
     fn to_html(&self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
-        style.push_str(":");
+        style.push(':');
         style.push_str(value);
         style.push(';');
     }
@@ -220,7 +220,7 @@ where
         let (name, value) = self;
         let (style, prev) = state;
         if value != *prev {
-            R::set_css_property(&style, name, &value);
+            R::set_css_property(style, name, &value);
         }
         *prev = value;
     }
@@ -256,7 +256,7 @@ where
                     Cow<'static, str>,
                 ) = &mut state;
                 if &value != prev {
-                    R::set_css_property(&style, name, &value);
+                    R::set_css_property(style, name, &value);
                 }
                 *prev = value;
                 state
@@ -324,7 +324,7 @@ mod tests {
     #[test]
     fn adds_simple_style() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> = p(style("display: block"), ());
+        let el: HtmlElement<_, _, _, Dom> = p(style("display: block"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p style="display: block;"></p>"#);
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn mixes_plain_and_specific_styles() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> =
+        let el: HtmlElement<_, _, _, Dom> =
             p((style("display: block"), style(("color", "blue"))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn handles_dynamic_styles() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> = p(
+        let el: HtmlElement<_, _, _, Dom> = p(
             (
                 style("display: block"),
                 style(("color", "blue")),

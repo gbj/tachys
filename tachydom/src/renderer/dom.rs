@@ -1,11 +1,5 @@
 use super::{CastFrom, DomRenderer, Renderer};
-use crate::{
-    dom::document,
-    html::element::{CreateElement, ElementType},
-    ok_or_debug, or_debug,
-    view::Mountable,
-};
-use once_cell::unsync::Lazy;
+use crate::{dom::document, ok_or_debug, or_debug, view::Mountable};
 use wasm_bindgen::{intern, JsCast, JsValue};
 use web_sys::{
     Comment, CssStyleDeclaration, DocumentFragment, DomTokenList, Element,
@@ -95,7 +89,14 @@ impl DomRenderer for Dom {
         cb: Box<dyn FnMut(Self::Event)>,
     ) {
         let cb = wasm_bindgen::closure::Closure::wrap(cb).into_js_value();
-        el.add_event_listener_with_callback(name, cb.as_ref().unchecked_ref());
+        or_debug!(
+            el.add_event_listener_with_callback(
+                name,
+                cb.as_ref().unchecked_ref()
+            ),
+            el,
+            "addEventListener"
+        );
     }
 
     fn class_list(el: &Self::Element) -> Self::ClassList {

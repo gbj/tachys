@@ -28,9 +28,6 @@ pub struct Text(Node);
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Placeholder(Node);
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Fragment(Node);
-
 impl AsRef<Node> for Node {
     fn as_ref(&self) -> &Node {
         self
@@ -55,12 +52,6 @@ impl AsRef<Node> for Placeholder {
     }
 }
 
-impl AsRef<Node> for Fragment {
-    fn as_ref(&self) -> &Node {
-        &self.0
-    }
-}
-
 pub fn node_eq(a: impl AsRef<Node>, b: impl AsRef<Node>) -> bool {
     a.as_ref() == b.as_ref()
 }
@@ -79,12 +70,6 @@ impl From<Element> for Node {
 
 impl From<Placeholder> for Node {
     fn from(value: Placeholder) -> Self {
-        Node(value.0 .0)
-    }
-}
-
-impl From<Fragment> for Node {
-    fn from(value: Fragment) -> Self {
         Node(value.0 .0)
     }
 }
@@ -158,11 +143,6 @@ impl DebugHtml for NodeData {
                 buf.push_str("</");
                 buf.push_str(tag);
                 buf.push('>');
-            }
-            NodeType::Fragment(nodes) => {
-                for node in nodes {
-                    node.debug_html(buf);
-                }
             }
             NodeType::Placeholder => buf.push_str("<!>"),
         }
@@ -248,7 +228,6 @@ pub enum NodeType {
         attrs: HashMap<String, String>,
         children: Vec<Node>,
     },
-    Fragment(Vec<Node>),
     Placeholder,
 }
 
@@ -289,20 +268,6 @@ impl Mountable<MockDom> for Placeholder {
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         MockDom::insert_node(parent, self.as_ref(), marker);
-    }
-}
-
-impl Mountable<MockDom> for Fragment {
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn mount(
-        &mut self,
-        parent: &<MockDom as Renderer>::Element,
-        marker: Option<&<MockDom as Renderer>::Node>,
-    ) {
-        todo!()
     }
 }
 
@@ -427,7 +392,6 @@ impl Renderer for MockDom {
         Document::with_node(node.0, |node| match &node.ty {
             NodeType::Text(_) => None,
             NodeType::Element { children, .. } => children.get(0).cloned(),
-            NodeType::Fragment(nodes) => nodes.get(0).cloned(),
             NodeType::Placeholder => None,
         })
         .flatten()
@@ -456,7 +420,7 @@ impl Renderer for MockDom {
     }
 
     fn log_node(node: &Self::Node) {
-        todo!()
+        println!("{node:?}");
     }
 }
 

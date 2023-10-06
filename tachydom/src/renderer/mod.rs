@@ -1,7 +1,4 @@
-use crate::{
-    html::element::{CreateElement, ElementType},
-    view::Mountable,
-};
+use crate::{html::element::CreateElement, view::Mountable};
 
 pub mod dom;
 #[cfg(feature = "testing")]

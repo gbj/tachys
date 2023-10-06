@@ -29,6 +29,7 @@ where
 }
 pub struct On<R: DomRenderer> {
     name: Cow<'static, str>,
+    #[allow(clippy::type_complexity)]
     setup: Box<dyn FnOnce(&R::Element)>,
 }
 

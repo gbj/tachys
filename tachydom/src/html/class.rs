@@ -1,8 +1,5 @@
 use super::attribute::Attribute;
-use crate::{
-    renderer::{dom::Dom, DomRenderer, Renderer},
-    view::ToTemplate,
-};
+use crate::{renderer::DomRenderer, view::ToTemplate};
 use leptos_reactive::{create_render_effect, Effect};
 use std::marker::PhantomData;
 
@@ -115,7 +112,7 @@ where
     type State = (R::Element, String);
 
     fn to_html(&self, class: &mut String) {
-        IntoClass::<R>::to_html(self, class);
+        IntoClass::<R>::to_html(&self.as_str(), class);
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
@@ -129,7 +126,7 @@ where
 
     fn rebuild(self, state: &mut Self::State) {
         let (el, prev) = state;
-        if &self != &*prev {
+        if self != *prev {
             R::set_attribute(el, "class", &self);
         }
         *prev = self;
@@ -290,7 +287,7 @@ mod tests {
     #[test]
     fn adds_simple_class() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> = p(class("foo bar"), ());
+        let el: HtmlElement<_, _, _, Dom> = p(class("foo bar"), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
         assert_eq!(html, r#"<p class="foo bar"></p>"#);
@@ -299,7 +296,7 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> =
+        let el: HtmlElement<_, _, _, Dom> =
             p((class("foo bar"), class(("baz", true))), ());
         el.to_html(&mut html, &PositionState::new(Position::FirstChild));
 
@@ -309,7 +306,7 @@ mod tests {
     #[test]
     fn adds_class_with_dynamic_and_function() {
         let mut html = String::new();
-        let mut el: HtmlElement<_, _, _, Dom> = p(
+        let el: HtmlElement<_, _, _, Dom> = p(
             (
                 class("foo bar"),
                 class(("baz", || true)),

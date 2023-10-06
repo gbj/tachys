@@ -17,8 +17,10 @@ where
     to_html: fn(&dyn Any, &mut String, &PositionState),
     build: fn(Box<dyn Any>) -> AnyViewState<R>,
     rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState<R>),
+    #[allow(clippy::type_complexity)]
     hydrate_from_server:
         fn(Box<dyn Any>, &Cursor<R>, &PositionState) -> AnyViewState<R>,
+    #[allow(clippy::type_complexity)]
     hydrate_from_template:
         fn(Box<dyn Any>, &Cursor<R>, &PositionState) -> AnyViewState<R>,
 }
@@ -266,7 +268,7 @@ mod tests {
     use crate::{
         html::element::{p, span},
         renderer::mock_dom::MockDom,
-        view::{any_view::AnyView, Render, RenderHtml},
+        view::{any_view::AnyView, RenderHtml},
     };
 
     #[test]

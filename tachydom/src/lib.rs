@@ -10,6 +10,9 @@ pub mod hydration;
 pub mod renderer;
 pub mod view;
 
+#[cfg(feature = "leptos")]
+mod leptos;
+
 pub fn log(text: &str) {
     web_sys::console::log_1(&JsValue::from_str(text));
 }

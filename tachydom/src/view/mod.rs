@@ -2,7 +2,6 @@ use crate::{hydration::Cursor, renderer::Renderer};
 use std::{cell::Cell, rc::Rc};
 
 pub mod any_view;
-pub mod dynamic;
 pub mod iterators;
 #[cfg(feature = "nightly")]
 pub mod static_types;

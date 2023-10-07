@@ -1,5 +1,8 @@
-use super::{Mountable, Render};
-use crate::renderer::Renderer;
+use super::{Mountable, Position, PositionState, Render, RenderHtml};
+use crate::{
+    hydration::Cursor,
+    renderer::{CastFrom, Renderer},
+};
 use drain_filter_polyfill::VecExt as VecDrainFilterExt;
 use indexmap::IndexSet;
 use rustc_hash::FxHasher;
@@ -43,17 +46,6 @@ where
     items: I,
     key_fn: KF,
     view_fn: VF,
-    rndr: PhantomData<Rndr>,
-}
-
-pub struct KeyedItem<K, V, Rndr>
-where
-    K: Eq + Hash + 'static,
-    V: Render<Rndr>,
-    Rndr: Renderer,
-{
-    key: K,
-    item: V,
     rndr: PhantomData<Rndr>,
 }
 
@@ -132,6 +124,63 @@ where
         );
 
         *hashed_items = new_hashed_items;
+    }
+}
+
+impl<T, I, K, KF, VF, V, Rndr> RenderHtml<Rndr>
+    for Keyed<T, I, K, KF, VF, V, Rndr>
+where
+    I: IntoIterator<Item = T>,
+    K: Eq + Hash + 'static,
+    KF: Fn(&T) -> K,
+    V: RenderHtml<Rndr>,
+    VF: Fn(T) -> V,
+    Rndr: Renderer,
+    Rndr::Node: Clone,
+    Rndr::Element: Clone,
+{
+    fn to_html(self, buf: &mut String, position: &PositionState) {
+        for item in self.items.into_iter() {
+            let item = (self.view_fn)(item);
+            item.to_html(buf, position);
+            position.set(Position::NextChild);
+        }
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<Rndr>,
+        position: &PositionState,
+    ) -> Self::State {
+        // get parent and position
+        let current = cursor.current();
+        let parent = if position.get() == Position::FirstChild {
+            current
+        } else {
+            Rndr::get_parent(&current)
+                .expect("first child of keyed list has no parent")
+        };
+        let parent = Rndr::Element::cast_from(parent)
+            .expect("parent of keyed list should be an element");
+
+        // build list
+        let items = self.items.into_iter();
+        let (capacity, _) = items.size_hint();
+        let mut hashed_items =
+            FxIndexSet::with_capacity_and_hasher(capacity, Default::default());
+        let mut rendered_items = Vec::new();
+        for item in items {
+            hashed_items.insert((self.key_fn)(&item));
+            let view = (self.view_fn)(item);
+            let item = view.hydrate::<FROM_SERVER>(cursor, position);
+            rendered_items.push(Some(item));
+        }
+        KeyedState {
+            parent: Some(parent),
+            marker: None, // TODO?
+            hashed_items,
+            rendered_items,
+        }
     }
 }
 

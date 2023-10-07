@@ -41,6 +41,15 @@ impl Mountable<TachyGtk> for Element {
         self.0
             .insert_before(&parent.0, marker.as_ref().map(|m| &m.0));
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<TachyGtk as Renderer>::Element,
+        child: &mut dyn Mountable<TachyGtk>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
+    }
 }
 
 impl Mountable<TachyGtk> for Text {
@@ -56,6 +65,15 @@ impl Mountable<TachyGtk> for Text {
         self.0
              .0
             .insert_before(&parent.0, marker.as_ref().map(|m| &m.0));
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<TachyGtk as Renderer>::Element,
+        child: &mut dyn Mountable<TachyGtk>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
     }
 }
 
@@ -152,6 +170,10 @@ impl Renderer for TachyGtk {
     fn log_node(node: &Self::Node) {
         todo!()
     }
+
+    fn clear_children(parent: &Self::Element) {
+        todo!()
+    }
 }
 
 pub struct Button<C, F>(C, F)
@@ -241,5 +263,14 @@ where
         marker: Option<&<TachyGtk as Renderer>::Node>,
     ) {
         TachyGtk::insert_node(parent, &self.0, marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<TachyGtk as Renderer>::Element,
+        child: &mut dyn Mountable<TachyGtk>,
+    ) -> bool {
+        child.mount(parent, Some(self.0.as_ref()));
+        true
     }
 }

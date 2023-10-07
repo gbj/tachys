@@ -1,6 +1,6 @@
 use gtk::{prelude::*, Application, ApplicationWindow, Button, Orientation};
 use leptos_reactive::*;
-use tachydom::view::{strings::StrState, Mountable, Render};
+use tachydom::view::{keyed::keyed, strings::StrState, Mountable, Render};
 use tachygtk::{button, r#box, Element, ElementState, TachyGtk};
 mod tachygtk;
 
@@ -21,20 +21,42 @@ fn build_ui(app: &Application) {
     let _ = create_runtime();
 
     let value = RwSignal::new(0);
+    let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
     let view = r#box(
         Orientation::Vertical,
         12,
         (
             r#box(
-                Orientation::Horizontal,
+                Orientation::Vertical,
                 12,
                 (
-                    button("-1", move |_| value.update(|n| *n -= 1)),
-                    move || value.get().to_string(),
-                    button("+1", move |_| value.update(|n| *n += 1)),
+                    r#box(
+                        Orientation::Horizontal,
+                        12,
+                        (
+                            button("-1", move |_| value.update(|n| *n -= 1)),
+                            move || value.get().to_string(),
+                            button("+1", move |_| value.update(|n| *n += 1)),
+                        ),
+                    ),
+                    move || (value.get() % 2 == 0).then_some("Even!"),
                 ),
             ),
-            move || (value.get() % 2 == 0).then_some("Even!"),
+            r#box(
+                Orientation::Vertical,
+                12,
+                (
+                    button("Swap", move |_| {
+                        rows.update(|items| {
+                            items.swap(1, 3);
+                            println!("{items:?}");
+                        })
+                    }),
+                    r#box(Orientation::Vertical, 12, move || {
+                        keyed(rows(), |k| *k, |v| v.to_string())
+                    }),
+                ),
+            ),
         ),
     );
     let state: ElementState<_> = view.build();

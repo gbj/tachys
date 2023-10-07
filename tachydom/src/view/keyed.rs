@@ -10,7 +10,43 @@ use std::{
 
 type FxIndexSet<T> = IndexSet<T, BuildHasherDefault<FxHasher>>;
 
-pub struct Keyed<K, V, Rndr>
+pub fn keyed<T, I, K, KF, VF, V, Rndr>(
+    items: I,
+    key_fn: KF,
+    view_fn: VF,
+) -> Keyed<T, I, K, KF, VF, V, Rndr>
+where
+    I: IntoIterator<Item = T>,
+    K: Eq + Hash + 'static,
+    KF: Fn(&T) -> K,
+    V: Render<Rndr>,
+    VF: Fn(T) -> V,
+    Rndr: Renderer,
+{
+    Keyed {
+        items,
+        key_fn,
+        view_fn,
+        rndr: PhantomData,
+    }
+}
+
+pub struct Keyed<T, I, K, KF, VF, V, Rndr>
+where
+    I: IntoIterator<Item = T>,
+    K: Eq + Hash + 'static,
+    KF: Fn(&T) -> K,
+    V: Render<Rndr>,
+    VF: Fn(T) -> V,
+    Rndr: Renderer,
+{
+    items: I,
+    key_fn: KF,
+    view_fn: VF,
+    rndr: PhantomData<Rndr>,
+}
+
+pub struct KeyedItem<K, V, Rndr>
 where
     K: Eq + Hash + 'static,
     V: Render<Rndr>,
@@ -33,23 +69,28 @@ where
     rendered_items: Vec<Option<V::State>>,
 }
 
-impl<'a, K, V, Rndr> Render<Rndr> for Vec<Keyed<K, V, Rndr>>
+impl<T, I, K, KF, VF, V, Rndr> Render<Rndr> for Keyed<T, I, K, KF, VF, V, Rndr>
 where
+    I: IntoIterator<Item = T>,
     K: Eq + Hash + 'static,
+    KF: Fn(&T) -> K,
     V: Render<Rndr>,
+    VF: Fn(T) -> V,
     Rndr: Renderer,
     Rndr::Element: Clone,
 {
     type State = KeyedState<K, V, Rndr>;
 
     fn build(self) -> Self::State {
-        let capacity = self.len();
+        let items = self.items.into_iter();
+        let (capacity, _) = items.size_hint();
         let mut hashed_items =
             FxIndexSet::with_capacity_and_hasher(capacity, Default::default());
         let mut rendered_items = Vec::new();
-        for Keyed { key, item, .. } in self {
-            hashed_items.insert(key);
-            rendered_items.push(Some(item.build()));
+        for item in items {
+            hashed_items.insert((self.key_fn)(&item));
+            let view = (self.view_fn)(item);
+            rendered_items.push(Some(view.build()));
         }
         KeyedState {
             parent: None,
@@ -66,13 +107,14 @@ where
             hashed_items,
             ref mut rendered_items,
         } = state;
-        let capacity = self.len();
+        let new_items = self.items.into_iter();
+        let (capacity, _) = new_items.size_hint();
         let mut new_hashed_items =
             FxIndexSet::with_capacity_and_hasher(capacity, Default::default());
 
         let mut items = Vec::new();
-        for Keyed { key, item, .. } in self {
-            new_hashed_items.insert(key);
+        for item in new_items {
+            new_hashed_items.insert((self.key_fn)(&item));
             items.push(Some(item));
         }
 
@@ -85,6 +127,7 @@ where
             marker,
             cmds,
             rendered_items,
+            &self.view_fn,
             items,
         );
 
@@ -303,18 +346,17 @@ impl Default for DiffOpAddMode {
     }
 }
 
-fn apply_diff<V, Rndr>(
+fn apply_diff<T, V, Rndr>(
     parent: &Rndr::Element,
     marker: &Option<Rndr::Node>,
     diff: Diff,
     children: &mut Vec<Option<V::State>>,
-    mut items: Vec<Option<V>>,
+    view_fn: impl Fn(T) -> V,
+    mut items: Vec<Option<T>>,
 ) where
     V: Render<Rndr>,
     Rndr: Renderer,
 {
-    println!("diff = {diff:#?}");
-
     // The order of cmds needs to be:
     // 1. Clear
     // 2. Removals
@@ -355,11 +397,7 @@ fn apply_diff<V, Rndr>(
         .enumerate()
         .filter(|(_, move_)| !move_.move_in_dom)
     {
-        let mut child = moved_children[i].take();
-        let item = items[i].take();
-        if let (Some(child), Some(item)) = (&mut child, item) {
-            item.rebuild(child);
-        }
+        let child = moved_children[i].take();
         children[*to] = child;
     }
 
@@ -386,6 +424,7 @@ fn apply_diff<V, Rndr>(
 
     for DiffOpAdd { at, mode } in add_cmds {
         let item = items[at].take().unwrap();
+        let item = view_fn(item);
         let mut item = item.build();
 
         match mode {
@@ -406,12 +445,6 @@ fn apply_diff<V, Rndr>(
         }
 
         children[at] = Some(item);
-    }
-
-    for (item, state) in items.into_iter().zip(children.iter_mut()) {
-        if let (Some(item), Some(state)) = (item, state.as_mut()) {
-            item.rebuild(state);
-        }
     }
 
     #[allow(unstable_name_collisions)]
@@ -488,27 +521,19 @@ fn unpack_moves(diff: &Diff) -> (Vec<DiffOpMove>, Vec<DiffOpAdd>) {
 
 #[cfg(test)]
 mod tests {
-    use super::Keyed;
     use crate::{
         html::element::{li, ul, HtmlElement, Li},
         renderer::mock_dom::MockDom,
-        view::Render,
+        view::{keyed::keyed, Render},
     };
-    use std::marker::PhantomData;
 
-    fn item(
-        key: usize,
-    ) -> Keyed<usize, HtmlElement<Li, (), String, MockDom>, MockDom> {
-        Keyed {
-            key,
-            item: li((), key.to_string()),
-            rndr: PhantomData::<MockDom>,
-        }
+    fn item(key: usize) -> HtmlElement<Li, (), String, MockDom> {
+        li((), key.to_string())
     }
 
     #[test]
     fn keyed_creates_list() {
-        let el = ul((), (1..=3).map(item).collect::<Vec<_>>());
+        let el = ul((), keyed(1..=3, |k| *k, item));
         let el_state = el.build();
         assert_eq!(
             el_state.el.to_debug_html(),
@@ -518,9 +543,9 @@ mod tests {
 
     #[test]
     fn adding_items_updates_list() {
-        let el = ul((), (1..=3).map(item).collect::<Vec<_>>());
+        let el = ul((), keyed(1..=3, |k| *k, item));
         let mut el_state = el.build();
-        let el = ul((), (1..=5).map(item).collect::<Vec<_>>());
+        let el = ul((), keyed(1..=5, |k| *k, item));
         el.rebuild(&mut el_state);
         assert_eq!(
             el_state.el.to_debug_html(),
@@ -530,9 +555,9 @@ mod tests {
 
     #[test]
     fn removing_items_updates_list() {
-        let el = ul((), (1..=3).map(item).collect::<Vec<_>>());
+        let el = ul((), keyed(1..=3, |k| *k, item));
         let mut el_state = el.build();
-        let el = ul((), (1..=2).map(item).collect::<Vec<_>>());
+        let el = ul((), keyed(1..=2, |k| *k, item));
         el.rebuild(&mut el_state);
         assert_eq!(
             el_state.el.to_debug_html(),
@@ -542,15 +567,9 @@ mod tests {
 
     #[test]
     fn swapping_items_updates_list() {
-        let el = ul(
-            (),
-            [1, 2, 3, 4, 5].into_iter().map(item).collect::<Vec<_>>(),
-        );
+        let el = ul((), keyed([1, 2, 3, 4, 5], |k| *k, item));
         let mut el_state = el.build();
-        let el = ul(
-            (),
-            [1, 4, 3, 2, 5].into_iter().map(item).collect::<Vec<_>>(),
-        );
+        let el = ul((), keyed([1, 4, 3, 2, 5], |k| *k, item));
         el.rebuild(&mut el_state);
         assert_eq!(
             el_state.el.to_debug_html(),
@@ -560,12 +579,9 @@ mod tests {
 
     #[test]
     fn swapping_and_removing_orders_correctly() {
-        let el = ul(
-            (),
-            [1, 2, 3, 4, 5].into_iter().map(item).collect::<Vec<_>>(),
-        );
+        let el = ul((), keyed([1, 2, 3, 4, 5], |k| *k, item));
         let mut el_state = el.build();
-        let el = ul((), [1, 4, 3, 5].into_iter().map(item).collect::<Vec<_>>());
+        let el = ul((), keyed([1, 4, 3, 5], |k| *k, item));
         el.rebuild(&mut el_state);
         assert_eq!(
             el_state.el.to_debug_html(),
@@ -575,16 +591,22 @@ mod tests {
 
     #[test]
     fn arbitrarily_hard_adjustment() {
-        let el = ul(
-            (),
-            [1, 3, 7, 5, 2].into_iter().map(item).collect::<Vec<_>>(),
-        );
+        let el = ul((), keyed([1, 2, 3, 4, 5], |k| *k, item));
         let mut el_state = el.build();
-        let el = ul((), [2, 4, 3].into_iter().map(item).collect::<Vec<_>>());
+        let el = ul((), keyed([2, 4, 3], |k| *k, item));
         el.rebuild(&mut el_state);
         assert_eq!(
             el_state.el.to_debug_html(),
             "<ul><li>2</li><li>4</li><li>3</li></ul>"
         );
+    }
+
+    #[test]
+    fn clearing_works() {
+        let el = ul((), keyed([1, 2, 3, 4, 5], |k| *k, item));
+        let mut el_state = el.build();
+        let el = ul((), keyed([], |k| *k, item));
+        el.rebuild(&mut el_state);
+        assert_eq!(el_state.el.to_debug_html(), "<ul></ul>");
     }
 }

@@ -3,6 +3,7 @@ use std::{cell::Cell, rc::Rc};
 
 pub mod any_view;
 pub mod iterators;
+pub mod keyed;
 #[cfg(feature = "nightly")]
 pub mod static_types;
 pub mod strings;
@@ -82,6 +83,27 @@ pub trait Mountable<R: Renderer> {
 
     /// Mounts a node to the interface.
     fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>);
+
+    /// Inserts another `Mountable` type before this one. Returns `false` if
+    /// this does not actually exist in the UI (for example, `()`).
+    fn insert_before_this(
+        &self,
+        parent: &R::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool;
+
+    /// Inserts another `Mountable` type before this one, or before the marker
+    /// if this one doesn't exist in the UI (for example, `()`).
+    fn insert_before_this_or_marker(
+        &self,
+        parent: &R::Element,
+        child: &mut dyn Mountable<R>,
+        marker: Option<&R::Node>,
+    ) {
+        if !self.insert_before_this(parent, child) {
+            child.mount(parent, marker);
+        }
+    }
 }
 
 /// Indicates where a node should be mounted to its parent.
@@ -110,6 +132,16 @@ where
         if let Some(ref mut inner) = self {
             inner.mount(parent, marker);
         }
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        self.as_ref()
+            .map(|inner| inner.insert_before_this(parent, child))
+            .unwrap_or(false)
     }
 }
 

@@ -108,6 +108,23 @@ where
         }
         self.placeholder.mount(parent, marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &R::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        if self
+            .state
+            .as_ref()
+            .map(|n| n.insert_before_this(parent, child))
+            == Some(true)
+        {
+            true
+        } else {
+            self.placeholder.insert_before_this(parent, child)
+        }
+    }
 }
 
 /*

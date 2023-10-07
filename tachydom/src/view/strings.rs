@@ -143,6 +143,15 @@ impl<R: Renderer> Mountable<R> for StringState<R> {
     ) {
         R::insert_node(parent, self.node.as_ref(), marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        child.mount(parent, Some(self.node.as_ref()));
+        true
+    }
 }
 
 impl<'a, R> Mountable<R> for StrState<'a, R>
@@ -159,5 +168,14 @@ where
         marker: Option<&<R as Renderer>::Node>,
     ) {
         R::insert_node(parent, self.node.as_ref(), marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        child.mount(parent, Some(self.node.as_ref()));
+        true
     }
 }

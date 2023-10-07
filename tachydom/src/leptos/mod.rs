@@ -109,6 +109,20 @@ where
             }
         });
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        self.with_value_mut(|value| {
+            value
+                .as_mut()
+                .map(|value| value.insert_before_this(parent, child))
+        })
+        .flatten()
+        .unwrap_or(false)
+    }
 }
 
 #[cfg(test)]

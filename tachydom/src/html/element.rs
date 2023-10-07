@@ -169,6 +169,15 @@ where
     fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
         R::insert_node(parent, self.el.as_ref(), marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        child.mount(parent, Some(self.el.as_ref()));
+        true
+    }
 }
 
 impl<E, At, Ch, Rndr> ToTemplate for HtmlElement<E, At, Ch, Rndr>

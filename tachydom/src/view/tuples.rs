@@ -32,6 +32,14 @@ impl<R: Renderer> Mountable<R> for () {
     fn unmount(&mut self) {}
 
     fn mount(&mut self, _parent: &R::Element, _marker: Option<&R::Node>) {}
+
+    fn insert_before_this(
+        &self,
+        _parent: &<R as Renderer>::Element,
+        _child: &mut dyn Mountable<R>,
+    ) -> bool {
+        false
+    }
 }
 
 impl ToTemplate for () {
@@ -169,6 +177,18 @@ macro_rules! impl_view_for_tuples {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
 					[<$first:lower>].mount(parent, marker);
 					$([<$ty:lower>].mount(parent, marker));*
+				}
+			}
+
+			fn insert_before_this(
+				&self,
+				parent: &Rndr::Element,
+				child: &mut dyn Mountable<Rndr>,
+			) -> bool {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					[<$first:lower>].insert_before_this(parent, child)
+					$(|| [<$ty:lower>].insert_before_this(parent, child))*
 				}
 			}
 		}

@@ -239,6 +239,15 @@ impl Mountable<MockDom> for Node {
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         MockDom::insert_node(parent, self, marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<MockDom as Renderer>::Element,
+        child: &mut dyn Mountable<MockDom>,
+    ) -> bool {
+        child.mount(parent, Some(self));
+        true
+    }
 }
 
 impl Mountable<MockDom> for Text {
@@ -248,6 +257,15 @@ impl Mountable<MockDom> for Text {
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         MockDom::insert_node(parent, self.as_ref(), marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<MockDom as Renderer>::Element,
+        child: &mut dyn Mountable<MockDom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
     }
 }
 
@@ -259,6 +277,15 @@ impl Mountable<MockDom> for Element {
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         MockDom::insert_node(parent, self.as_ref(), marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<MockDom as Renderer>::Element,
+        child: &mut dyn Mountable<MockDom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
+    }
 }
 
 impl Mountable<MockDom> for Placeholder {
@@ -268,6 +295,15 @@ impl Mountable<MockDom> for Placeholder {
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         MockDom::insert_node(parent, self.as_ref(), marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<MockDom as Renderer>::Element,
+        child: &mut dyn Mountable<MockDom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
     }
 }
 
@@ -356,7 +392,7 @@ impl Renderer for MockDom {
         parent: &Self::Element,
         child: &Self::Node,
     ) -> Option<Self::Node> {
-        Document::with_node_mut(parent.0 .0, |parent| {
+        let child = Document::with_node_mut(parent.0 .0, |parent| {
             if let NodeType::Element {
                 ref mut children, ..
             } = parent.ty
@@ -370,7 +406,11 @@ impl Renderer for MockDom {
                 None
             }
         })
-        .flatten()
+        .flatten()?;
+        Document::with_node_mut(child.0, |node| {
+            node.parent = None;
+        });
+        Some(child)
     }
 
     fn remove(node: &Self::Node) {
@@ -421,6 +461,22 @@ impl Renderer for MockDom {
 
     fn log_node(node: &Self::Node) {
         println!("{node:?}");
+    }
+
+    fn clear_children(parent: &Self::Element) {
+        let prev_children =
+            Document::with_node_mut(parent.0 .0, |node| match node.ty {
+                NodeType::Element {
+                    ref mut children, ..
+                } => std::mem::take(children),
+                _ => panic!("Called clear_children on a non-Element node."),
+            })
+            .unwrap_or_default();
+        for child in prev_children {
+            Document::with_node_mut(child.0, |node| {
+                node.parent = None;
+            });
+        }
     }
 }
 

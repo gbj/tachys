@@ -76,6 +76,10 @@ impl Renderer for Dom {
     fn log_node(node: &Self::Node) {
         web_sys::console::log_1(node);
     }
+
+    fn clear_children(parent: &Self::Element) {
+        parent.set_text_content(Some(""));
+    }
 }
 
 impl DomRenderer for Dom {
@@ -136,6 +140,15 @@ impl Mountable<Dom> for Node {
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Dom as Renderer>::Element,
+        child: &mut dyn Mountable<Dom>,
+    ) -> bool {
+        child.mount(parent, Some(self));
+        true
+    }
 }
 
 impl Mountable<Dom> for Text {
@@ -145,6 +158,15 @@ impl Mountable<Dom> for Text {
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Dom as Renderer>::Element,
+        child: &mut dyn Mountable<Dom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
     }
 }
 
@@ -156,6 +178,15 @@ impl Mountable<Dom> for Comment {
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Dom as Renderer>::Element,
+        child: &mut dyn Mountable<Dom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
+    }
 }
 
 impl Mountable<Dom> for Element {
@@ -166,6 +197,15 @@ impl Mountable<Dom> for Element {
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
     }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Dom as Renderer>::Element,
+        child: &mut dyn Mountable<Dom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
+    }
 }
 
 impl Mountable<Dom> for DocumentFragment {
@@ -175,6 +215,15 @@ impl Mountable<Dom> for DocumentFragment {
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
         Dom::insert_node(parent, self, marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Dom as Renderer>::Element,
+        child: &mut dyn Mountable<Dom>,
+    ) -> bool {
+        child.mount(parent, Some(self.as_ref()));
+        true
     }
 }
 

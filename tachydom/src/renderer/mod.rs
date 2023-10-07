@@ -71,6 +71,9 @@ pub trait Renderer: Sized {
         child: &Self::Node,
     ) -> Option<Self::Node>;
 
+    /// Removes all children from the parent element.
+    fn clear_children(parent: &Self::Element);
+
     /// Removes the node.
     fn remove(node: &Self::Node);
 

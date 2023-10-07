@@ -34,6 +34,8 @@ where
     state: Box<dyn Any>,
     unmount: fn(&mut dyn Any),
     mount: fn(&mut dyn Any, parent: &R::Element, marker: Option<&R::Node>),
+    insert_before_this:
+        fn(&dyn Any, parent: &R::Element, child: &mut dyn Mountable<R>) -> bool,
     rndr: PhantomData<R>,
 }
 
@@ -44,11 +46,54 @@ where
     fn into_any(self) -> AnyView<R>;
 }
 
+fn mount_any<R, T>(
+    state: &mut dyn Any,
+    parent: &R::Element,
+    marker: Option<&R::Node>,
+) where
+    T: Render<R>,
+    T::State: 'static,
+    R: Renderer,
+{
+    let state = state
+        .downcast_mut::<T::State>()
+        .expect("AnyViewState::as_mountable couldn't downcast state");
+    state.mount(parent, marker)
+}
+
+fn unmount_any<R, T>(state: &mut dyn Any)
+where
+    T: Render<R>,
+    T::State: 'static,
+    R: Renderer,
+{
+    let state = state
+        .downcast_mut::<T::State>()
+        .expect("AnyViewState::unmount couldn't downcast state");
+    state.unmount();
+}
+
+fn insert_before_this<R, T>(
+    state: &dyn Any,
+    parent: &R::Element,
+    child: &mut dyn Mountable<R>,
+) -> bool
+where
+    T: Render<R>,
+    T::State: 'static,
+    R: Renderer + 'static,
+{
+    let state = state
+        .downcast_ref::<T::State>()
+        .expect("AnyViewState::opening_node couldn't downcast state");
+    state.insert_before_this(parent, child)
+}
+
 impl<T, R> IntoAny<R> for T
 where
     T: RenderHtml<R> + 'static,
     T::State: 'static,
-    R: Renderer,
+    R: Renderer + 'static,
     R::Node: Clone,
     R::Element: Clone,
 {
@@ -69,27 +114,15 @@ where
                 .downcast::<T>()
                 .expect("AnyView::build couldn't downcast");
             let state = Box::new(value.build());
-            let unmount = |state: &mut dyn Any| {
-                let state = state
-                    .downcast_mut::<T::State>()
-                    .expect("AnyViewState::unmount couldn't downcast state");
-                state.unmount();
-            };
-            let mount = |state: &mut dyn Any,
-                         parent: &R::Element,
-                         marker: Option<&R::Node>| {
-                let state = state.downcast_mut::<T::State>().expect(
-                    "AnyViewState::as_mountable couldn't downcast state",
-                );
-                state.mount(parent, marker)
-            };
+
             AnyViewState {
                 type_id: TypeId::of::<T>(),
                 state,
-                unmount,
-                mount,
                 placeholder: R::create_placeholder(),
                 rndr: PhantomData,
+                mount: mount_any::<R, T>,
+                unmount: unmount_any::<R, T>,
+                insert_before_this: insert_before_this::<R, T>,
             }
         };
         let hydrate_from_server =
@@ -106,30 +139,14 @@ where
                 let placeholder = R::Placeholder::cast_from(cursor.current())
                     .expect("should be a placeholder node");
 
-                // define unmount/mount functions
-                let unmount = |state: &mut dyn Any| {
-                    let state = state.downcast_mut::<T::State>().expect(
-                        "AnyViewState::unmount couldn't downcast state",
-                    );
-                    state.unmount();
-                };
-                let mount =
-                    |state: &mut dyn Any,
-                     parent: &R::Element,
-                     marker: Option<&R::Node>| {
-                        let state = state.downcast_mut::<T::State>().expect(
-                            "AnyViewState::as_mountable couldn't downcast \
-                             state",
-                        );
-                        state.mount(parent, marker)
-                    };
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
-                    unmount,
-                    mount,
                     rndr: PhantomData,
                     placeholder,
+                    mount: mount_any::<R, T>,
+                    unmount: unmount_any::<R, T>,
+                    insert_before_this: insert_before_this::<R, T>,
                 }
             };
         let hydrate_from_template =
@@ -146,30 +163,14 @@ where
                 let placeholder = R::Placeholder::cast_from(cursor.current())
                     .expect("should be a placeholder node");
 
-                // define unmount/mount functions
-                let unmount = |state: &mut dyn Any| {
-                    let state = state.downcast_mut::<T::State>().expect(
-                        "AnyViewState::unmount couldn't downcast state",
-                    );
-                    state.unmount();
-                };
-                let mount =
-                    |state: &mut dyn Any,
-                     parent: &R::Element,
-                     marker: Option<&R::Node>| {
-                        let state = state.downcast_mut::<T::State>().expect(
-                            "AnyViewState::as_mountable couldn't downcast \
-                             state",
-                        );
-                        state.mount(parent, marker)
-                    };
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
-                    unmount,
-                    mount,
                     rndr: PhantomData,
                     placeholder,
+                    mount: mount_any::<R, T>,
+                    unmount: unmount_any::<R, T>,
+                    insert_before_this: insert_before_this::<R, T>,
                 }
             };
         let rebuild = |new_type_id: TypeId,
@@ -213,7 +214,7 @@ where
 
 impl<R> Render<R> for AnyView<R>
 where
-    R: Renderer,
+    R: Renderer + 'static,
 {
     type State = AnyViewState<R>;
 
@@ -228,7 +229,7 @@ where
 
 impl<R> RenderHtml<R> for AnyView<R>
 where
-    R: Renderer,
+    R: Renderer + 'static,
     R::Element: Clone,
     R::Node: Clone,
 {
@@ -251,7 +252,7 @@ where
 
 impl<R> Mountable<R> for AnyViewState<R>
 where
-    R: Renderer,
+    R: Renderer + 'static,
 {
     fn unmount(&mut self) {
         (self.unmount)(&mut *self.state)
@@ -259,6 +260,14 @@ where
 
     fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
         (self.mount)(&mut *self.state, parent, marker)
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        (self.insert_before_this)(self, parent, child)
     }
 }
 

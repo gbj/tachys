@@ -415,6 +415,7 @@ fn apply_diff<T, V, Rndr>(
     // 6. Additions
     // 7. Removes holes
     if diff.clear {
+        // TODO fix
         Rndr::clear_children(parent);
         children.clear();
 
@@ -433,10 +434,7 @@ fn apply_diff<T, V, Rndr>(
 
     let mut moved_children = move_cmds
         .iter()
-        .map(|move_| {
-            let each_item = children[move_.from].take().unwrap();
-            Some(each_item)
-        })
+        .map(|move_| children[move_.from].take())
         .collect::<Vec<_>>();
 
     children.resize_with(children.len() + diff.added.len(), || None);
@@ -446,8 +444,7 @@ fn apply_diff<T, V, Rndr>(
         .enumerate()
         .filter(|(_, move_)| !move_.move_in_dom)
     {
-        let child = moved_children[i].take();
-        children[*to] = child;
+        children[*to] = moved_children[i].take();
     }
 
     for (i, DiffOpMove { to, .. }) in move_cmds
@@ -478,7 +475,9 @@ fn apply_diff<T, V, Rndr>(
 
         match mode {
             DiffOpAddMode::Normal => {
-                if let Some(Some(state)) = moved_children.get(at + 1) {
+                if let Some(Some(state)) =
+                    children.get_next_closest_mounted_sibling(at)
+                {
                     state.insert_before_this_or_marker(
                         parent,
                         &mut item,
@@ -647,6 +646,26 @@ mod tests {
         assert_eq!(
             el_state.el.to_debug_html(),
             "<ul><li>2</li><li>4</li><li>3</li></ul>"
+        );
+    }
+
+    #[test]
+    fn a_series_of_moves() {
+        let el = ul((), keyed([1, 2, 3, 4, 5], |k| *k, item));
+        let mut el_state = el.build();
+        let el = ul((), keyed([2, 4, 3], |k| *k, item));
+        el.rebuild(&mut el_state);
+        let el = ul((), keyed([1, 7, 5, 11, 13, 17], |k| *k, item));
+        el.rebuild(&mut el_state);
+        let el = ul((), keyed([2, 6, 8, 7, 13], |k| *k, item));
+        el.rebuild(&mut el_state);
+        let el = ul((), keyed([13, 4, 5, 3], |k| *k, item));
+        el.rebuild(&mut el_state);
+        let el = ul((), keyed([1, 2, 3, 4], |k| *k, item));
+        el.rebuild(&mut el_state);
+        assert_eq!(
+            el_state.el.to_debug_html(),
+            "<ul><li>1</li><li>2</li><li>3</li><li>4</li></ul>"
         );
     }
 

@@ -2,7 +2,7 @@ mod key;
 mod value;
 use crate::{
     renderer::Renderer,
-    view::{Position, RenderHtml, ToTemplate},
+    view::{Position, ToTemplate},
 };
 pub use key::*;
 use std::{fmt::Debug, marker::PhantomData};
@@ -11,7 +11,7 @@ pub use value::*;
 pub trait Attribute<R: Renderer> {
     type State;
 
-    fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String);
+    fn to_html(self, buf: &mut String, class: &mut String, style: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -27,7 +27,7 @@ where
     type State = ();
 
     fn to_html(
-        &self,
+        self,
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,
@@ -69,7 +69,7 @@ where
     type State = V::State;
 
     fn to_html(
-        &self,
+        self,
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
@@ -100,7 +100,7 @@ macro_rules! impl_attr_for_tuples {
 		{
 			type State = ($first::State, $($ty::State,)*);
 
-			fn to_html(&self, buf: &mut String, class: &mut String, style: &mut String) {
+			fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html(buf, class, style);

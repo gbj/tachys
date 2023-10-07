@@ -48,7 +48,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         if let Some(value) = self {
             value.to_html(buf, position);
         }
@@ -150,7 +150,7 @@ where
     R: Renderer,
     R::Node: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         for item in self {
             item.to_html(buf, position);
         }
@@ -237,7 +237,7 @@ where
     R: Renderer,
     R::Node: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         for mut next in self.0.by_ref() {
             next.to_html(buf, position);
         }

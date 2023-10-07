@@ -4,7 +4,7 @@ use std::borrow::Cow;
 pub trait AttributeValue<R: Renderer> {
     type State;
 
-    fn to_html(&self, key: &str, buf: &mut String);
+    fn to_html(self, key: &str, buf: &mut String);
 
     fn to_template(key: &str, buf: &mut String);
 
@@ -24,7 +24,7 @@ where
     R: Renderer,
 {
     type State = ();
-    fn to_html(&self, _key: &str, _buf: &mut String) {}
+    fn to_html(self, _key: &str, _buf: &mut String) {}
 
     fn to_template(_key: &str, _buf: &mut String) {}
 
@@ -42,7 +42,7 @@ where
 {
     type State = (R::Element, &'a str);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(self, key: &str, buf: &mut String) {
         buf.push(' ');
         buf.push_str(key);
         buf.push_str("=\"");
@@ -88,7 +88,7 @@ where
 {
     type State = (R::Element, String);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(self, key: &str, buf: &mut String) {
         <&str as AttributeValue<R>>::to_html(&self.as_str(), key, buf);
     }
 
@@ -130,8 +130,8 @@ where
 {
     type State = (R::Element, bool);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
-        if *self {
+    fn to_html(self, key: &str, buf: &mut String) {
+        if self {
             buf.push(' ');
             buf.push_str(key);
         }
@@ -182,7 +182,7 @@ where
 {
     type State = (R::Element, Option<V::State>);
 
-    fn to_html(&self, key: &str, buf: &mut String) {
+    fn to_html(self, key: &str, buf: &mut String) {
         if let Some(v) = self {
             v.to_html(key, buf);
         }

@@ -71,7 +71,7 @@ where
     Rndr::Node: Clone,
     Rndr::Element: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);

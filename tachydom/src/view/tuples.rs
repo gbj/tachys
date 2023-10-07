@@ -18,7 +18,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&self, _buf: &mut String, _position: &PositionState) {}
+    fn to_html(self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -65,7 +65,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         self.0.to_html(buf, position);
     }
 
@@ -122,7 +122,7 @@ macro_rules! impl_view_for_tuples {
 			Rndr::Node: Clone,
 			Rndr::Element: Clone
 		{
-			fn to_html(&self, buf: &mut String, position: &PositionState) {
+			fn to_html(self, buf: &mut String, position: &PositionState) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html(buf, position);

@@ -12,7 +12,7 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(self, class: &mut String) {
         let value = self();
         value.to_html(class);
     }
@@ -56,7 +56,7 @@ where
 {
     type State = Effect<bool>;
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(self, class: &mut String) {
         let (name, f) = self;
         let include = f();
         if include {

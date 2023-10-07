@@ -50,7 +50,7 @@ where
 
     #[inline(always)]
     fn to_html(
-        &self,
+        self,
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,

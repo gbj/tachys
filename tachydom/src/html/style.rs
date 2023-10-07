@@ -34,7 +34,7 @@ where
     type State = S::State;
 
     fn to_html(
-        &self,
+        self,
         _buf: &mut String,
         _class: &mut String,
         style: &mut String,
@@ -70,7 +70,7 @@ where
 pub trait IntoStyle<R: DomRenderer> {
     type State;
 
-    fn to_html(&self, class: &mut String);
+    fn to_html(self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -82,7 +82,7 @@ pub trait IntoStyle<R: DomRenderer> {
 pub trait StylePropertyValue<R: DomRenderer> {
     type State;
 
-    fn to_html(&self, name: &str, class: &mut String);
+    fn to_html(self, name: &str, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -100,7 +100,7 @@ where
 {
     type State = (R::Element, &'a str);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(self, style: &mut String) {
         style.push_str(self);
         style.push(';');
     }
@@ -130,8 +130,8 @@ where
 {
     type State = (R::Element, String);
 
-    fn to_html(&self, style: &mut String) {
-        style.push_str(self);
+    fn to_html(self, style: &mut String) {
+        style.push_str(&self);
         style.push(';');
     }
 
@@ -159,7 +159,7 @@ where
 {
     type State = (R::CssStyleDeclaration, &'a str);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push(':');
@@ -195,11 +195,11 @@ where
 {
     type State = (R::CssStyleDeclaration, String);
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(self, style: &mut String) {
         let (name, value) = self;
         style.push_str(name);
         style.push(':');
-        style.push_str(value);
+        style.push_str(&value);
         style.push(';');
     }
 

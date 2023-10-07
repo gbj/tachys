@@ -55,12 +55,12 @@ where
     type State = ();
 
     fn to_html(
-        &self,
+        self,
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
     ) {
-        AttributeValue::<R>::to_html(&V, K::KEY, buf)
+        AttributeValue::<R>::to_html(V, K::KEY, buf)
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, _el: &R::Element) -> Self::State {
@@ -98,7 +98,7 @@ where
     R::Element: Clone,
     R::Text: Mountable<R>,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")

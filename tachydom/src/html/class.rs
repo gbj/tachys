@@ -30,7 +30,7 @@ where
     type State = C::State;
 
     fn to_html(
-        &self,
+        self,
         _buf: &mut String,
         class: &mut String,
         _style: &mut String,
@@ -65,7 +65,7 @@ where
 pub trait IntoClass<R: DomRenderer> {
     type State;
 
-    fn to_html(&self, class: &mut String);
+    fn to_html(self, class: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -81,7 +81,7 @@ where
 {
     type State = (R::Element, &'a str);
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(self, class: &mut String) {
         class.push_str(self);
     }
 
@@ -110,8 +110,8 @@ where
 {
     type State = (R::Element, String);
 
-    fn to_html(&self, class: &mut String) {
-        IntoClass::<R>::to_html(&self.as_str(), class);
+    fn to_html(self, class: &mut String) {
+        IntoClass::<R>::to_html(self.as_str(), class);
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
@@ -138,9 +138,9 @@ where
 {
     type State = (R::ClassList, bool);
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(self, class: &mut String) {
         let (name, include) = self;
-        if *include {
+        if include {
             class.push_str(name);
         }
     }

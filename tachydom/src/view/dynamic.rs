@@ -53,7 +53,7 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(&self, buf: &mut String, position: &PositionState) {
+    fn to_html(self, buf: &mut String, position: &PositionState) {
         let value = self();
         value.to_html(buf, position)
     }

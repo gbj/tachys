@@ -1,5 +1,6 @@
 use leptos_reactive::{
-    create_effect, create_runtime, create_signal, SignalGet, SignalUpdate,
+    create_effect, create_runtime, create_signal, RwSignal, SignalGet,
+    SignalUpdate,
 };
 use tachy_maccy::view;
 use tachydom::{
@@ -8,14 +9,16 @@ use tachydom::{
     renderer::dom::Dom,
     renderer::DomRenderer,
     view::{
-        any_view::IntoAny, /* template::ViewTemplate, */ Position, Render,
-        RenderHtml, ToTemplate,
+        any_view::IntoAny, keyed::keyed,
+        /* template::ViewTemplate, */ Position, Render, RenderHtml,
+        ToTemplate,
     },
 };
 
 pub fn my_app() -> impl RenderHtml<Dom> {
     let rt = create_runtime();
     let (count, set_count) = create_signal(0);
+    let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
 
     view! {
         <p
@@ -49,6 +52,16 @@ pub fn my_app() -> impl RenderHtml<Dom> {
         {move || (count() % 2 == 0).then(|| view! {
             <p>"Even"</p>
         })}
+        <button on:click=move |_| {
+                        rows.update(|items| {
+                            items.swap(1, 3);
+                            println!("{items:?}");
+                        })
+                    }
+        >"Swap"</button>
+        {move || {
+            keyed(rows(), |k| *k, |v| v.to_string())
+        }}
     }
 }
 /*
@@ -83,7 +96,7 @@ impl<C: View> App<C> {
         body().append_child(&contents);
     }
 
-    pub fn to_html(&self) -> String {
+    pub fn to_html(self) -> String {
         let mut buf = String::from(
             r#"<!DOCTYPE html>
 <html>

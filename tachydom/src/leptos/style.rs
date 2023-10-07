@@ -11,7 +11,7 @@ where
 {
     type State = Effect<(R::CssStyleDeclaration, Cow<'static, str>)>;
 
-    fn to_html(&self, style: &mut String) {
+    fn to_html(self, style: &mut String) {
         let (name, f) = self;
         let value = f();
         style.push_str(name);
@@ -60,7 +60,7 @@ where
 {
     type State = Effect<C::State>;
 
-    fn to_html(&self, class: &mut String) {
+    fn to_html(self, class: &mut String) {
         let value = self();
         value.to_html(class);
     }

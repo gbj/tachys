@@ -47,7 +47,7 @@ where
     R::Element: Clone,
 {
     /// Renders a view to HTML.
-    fn to_html(&self, buf: &mut String, position: &PositionState);
+    fn to_html(self, buf: &mut String, position: &PositionState);
 
     /// Makes a set of DOM nodes rendered from HTML interactive.
     ///

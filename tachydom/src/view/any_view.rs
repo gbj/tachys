@@ -291,6 +291,6 @@ mod tests {
             span((), "bar").into_any()
         };
         view.to_html(&mut buf, &Default::default());
-        assert_eq!(buf, "<span>bar</span>");
+        assert_eq!(buf, "<span>bar</span><!>");
     }
 }

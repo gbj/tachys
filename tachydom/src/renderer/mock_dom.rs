@@ -2,7 +2,7 @@
 //!
 //! Do not use this for anything real.
 
-use super::{CastFrom, Renderer};
+use super::{CastFrom, DomRenderer, Renderer};
 use crate::{
     html::element::{CreateElement, ElementType},
     view::Mountable,
@@ -203,6 +203,45 @@ impl Document {
             parent: None,
             ty: NodeType::Placeholder,
         })))
+    }
+}
+
+// TODO!
+impl DomRenderer for MockDom {
+    type Event = ();
+    type ClassList = ();
+    type CssStyleDeclaration = ();
+
+    fn add_event_listener(
+        el: &Self::Element,
+        name: &str,
+        cb: Box<dyn FnMut(Self::Event)>,
+    ) {
+        todo!()
+    }
+
+    fn class_list(el: &Self::Element) -> Self::ClassList {
+        todo!()
+    }
+
+    fn add_class(class_list: &Self::ClassList, name: &str) {
+        todo!()
+    }
+
+    fn remove_class(class_list: &Self::ClassList, name: &str) {
+        todo!()
+    }
+
+    fn style(el: &Self::Element) -> Self::CssStyleDeclaration {
+        todo!()
+    }
+
+    fn set_css_property(
+        style: &Self::CssStyleDeclaration,
+        name: &str,
+        value: &str,
+    ) {
+        todo!()
     }
 }
 

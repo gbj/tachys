@@ -8,6 +8,7 @@ pub mod dom;
 pub mod html;
 pub mod hydration;
 pub mod renderer;
+pub mod tuple_builder;
 pub mod view;
 
 #[cfg(feature = "leptos")]

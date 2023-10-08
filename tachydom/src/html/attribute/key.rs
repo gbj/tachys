@@ -1,5 +1,5 @@
 use super::{Attr, AttributeValue};
-use crate::renderer::Renderer;
+use crate::renderer::{DomRenderer, Renderer};
 use std::{fmt::Debug, marker::PhantomData};
 
 pub trait AttributeKey {
@@ -11,6 +11,21 @@ pub trait AttributeKey {
 /// [MDN docs](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes)
 
 pub trait GlobalAttribute {}
+
+// Support classes and styles.
+impl<C, R> GlobalAttribute for crate::html::class::Class<C, R>
+where
+    C: crate::html::class::IntoClass<R>,
+    R: DomRenderer,
+{
+}
+
+impl<S, R> GlobalAttribute for crate::html::style::Style<S, R>
+where
+    S: crate::html::style::IntoStyle<R>,
+    R: DomRenderer,
+{
+}
 
 macro_rules! attributes {
 	($($key:ident $html:literal [$($attr_trait:ty),*]),* $(,)?) => {

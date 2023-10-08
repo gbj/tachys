@@ -44,6 +44,31 @@ pub fn render_view(
     }
 }
 
+fn element_children_to_tokens(
+    nodes: &[Node],
+    parent_type: TagType,
+    parent_slots: Option<&mut HashMap<String, Vec<TokenStream>>>,
+    global_class: Option<&TokenTree>,
+    view_marker: Option<&str>,
+) -> Option<TokenStream> {
+    let children = children_to_tokens(
+        nodes,
+        parent_type,
+        parent_slots,
+        global_class,
+        view_marker,
+    )
+    .into_iter()
+    .map(|child| {
+        quote! {
+            .child(#child)
+        }
+    });
+    Some(quote! {
+        #(#children)*
+    })
+}
+
 fn fragment_to_tokens(
     nodes: &[Node],
     parent_type: TagType,
@@ -51,21 +76,53 @@ fn fragment_to_tokens(
     global_class: Option<&TokenTree>,
     view_marker: Option<&str>,
 ) -> Option<TokenStream> {
+    let children = children_to_tokens(
+        nodes,
+        parent_type,
+        parent_slots,
+        global_class,
+        view_marker,
+    );
+    if children.len() == 1 {
+        children.into_iter().next()
+    } else {
+        Some(quote! {
+            (#(#children),*)
+        })
+    }
+}
+
+fn children_to_tokens(
+    nodes: &[Node],
+    parent_type: TagType,
+    parent_slots: Option<&mut HashMap<String, Vec<TokenStream>>>,
+    global_class: Option<&TokenTree>,
+    view_marker: Option<&str>,
+) -> Vec<TokenStream> {
     if nodes.len() == 1 {
-        node_to_tokens(
+        match node_to_tokens(
             &nodes[0],
             parent_type,
             parent_slots,
             global_class,
             view_marker,
-        )
+        ) {
+            Some(tokens) => vec![tokens],
+            None => vec![],
+        }
     } else {
-        let nodes = nodes.iter().filter_map(|node| {
-            node_to_tokens(node, TagType::Unknown, None, global_class, view_marker)
-        });
-        Some(quote! {
-            (#(#nodes),*)
-        })
+        nodes
+            .iter()
+            .filter_map(|node| {
+                node_to_tokens(
+                    node,
+                    TagType::Unknown,
+                    None,
+                    global_class,
+                    view_marker,
+                )
+            })
+            .collect()
     }
 }
 
@@ -92,9 +149,13 @@ fn node_to_tokens(
             let text = syn::LitStr::new(&text, raw.span());
             Some(text_to_tokens(&text))
         }
-        Node::Element(node) => {
-            element_to_tokens(node, parent_type, parent_slots, global_class, view_marker)
-        }
+        Node::Element(node) => element_to_tokens(
+            node,
+            parent_type,
+            parent_slots,
+            global_class,
+            view_marker,
+        ),
     }
 }
 
@@ -182,31 +243,42 @@ pub(crate) fn element_to_tokens(
                 .iter()
                 .filter_map(|node| attribute_to_tokens(node, global_class));
             Some(quote! {
-                (#(#nodes),*)
+                #(#nodes)*
             })
         };
 
-        let children = if !is_self_closing(node) {
-            Some(fragment_to_tokens(
+        let self_closing = is_self_closing(node);
+        let children = if !self_closing {
+            element_children_to_tokens(
                 &node.children,
                 parent_type,
                 parent_slots,
                 global_class,
                 view_marker,
-            ))
+            )
         } else {
             if !node.children.is_empty() {
                 let name = node.name();
                 proc_macro_error::emit_error!(
                     name.span(),
-                    format!("Self-closing elements like <{name}> cannot have children.")
+                    format!(
+                        "Self-closing elements like <{name}> cannot have \
+                         children."
+                    )
                 );
             };
             None
         };
+        let starting_children = if !self_closing {
+            Some(quote! {, () })
+        } else {
+            None
+        };
 
         Some(quote! {
-            #name(#attributes, #children)
+            #name(() #starting_children)
+                #attributes
+                #children
         })
     }
 }
@@ -215,48 +287,53 @@ fn attribute_to_tokens(
     node: &NodeAttribute,
     global_class: Option<&TokenTree>,
 ) -> Option<TokenStream> {
-    match node {
+    let span = node.span();
+    let attr = match node {
         NodeAttribute::Block(_) => todo!(),
         NodeAttribute::Attribute(node) => {
             let span = node.key.span();
             let name = node.key.to_string();
-            if name == "ref" || name == "_ref" || name == "ref_" || name == "node_ref" {
+            if name == "ref"
+                || name == "_ref"
+                || name == "ref_"
+                || name == "node_ref"
+            {
                 todo!()
             } else if let Some(name) = name.strip_prefix("on:") {
-                Some(event_to_tokens(name, node))
+                event_to_tokens(name, node)
             } else if let Some(name) = name.strip_prefix("class:") {
                 let class = match &node.key {
                     NodeName::Punctuated(parts) => &parts[0],
                     _ => unreachable!(),
                 };
-                Some(class_to_tokens(node, class.into_token_stream(), Some(name)))
+                class_to_tokens(node, class.into_token_stream(), Some(name))
             } else if name == "class" {
                 let class = match &node.key {
                     NodeName::Path(path) => path.path.get_ident(),
                     _ => unreachable!(),
                 };
-                Some(class_to_tokens(node, class.into_token_stream(), None))
+                class_to_tokens(node, class.into_token_stream(), None)
             } else if let Some(name) = name.strip_prefix("style:") {
                 let style = match &node.key {
                     NodeName::Punctuated(parts) => &parts[0],
                     _ => unreachable!(),
                 };
-                Some(style_to_tokens(node, style.into_token_stream(), Some(name)))
+                style_to_tokens(node, style.into_token_stream(), Some(name))
             } else if name == "style" {
                 let style = match &node.key {
                     NodeName::Path(path) => path.path.get_ident(),
                     _ => unreachable!(),
                 };
-                Some(style_to_tokens(node, style.into_token_stream(), None))
+                style_to_tokens(node, style.into_token_stream(), None)
             } else {
                 let key = &node.key;
                 let key = quote! {
                     ::tachydom::html::attribute::#key
                 };
                 let value = attribute_value(node);
-                Some(quote! {
+                quote! {
                     #key(#value)
-                })
+                }
                 // TODO fix static attrs
                 /* if let Expr::Lit(lit) = value {
                     if cfg!(feature = "nightly") {
@@ -275,7 +352,10 @@ fn attribute_to_tokens(
                 }*/
             }
         }
-    }
+    };
+    Some(quote_spanned! { span =>
+        .attr(#attr)
+    })
 }
 
 fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
@@ -380,8 +460,8 @@ fn is_self_closing(node: &NodeElement) -> bool {
     // self-closing tags
     // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
     [
-        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
-        "source", "track", "wbr",
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+        "meta", "param", "source", "track", "wbr",
     ]
     .binary_search(&node.name().to_string().as_str())
     .is_ok()

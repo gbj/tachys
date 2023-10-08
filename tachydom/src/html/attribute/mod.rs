@@ -140,6 +140,33 @@ macro_rules! impl_attr_for_tuples {
 	};
 }
 
+impl<A, Rndr> Attribute<Rndr> for (A,)
+where
+    A: Attribute<Rndr>,
+    Rndr: Renderer,
+{
+    type State = A::State;
+
+    fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {
+        self.0.to_html(buf, class, style);
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        el: &Rndr::Element,
+    ) -> Self::State {
+        self.0.hydrate::<FROM_SERVER>(el)
+    }
+
+    fn build(self, el: &Rndr::Element) -> Self::State {
+        self.0.build(el)
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        self.0.rebuild(state);
+    }
+}
+
 impl_attr_for_tuples!(A, B);
 impl_attr_for_tuples!(A, B, C);
 impl_attr_for_tuples!(A, B, C, D);

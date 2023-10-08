@@ -1,5 +1,5 @@
 use crate::{
-    html::attribute::Attribute,
+    html::attribute::{Attribute, GlobalAttribute},
     renderer::DomRenderer,
     view::{Position, ToTemplate},
 };
@@ -41,6 +41,8 @@ where
         f.debug_tuple("On").field(&self.name).finish()
     }
 }
+
+impl<R: DomRenderer> GlobalAttribute for On<R> {}
 
 impl<R> Attribute<R> for On<R>
 where

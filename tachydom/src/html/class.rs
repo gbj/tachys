@@ -3,8 +3,9 @@ use crate::{renderer::DomRenderer, view::ToTemplate};
 use std::marker::PhantomData;
 
 #[inline(always)]
-pub fn class<R>(class: impl IntoClass<R>) -> impl Attribute<R>
+pub fn class<C, R>(class: C) -> Class<C, R>
 where
+    C: IntoClass<R>,
     R: DomRenderer,
 {
     Class {
@@ -13,7 +14,7 @@ where
     }
 }
 
-struct Class<C, R>
+pub struct Class<C, R>
 where
     C: IntoClass<R>,
     R: DomRenderer,

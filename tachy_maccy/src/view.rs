@@ -269,14 +269,9 @@ pub(crate) fn element_to_tokens(
             };
             None
         };
-        let starting_children = if !self_closing {
-            Some(quote! {, () })
-        } else {
-            None
-        };
 
         Some(quote! {
-            #name(() #starting_children)
+            #name()
                 #attributes
                 #children
         })

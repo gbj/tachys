@@ -114,15 +114,7 @@ where
     }
 } */
 
-pub trait Element<Rndr>
-where
-    Rndr: Renderer,
-{
-    type Attributes: Attribute<Rndr>;
-    type Children: Render<Rndr>;
-}
-
-pub trait GlobalAttributes<E, At, Ch, Rndr>
+/* pub trait GlobalAttributes<E, At, Ch, Rndr>
 where
     Self: Sized,
     E: Element<Rndr, Attributes = At, Children = Ch>,
@@ -130,26 +122,10 @@ where
     Ch: Render<Rndr>,
     Rndr: Renderer,
 {
-    fn set_attr<NewAttr>(
-        self,
-        new_attr: NewAttr,
-    ) -> impl Element<
-        Rndr,
-        Attributes = <At as TupleBuilder<NewAttr>>::Output,
-        Children = Ch,
-    >
-    where
-        At: TupleBuilder<NewAttr>,
-        <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>;
-
     fn id<V>(
         self,
         value: V,
-    ) -> impl Element<
-        Rndr,
-        Attributes = <At as TupleBuilder<Attr<Id, V, Rndr>>>::Output,
-        Children = Ch,
-    >
+    ) -> E::Element<<At as TupleBuilder<Attr<Id, V, Rndr>>>::Output, Ch, Rndr>
     where
         V: AttributeValue<Rndr>,
         At: TupleBuilder<Attr<Id, V, Rndr>>,
@@ -157,7 +133,7 @@ where
     {
         self.set_attr(id(value))
     }
-}
+} */
 
 pub trait ElementChild<NewChild> {
     type Output;
@@ -168,12 +144,6 @@ pub trait ElementChild<NewChild> {
 pub trait ElementType {
     const TAG: &'static str;
     const SELF_CLOSING: bool;
-}
-
-pub trait HtmlAttribute<El>
-where
-    El: ElementType,
-{
 }
 
 pub trait CreateElement<R: Renderer> {
@@ -361,9 +331,9 @@ mod tests {
     use super::{main, p, HtmlElement};
     use crate::{
         html::{
-            attribute::{id, src},
+            attribute::{global::GlobalAttributes, id, src},
             class::class,
-            element::{em, ElementChild, GlobalAttributes, HtmlMain},
+            element::{em, ElementChild, HtmlMain},
         },
         renderer::mock_dom::MockDom,
         view::Render,
@@ -371,13 +341,12 @@ mod tests {
 
     #[test]
     fn mock_dom_creates_element() {
-        let p = p().child("Hello, world!");
-        p.set_attr(class("foo"));
-        let el: HtmlMain<_, _, MockDom> = main().child(p);
+        let el: HtmlMain<_, _, MockDom> =
+            main().child(p().id("test").lang("en").child("Hello, world!"));
         let el = el.build();
         assert_eq!(
             el.el.to_debug_html(),
-            "<main><p id=\"test\">Hello, world!</p></main>"
+            "<main><p id=\"test\" lang=\"en\">Hello, world!</p></main>"
         );
     }
 

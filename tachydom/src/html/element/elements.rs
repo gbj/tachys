@@ -1,11 +1,8 @@
 use crate::{
     html::{
-        attribute::*,
+        attribute::{global::AddAttribute, *},
         class::{Class, IntoClass},
-        element::{
-            CreateElement, Element, ElementChild, ElementType,
-            GlobalAttributes, HtmlAttribute, HtmlElement,
-        },
+        element::{CreateElement, ElementChild, ElementType, HtmlElement},
     },
     renderer::{dom::Dom, DomRenderer, Renderer},
     tuple_builder::TupleBuilder,
@@ -18,8 +15,7 @@ macro_rules! html_elements {
 	($($tag:ident  [$($attr:ty),*]),* $(,)?) => {
         paste::paste! {
             $(
-                // `tag()`
-
+                // `tag()` function
                 pub fn $tag<Rndr>() -> [<Html $tag:camel>]<(), (), Rndr>
                 where
                     Rndr: Renderer
@@ -34,7 +30,7 @@ macro_rules! html_elements {
                 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
                 pub struct [<Html $tag:camel>]<At, Ch, Rndr>
                 where
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                    At: Attribute<Rndr>,
                     Ch: Render<Rndr>,
                     Rndr: Renderer {
                     attributes: At,
@@ -43,10 +39,9 @@ macro_rules! html_elements {
                 }
 
                 // .child()
-
                 impl<At, Ch, NewChild, Rndr> ElementChild<NewChild> for [<Html $tag:camel>]<At, Ch, Rndr>
                 where
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                    At: Attribute<Rndr>,
                     Ch: Render<Rndr> + TupleBuilder<NewChild>,
                     <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
                     Rndr: Renderer
@@ -75,7 +70,7 @@ macro_rules! html_elements {
                 $(
                     impl<At, Ch, Rndr> [<Html $tag:camel>]<At, Ch, Rndr>
                     where
-                        At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                        At: Attribute<Rndr>,
                         Ch: Render<Rndr>,
                         Rndr: Renderer,
                     {
@@ -86,7 +81,7 @@ macro_rules! html_elements {
                         where
                             V: AttributeValue<Rndr>,
                             At: TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>,
-                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output: Attribute<Rndr>,
                         {
                             let [<Html $tag:camel>] {
                                 attributes,
@@ -103,40 +98,23 @@ macro_rules! html_elements {
                 )*
 
                 // Global Attributes
-                impl<At, Ch, Rndr> Element<Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
+                impl<At, Ch, Rndr, NewAttr> AddAttribute<NewAttr, Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
                 where
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                    At: Attribute<Rndr> + TupleBuilder<NewAttr>,
+                    <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
                     Ch: Render<Rndr>,
-                    Rndr: Renderer,
+                    Rndr: Renderer
                 {
-                    type Attributes = At;
-                    type Children = Ch;
-                }
+                    type Output = [<Html $tag:camel>]<<At as TupleBuilder<NewAttr>>::Output, Ch, Rndr>;
 
-                impl<At, Ch, Rndr> GlobalAttributes<Self, At, Ch, Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    Self: Sized,
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
-                    Ch: Render<Rndr>,
-                    Rndr: Renderer {
-                    fn set_attr<NewAttr>(
-                        self,
-                        new_attr: NewAttr,
-                    ) -> impl Element<
-                        Rndr,
-                        Attributes = <At as TupleBuilder<NewAttr>>::Output,
-                        Children = Ch,
-                    >
-                    where
-                        At: TupleBuilder<NewAttr> + HtmlAttribute<[<$tag:camel>]>,
-                        <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]> {
+                    fn add_attr(self, attr: NewAttr) -> Self::Output {
                         let [<Html $tag:camel>] {
                             attributes,
                             children,
                             rndr
                         } = self;
                         [<Html $tag:camel>] {
-                            attributes: attributes.next_tuple(new_attr),
+                            attributes: attributes.next_tuple(attr),
                             children,
                             rndr
                         }
@@ -165,14 +143,10 @@ macro_rules! html_elements {
                     }
                 }
 
-                // Typed attributes
-                build_attributes! { [<$tag:camel>] }
-                $(impl HtmlAttribute<[<$tag:camel>]> for $crate::html::attribute::$attr {})*
-
                 // Render and RenderHtml implementations simply delegate to HtmlElement
                 impl<At, Ch, Rndr> Render<Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
                 where
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                    At: Attribute<Rndr>,
                     Ch: Render<Rndr>,
                     Rndr: Renderer,
                     Rndr::Node: Clone,
@@ -219,7 +193,7 @@ macro_rules! html_self_closing_elements {
             $(
                 pub fn $tag<At, Rndr>(attributes: At) -> HtmlElement<[<$tag:camel>], At, (), Rndr>
                 where
-                    At: Attribute<Rndr> + HtmlAttribute<[<$tag:camel>]>,
+                    At: Attribute<Rndr>,
                     Rndr: Renderer
                 {
                     HtmlElement {
@@ -251,9 +225,6 @@ macro_rules! html_self_closing_elements {
                     }
                 }
 
-                build_attributes! { [<$tag:camel>] }
-                $(impl HtmlAttribute<[<$tag:camel>]> for $crate::html::attribute::$attr {})*
-
                 $(
                     impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
                     where
@@ -275,81 +246,6 @@ macro_rules! html_self_closing_elements {
 		}
     }
 }
-
-macro_rules! build_attributes {
-    ($el:ident) => {
-        // Support all global attributes
-        impl<T: GlobalAttribute> HtmlAttribute<$el> for T {}
-
-        // Support all specified attributes.
-        impl<K, V, R> HtmlAttribute<$el>
-            for $crate::html::attribute::Attr<K, V, R>
-        where
-            K: $crate::html::attribute::AttributeKey + HtmlAttribute<$el>,
-            V: $crate::html::attribute::AttributeValue<R>,
-            R: Renderer,
-        {
-        }
-
-        // Support no attributes.
-        impl HtmlAttribute<$el> for () {}
-    };
-}
-
-macro_rules! impl_attr_trait_for_tuple {
-    ($first:ident, $($ty:ident),* $(,)?) => {
-        impl<El: ElementType, $first, $($ty),*> HtmlAttribute<El> for ($first, $($ty,)*)
-            where $first: HtmlAttribute<El>, $($ty: HtmlAttribute<El>,)*
-            {}
-    };
-}
-
-// Support tuples of attributes.
-impl<E: ElementType, A: HtmlAttribute<E>> HtmlAttribute<E> for (A,) {}
-impl_attr_trait_for_tuple!(A, B);
-impl_attr_trait_for_tuple!(A, B, C);
-impl_attr_trait_for_tuple!(A, B, C, D);
-impl_attr_trait_for_tuple!(A, B, C, D, E);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
-impl_attr_trait_for_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
-);
-impl_attr_trait_for_tuple!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y,
-    Z
-);
 
 /* html_self_closing_elements! {
     area [Alt, Coords, Download, Href, Hreflang, Ping, Rel, Shape, Target],
@@ -476,7 +372,7 @@ pub fn option<At, Ch, Rndr>(
     children: Ch,
 ) -> HtmlElement<Option_, At, Ch, Rndr>
 where
-    At: Attribute<Rndr> + HtmlAttribute<Option_>,
+    At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
 {
@@ -508,9 +404,3 @@ impl CreateElement<Dom> for Option_ {
         ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
     }
 }
-
-build_attributes! { Option_ }
-impl HtmlAttribute<Option_> for crate::html::attribute::Disabled {}
-impl HtmlAttribute<Option_> for crate::html::attribute::Label {}
-impl HtmlAttribute<Option_> for crate::html::attribute::Selected {}
-impl HtmlAttribute<Option_> for crate::html::attribute::Value {}

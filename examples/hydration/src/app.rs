@@ -21,6 +21,7 @@ pub fn my_app() -> impl RenderHtml<Dom> {
     let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
 
     view! {
+        <div src="test.jpeg" alt="test" splurp="test" />
         <p
             class:bar=move || count.get() % 2 == 0
             class="foo"
@@ -32,6 +33,7 @@ pub fn my_app() -> impl RenderHtml<Dom> {
             } else {
                 "red"
             }
+
             style:display="block"
         >
             "This is" <strong>"very"</strong> cool stuff.<span></span>

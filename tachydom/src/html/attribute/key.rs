@@ -32,7 +32,7 @@ macro_rules! attributes {
         paste::paste! {
             $(
                 pub fn $key<V, R>(value: V) -> Attr<[<$key:camel>], V, R>
-				where V: AttributeValue<R> + std::fmt::Debug,
+				where V: AttributeValue<R>,
                   R: Renderer
                 {
                     Attr([<$key:camel>], value, PhantomData)

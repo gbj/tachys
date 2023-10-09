@@ -1,10 +1,11 @@
 use crate::{
     html::{
-        attribute::{Attribute, GlobalAttribute},
+        attribute::*,
         class::{Class, IntoClass},
         element::{CreateElement, ElementType, HtmlAttribute, HtmlElement},
     },
     renderer::{dom::Dom, DomRenderer, Renderer},
+    tuple_builder::TupleBuilder,
     view::Render,
 };
 use once_cell::unsync::Lazy;
@@ -96,6 +97,24 @@ macro_rules! html_self_closing_elements {
 
                 build_attributes! { [<$tag:camel>] }
                 $(impl HtmlAttribute<[<$tag:camel>]> for $crate::html::attribute::$attr {})*
+
+                $(
+                    impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
+                    where
+                        At: Attribute<Rndr>,
+                        Ch: Render<Rndr>,
+                        Rndr: Renderer,
+                    {
+                        pub fn [<$attr:lower>]<V>(self, value: V) -> HtmlElement<[<$tag:camel>], <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output, Ch, Rndr>
+                        where
+                            V: AttributeValue<Rndr>,
+                            At: TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>,
+                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output: Attribute<Rndr>,
+                        {
+                            self.attr($crate::html::attribute::[<$attr:lower>](value))
+                        }
+                    }
+                )*
             )*
 		}
     }
@@ -181,19 +200,19 @@ html_self_closing_elements! {
     base [Href, Target],
     br [],
     col [Span],
-    embed [Height, Src, Type, Width],
+    embed [Height, Src, /* Type, */Width],
     hr [],
     img [Alt, Crossorigin, Decoding, Height, Ismap, Sizes, Src, Srcset, Usemap, Width],
-    input [Accept, Alt, Autocomplete, Capture, Checked, Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Height, List, Max, Maxlength, Min, Minlength, Multiple, Name, Pattern, Placeholder, Readonly, Required, Size, Src, Step, Type, Value, Width],
-    link [As, Crossorigin, Href, Hreflang, Media, Rel, Sizes, Type],
-    meta [Charset, Content, HttpEquiv, Name],
-    source [Src, Type],
+    input [Accept, Alt, Autocomplete, Capture, Checked, Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Height, List, Max, Maxlength, Min, Minlength, Multiple, Name, Pattern, Placeholder, Readonly, Required, Size, Src, Step, /* Type, */Value, Width],
+    link [/* As, */ Crossorigin, Href, Hreflang, Media, Rel, Sizes/* , Type */],
+    meta [Charset, Content, /* HttpEquiv, */ Name],
+    source [Src/* , Type */],
     track [Default, Kind, Label, Src, Srclang],
     wbr []
 }
 
 html_elements! {
-    a [Download, Href, Hreflang, Ping, Rel, Target, Type],
+    a [Download, Href, Hreflang, Ping, Rel, Target/* , Type */],
     abbr [],
     address [],
     article [],
@@ -205,7 +224,7 @@ html_elements! {
     blink [],
     blockquote [Cite],
     body [],
-    button [Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Name, Type, Value],
+    button [Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Name, /* Type, */Value],
     canvas [Height, Width],
     caption [],
     cite [],
@@ -251,8 +270,8 @@ html_elements! {
     meter [Value, Min, Max, Low, High, Optimum, Form],
     nav [],
     noscript [],
-    object [Data, Form, Height, Name, Type, Usemap, Width],
-    ol [Reversed, Start, Type],
+    object [Data, Form, Height, Name, /* Type, */Usemap, Width],
+    ol [Reversed, Start/* , Type */],
     optgroup [Disabled, Label],
     // option, // creates conflict with core Option
     output [For, Form, Name],
@@ -267,7 +286,7 @@ html_elements! {
     ruby [],
     s [],
     samp [],
-    script [Async, Crossorigin, Defer, Fetchpriority, Integrity, Nomodule, Referrerpolicy, Src, Type, Blocking],
+    script [/* Async, */ Crossorigin, Defer, Fetchpriority, Integrity, Nomodule, Referrerpolicy, Src, /* Type, */Blocking],
     search [],
     section [],
     select [Autocomplete, Disabled, Form, Multiple, Name, Required, Size],

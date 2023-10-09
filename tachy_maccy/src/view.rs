@@ -237,11 +237,11 @@ pub(crate) fn element_to_tokens(
 
         let attributes = node.attributes();
         let attributes = if attributes.len() == 1 {
-            attribute_to_tokens(&attributes[0], global_class)
+            Some(attribute_to_tokens(&attributes[0], global_class))
         } else {
             let nodes = attributes
                 .iter()
-                .filter_map(|node| attribute_to_tokens(node, global_class));
+                .map(|node| attribute_to_tokens(node, global_class));
             Some(quote! {
                 #(#nodes)*
             })
@@ -286,9 +286,9 @@ pub(crate) fn element_to_tokens(
 fn attribute_to_tokens(
     node: &NodeAttribute,
     global_class: Option<&TokenTree>,
-) -> Option<TokenStream> {
+) -> TokenStream {
     let span = node.span();
-    let attr = match node {
+    match node {
         NodeAttribute::Block(_) => todo!(),
         NodeAttribute::Attribute(node) => {
             let span = node.key.span();
@@ -327,12 +327,9 @@ fn attribute_to_tokens(
                 style_to_tokens(node, style.into_token_stream(), None)
             } else {
                 let key = &node.key;
-                let key = quote! {
-                    ::tachydom::html::attribute::#key
-                };
                 let value = attribute_value(node);
                 quote! {
-                    #key(#value)
+                    .#key(#value)
                 }
                 // TODO fix static attrs
                 /* if let Expr::Lit(lit) = value {
@@ -352,10 +349,7 @@ fn attribute_to_tokens(
                 }*/
             }
         }
-    };
-    Some(quote_spanned! { span =>
-        .attr(#attr)
-    })
+    }
 }
 
 fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
@@ -414,7 +408,7 @@ fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
     };
 
     quote! {
-        ::tachydom::html::event::#on(#event_type, #handler)
+        .attr(::tachydom::html::event::#on(#event_type, #handler))
     }
 }
 
@@ -426,11 +420,11 @@ fn class_to_tokens(
     let value = attribute_value(node);
     if let Some(class_name) = class_name {
         quote! {
-            ::tachydom::html::class::#class((#class_name, #value))
+            .attr(::tachydom::html::class::#class((#class_name, #value)))
         }
     } else {
         quote! {
-            ::tachydom::html::class::#class(#value)
+            .attr(::tachydom::html::class::#class(#value))
         }
     }
 }
@@ -443,11 +437,11 @@ fn style_to_tokens(
     let value = attribute_value(node);
     if let Some(style_name) = style_name {
         quote! {
-            ::tachydom::html::style::#style((#style_name, #value))
+            .attr(::tachydom::html::style::#style((#style_name, #value)))
         }
     } else {
         quote! {
-            ::tachydom::html::style::#style(#value)
+            .attr(::tachydom::html::style::#style(#value))
         }
     }
 }
@@ -589,10 +583,10 @@ fn parse_event(event_name: &str) -> (&str, bool) {
     }
 }
 
-fn attribute_value(attr: &KeyedAttribute) -> &syn::Expr {
+fn attribute_value(attr: &KeyedAttribute) -> TokenStream {
     match attr.value() {
-        Some(value) => value,
-        None => abort!(attr.key, "attribute should have value"),
+        Some(value) => quote! { #value },
+        None => quote! { true },
     }
 }
 

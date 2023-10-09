@@ -10,6 +10,7 @@ use crate::{
 use std::marker::PhantomData;
 
 mod elements;
+use super::attribute::{id, Attr, AttributeValue, Id};
 pub use elements::*;
 
 pub struct HtmlElement<E, At, Ch, Rndr>
@@ -23,7 +24,7 @@ where
     attributes: At,
     children: Ch,
 }
-
+/*
 impl<E, At, Ch, Rndr> HtmlElement<E, At, Ch, Rndr>
 where
     At: Attribute<Rndr>,
@@ -43,7 +44,7 @@ where
     ///     view::Render,
     /// };
     /// let el: HtmlElement<_, _, _, MockDom> =
-    ///     p((), ()).attr(id("foo")).attr(class("bar"));
+    ///     p().attr(id("foo")).attr(class("bar"));
     /// let el = el.build();
     /// assert_eq!(el.el.to_debug_html(), "<p id=\"foo\" class=\"bar\"></p>");
     /// ```
@@ -111,6 +112,57 @@ where
             children: children.next_tuple(child),
         }
     }
+} */
+
+pub trait Element<Rndr>
+where
+    Rndr: Renderer,
+{
+    type Attributes: Attribute<Rndr>;
+    type Children: Render<Rndr>;
+}
+
+pub trait GlobalAttributes<E, At, Ch, Rndr>
+where
+    Self: Sized,
+    E: Element<Rndr, Attributes = At, Children = Ch>,
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
+{
+    fn set_attr<NewAttr>(
+        self,
+        new_attr: NewAttr,
+    ) -> impl Element<
+        Rndr,
+        Attributes = <At as TupleBuilder<NewAttr>>::Output,
+        Children = Ch,
+    >
+    where
+        At: TupleBuilder<NewAttr>,
+        <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>;
+
+    fn id<V>(
+        self,
+        value: V,
+    ) -> impl Element<
+        Rndr,
+        Attributes = <At as TupleBuilder<Attr<Id, V, Rndr>>>::Output,
+        Children = Ch,
+    >
+    where
+        V: AttributeValue<Rndr>,
+        At: TupleBuilder<Attr<Id, V, Rndr>>,
+        <At as TupleBuilder<Attr<Id, V, Rndr>>>::Output: Attribute<Rndr>,
+    {
+        self.set_attr(id(value))
+    }
+}
+
+pub trait ElementChild<NewChild> {
+    type Output;
+
+    fn child(self, child: NewChild) -> Self::Output;
 }
 
 pub trait ElementType {
@@ -310,7 +362,8 @@ mod tests {
     use crate::{
         html::{
             attribute::{id, src},
-            element::em,
+            class::class,
+            element::{em, ElementChild, GlobalAttributes, HtmlMain},
         },
         renderer::mock_dom::MockDom,
         view::Render,
@@ -318,8 +371,9 @@ mod tests {
 
     #[test]
     fn mock_dom_creates_element() {
-        let el: HtmlElement<_, _, _, MockDom> =
-            main((), p(id("test"), "Hello, world!"));
+        let p = p().child("Hello, world!");
+        p.set_attr(class("foo"));
+        let el: HtmlMain<_, _, MockDom> = main().child(p);
         let el = el.build();
         assert_eq!(
             el.el.to_debug_html(),
@@ -329,8 +383,11 @@ mod tests {
 
     #[test]
     fn mock_dom_creates_element_with_several_children() {
-        let el: HtmlElement<_, _, _, MockDom> =
-            main((), p((), ("Hello, ", em((), "beautiful"), " world!")));
+        let el: HtmlMain<_, _, MockDom> = main().child(p().child((
+            "Hello, ",
+            em().child("beautiful"),
+            " world!",
+        )));
         let el = el.build();
         assert_eq!(
             el.el.to_debug_html(),

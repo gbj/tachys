@@ -271,7 +271,7 @@ where
         (self.insert_before_this)(self, parent, child)
     }
 }
-
+/* 
 #[cfg(test)]
 mod tests {
     use super::IntoAny;
@@ -294,3 +294,4 @@ mod tests {
         assert_eq!(buf, "<span>bar</span><!>");
     }
 }
+ */

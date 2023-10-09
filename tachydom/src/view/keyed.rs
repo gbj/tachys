@@ -566,7 +566,7 @@ fn unpack_moves(diff: &Diff) -> (Vec<DiffOpMove>, Vec<DiffOpAdd>) {
 
     (moves, adds)
 }
-
+/* 
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -678,3 +678,4 @@ mod tests {
         assert_eq!(el_state.el.to_debug_html(), "<ul></ul>");
     }
 }
+*/

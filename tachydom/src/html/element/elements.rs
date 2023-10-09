@@ -4,9 +4,10 @@ use crate::{
         class::{Class, IntoClass},
         element::{CreateElement, ElementChild, ElementType, HtmlElement},
     },
+    hydration::Cursor,
     renderer::{dom::Dom, DomRenderer, Renderer},
     tuple_builder::TupleBuilder,
-    view::Render,
+    view::{PositionState, Render, RenderHtml},
 };
 use once_cell::unsync::Lazy;
 use std::{fmt::Debug, marker::PhantomData};
@@ -180,6 +181,48 @@ macro_rules! html_elements {
                             ty: PhantomData,
                             rndr,
                         }.rebuild(state);
+                    }
+                }
+
+                impl<At, Ch, Rndr> RenderHtml<Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Ch: Render<Rndr>,
+                    Rndr: Renderer,
+                    Rndr::Node: Clone,
+                    Rndr::Element: Clone,
+                    HtmlElement<[<$tag:camel>], At, Ch, Rndr>: RenderHtml<Rndr>
+                {
+                    fn to_html(self, buf: &mut String, position: &PositionState) {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            children,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children,
+                            ty: PhantomData,
+                            rndr,
+                        }.to_html(buf, position)
+                    }
+
+                    fn hydrate<const FROM_SERVER: bool>(
+                        self,
+                        cursor: &Cursor<Rndr>,
+                        position: &PositionState,
+                    ) -> Self::State {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            children,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children,
+                            ty: PhantomData,
+                            rndr,
+                        }.hydrate::<FROM_SERVER>(cursor, position)
                     }
                 }
             )*

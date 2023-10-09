@@ -22,7 +22,7 @@ pub fn my_app() -> impl RenderHtml<Dom> {
     let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
 
     view! {
-        <button>"Test"</button>
+        <button id="test" disabled="true">"Test"</button>
         //<img src="test.jpeg" alt="test" splurp="test" />
         //<button></button>
         /* <p

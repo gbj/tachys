@@ -282,11 +282,9 @@ fn attribute_to_tokens(
     node: &NodeAttribute,
     global_class: Option<&TokenTree>,
 ) -> TokenStream {
-    let span = node.span();
     match node {
         NodeAttribute::Block(_) => todo!(),
         NodeAttribute::Attribute(node) => {
-            let span = node.key.span();
             let name = node.key.to_string();
             if name == "ref"
                 || name == "_ref"
@@ -321,7 +319,7 @@ fn attribute_to_tokens(
                 };
                 style_to_tokens(node, style.into_token_stream(), None)
             } else {
-                let key = &node.key;
+                let key = attribute_name(&node.key);
                 let value = attribute_value(node);
                 quote! {
                     .#key(#value)
@@ -575,6 +573,17 @@ fn parse_event(event_name: &str) -> (&str, bool) {
         (event_name, true)
     } else {
         (event_name, false)
+    }
+}
+
+/// Escapes Rust keywords that are also HTML attribute names
+/// to their raw-identifier form.
+fn attribute_name(name: &NodeName) -> TokenStream {
+    let s = name.to_string();
+    if s == "as" || s == "async" || s == "loop" || s == "for" || s == "type" {
+        Ident::new_raw(&s, name.span()).to_token_stream()
+    } else {
+        name.to_token_stream()
     }
 }
 

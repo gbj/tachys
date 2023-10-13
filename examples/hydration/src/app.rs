@@ -40,7 +40,7 @@ pub fn my_app() -> impl RenderHtml<Dom> {
         >
             "This is " <strong>"very"</strong> cool stuff.<span></span>
         </p>
-        <input/>
+        <input type="text" on:input=|ev| {}/>
         {move || if count() % 2 == 0 {
             view! { <div>"even"</div> }.into_any()
         } else {

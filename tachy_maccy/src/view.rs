@@ -403,7 +403,7 @@ fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
     };
 
     quote! {
-        .attr(::tachydom::html::event::#on(#event_type, #handler))
+        .#on(#event_type, #handler)
     }
 }
 
@@ -415,11 +415,11 @@ fn class_to_tokens(
     let value = attribute_value(node);
     if let Some(class_name) = class_name {
         quote! {
-            .attr(::tachydom::html::class::#class((#class_name, #value)))
+            .#class((#class_name, #value))
         }
     } else {
         quote! {
-            .attr(::tachydom::html::class::#class(#value))
+            .#class(#value)
         }
     }
 }
@@ -432,11 +432,11 @@ fn style_to_tokens(
     let value = attribute_value(node);
     if let Some(style_name) = style_name {
         quote! {
-            .attr(::tachydom::html::style::#style((#style_name, #value)))
+            .#style((#style_name, #value))
         }
     } else {
         quote! {
-            .attr(::tachydom::html::style::#style(#value))
+            .#style(#value)
         }
     }
 }

@@ -75,14 +75,14 @@ macro_rules! html_elements {
                         Ch: Render<Rndr>,
                         Rndr: Renderer,
                     {
-                        pub fn [<$attr:lower>]<V>(self, value: V) -> [<Html $tag:camel>] <
-                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output,
+                        pub fn $attr<V>(self, value: V) -> [<Html $tag:camel>] <
+                            <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
                             Ch, Rndr
                         >
                         where
                             V: AttributeValue<Rndr>,
-                            At: TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>,
-                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output: Attribute<Rndr>,
+                            At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
+                            <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
                         {
                             let [<Html $tag:camel>] {
                                 attributes,
@@ -90,7 +90,7 @@ macro_rules! html_elements {
                                 rndr
                             } = self;
                             [<Html $tag:camel>] {
-                                attributes: attributes.next_tuple($crate::html::attribute::[<$attr:lower>](value)),
+                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value)),
                                 children,
                                 rndr
                             }
@@ -231,28 +231,85 @@ macro_rules! html_elements {
 }
 
 macro_rules! html_self_closing_elements {
-	($($tag:ident [$($attr:ty),*]),* $(,)?) => {
+	($($tag:ident  [$($attr:ty),*]),* $(,)?) => {
         paste::paste! {
             $(
-                pub fn $tag<At, Rndr>(attributes: At) -> HtmlElement<[<$tag:camel>], At, (), Rndr>
+                // `tag()` function
+                pub fn $tag<Rndr>() -> [<Html $tag:camel>]<(), Rndr>
                 where
-                    At: Attribute<Rndr>,
                     Rndr: Renderer
                 {
-                    HtmlElement {
-                        ty: PhantomData,
+                     [<Html $tag:camel>] {
+                        attributes: (),
                         rndr: PhantomData,
-                        attributes,
-                        children: ()
                     }
                 }
 
+                #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+                pub struct [<Html $tag:camel>]<At, Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Rndr: Renderer {
+                    attributes: At,
+                    rndr: PhantomData<Rndr>
+                }
+
+                // Typed attribute methods
+                $(
+                    impl<At, Rndr> [<Html $tag:camel>]<At, Rndr>
+                    where
+                        At: Attribute<Rndr>,
+                        Rndr: Renderer,
+                    {
+                        pub fn $attr<V>(self, value: V) -> [<Html $tag:camel>] <
+                            <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
+                            Rndr
+                        >
+                        where
+                            V: AttributeValue<Rndr>,
+                            At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
+                            <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
+                        {
+                            let [<Html $tag:camel>] {
+                                attributes,
+                                rndr
+                            } = self;
+                            [<Html $tag:camel>] {
+                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value)),
+                                rndr
+                            }
+                        }
+                    }
+                )*
+
+                // Global Attributes
+                impl<At, Rndr, NewAttr> AddAttribute<NewAttr, Rndr> for [<Html $tag:camel>]<At, Rndr>
+                where
+                    At: Attribute<Rndr> + TupleBuilder<NewAttr>,
+                    <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
+                    Rndr: Renderer
+                {
+                    type Output = [<Html $tag:camel>]<<At as TupleBuilder<NewAttr>>::Output, Rndr>;
+
+                    fn add_attr(self, attr: NewAttr) -> Self::Output {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            rndr
+                        } = self;
+                        [<Html $tag:camel>] {
+                            attributes: attributes.next_tuple(attr),
+                            rndr
+                        }
+                    }
+                }
+
+                // Element creation
                 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
                 pub struct [<$tag:camel>];
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
-                    const SELF_CLOSING: bool = true;
+                    const SELF_CLOSING: bool = false;
                 }
 
                 impl CreateElement<Dom> for [<$tag:camel>] {
@@ -268,147 +325,205 @@ macro_rules! html_self_closing_elements {
                     }
                 }
 
-                $(
-                    impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
-                    where
-                        At: Attribute<Rndr>,
-                        Ch: Render<Rndr>,
-                        Rndr: Renderer,
-                    {
-                        pub fn [<$attr:lower>]<V>(self, value: V) -> HtmlElement<[<$tag:camel>], <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output, Ch, Rndr>
-                        where
-                            V: AttributeValue<Rndr>,
-                            At: TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>,
-                            <At as TupleBuilder<Attr<$crate::html::attribute::$attr, V, Rndr>>>::Output: Attribute<Rndr>,
-                        {
-                            self.attr($crate::html::attribute::[<$attr:lower>](value))
-                        }
+                // Render and RenderHtml implementations simply delegate to HtmlElement
+                impl<At, Rndr> Render<Rndr> for [<Html $tag:camel>]<At, Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Rndr: Renderer,
+                    Rndr::Node: Clone,
+                    HtmlElement<[<$tag:camel>], At, (), Rndr>: Render<Rndr>
+                {
+                    type State = <HtmlElement<[<$tag:camel>], At, (), Rndr> as Render<Rndr>>::State;
+
+                    fn build(self) -> Self::State {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children: (),
+                            ty: PhantomData,
+                            rndr,
+                        }.build()
                     }
-                )*
+
+                    fn rebuild(self, state: &mut Self::State) {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children: (),
+                            ty: PhantomData,
+                            rndr,
+                        }.rebuild(state);
+                    }
+                }
+
+                impl<At, Rndr> RenderHtml<Rndr> for [<Html $tag:camel>]<At, Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Rndr: Renderer,
+                    Rndr::Node: Clone,
+                    Rndr::Element: Clone,
+                    HtmlElement<[<$tag:camel>], At, (), Rndr>: RenderHtml<Rndr>
+                {
+                    fn to_html(self, buf: &mut String, position: &PositionState) {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children: (),
+                            ty: PhantomData,
+                            rndr,
+                        }.to_html(buf, position)
+                    }
+
+                    fn hydrate<const FROM_SERVER: bool>(
+                        self,
+                        cursor: &Cursor<Rndr>,
+                        position: &PositionState,
+                    ) -> Self::State {
+                        let [<Html $tag:camel>] {
+                            attributes,
+                            rndr
+                        } = self;
+                        HtmlElement {
+                            attributes,
+                            children: (),
+                            ty: PhantomData,
+                            rndr,
+                        }.hydrate::<FROM_SERVER>(cursor, position)
+                    }
+                }
             )*
 		}
     }
 }
 
-/* html_self_closing_elements! {
-    area [Alt, Coords, Download, Href, Hreflang, Ping, Rel, Shape, Target],
-    base [Href, Target],
+html_self_closing_elements! {
+    area [alt, coords, download, href, hreflang, ping, rel, shape, target],
+    base [href, target],
     br [],
-    col [Span],
-    embed [Height, Src, /* Type, */Width],
+    col [span],
+    embed [height, src, r#type, width],
     hr [],
-    img [Alt, Crossorigin, Decoding, Height, Ismap, Sizes, Src, Srcset, Usemap, Width],
-    input [Accept, Alt, Autocomplete, Capture, Checked, Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Height, List, Max, Maxlength, Min, Minlength, Multiple, Name, Pattern, Placeholder, Readonly, Required, Size, Src, Step, /* Type, */Value, Width],
-    link [/* As, */ Crossorigin, Href, Hreflang, Media, Rel, Sizes/* , Type */],
-    meta [Charset, Content, /* HttpEquiv, */ Name],
-    source [Src/* , Type */],
-    track [Default, Kind, Label, Src, Srclang],
+    img [alt, crossorigin, decoding, height, ismap, sizes, src, srcset, usemap, width],
+    input [accept, alt, autocomplete, capture, checked, disabled, form, formaction, formenctype, formmethod, formnovalidate, formtarget, height, list, max, maxlength, min, minlength, multiple, name, pattern, placeholder, readonly, required, size, src, step, r#type, value, width],
+    link [r#as, crossorigin, href, hreflang, media, rel, sizes, r#type],
+    meta [charset, content, http_equiv, name],
+    source [src, r#type],
+    track [default, kind, label, src, srclang],
     wbr []
-} */
+}
 
 html_elements! {
-/*    a [Download, Href, Hreflang, Ping, Rel, Target/* , Type */],
-   abbr [],
-   address [],
-   article [],
-   aside [],
-   audio [Autoplay, Controls, Crossorigin, /* Loop, */ Muted, Preload, Src],
-   b [],
-   bdi [],
-   bdo [],
-   blink [],
-   blockquote [Cite],
-   body [], */
-   button [Disabled, Form, Formaction, Formenctype, Formmethod, Formnovalidate, Formtarget, Name, /* Type, */Value],
-   /* canvas [Height, Width],
-   caption [],
-   cite [],
-   code [],
-   colgroup [Span],
-   data [Value],
-   datalist [],
-   dd [],
-   del [Cite, Datetime],
-   details [Open],
-   dfn [],
-   dialog [Open],
-   div [],
-   dl [],
-   dt [],*/
-   em [],
-   /*fieldset [],
-   figcaption [],
-   figure [],
-   footer [],
-   form [AcceptCharset, Action, Autocomplete, Enctype, Method, Name, Novalidate, Target],
-   h1 [],
-   h2 [],
-   h3 [],
-   h4 [],
-   h5 [],
-   h6 [],
-   head [],
-   header [],
-   hgroup [],
-   html [],
-   i [],
-   iframe [Allow, Allowfullscreen, Allowpaymentrequest, Height, Name, Referrerpolicy, Sandbox, Src, Srcdoc, Width],
-   ins [Cite, Datetime],
-   kbd [],
-   label [/* For, */ Form],
-   legend [],
-   li [Value],
- */   main [],
-/*    map [Name],
-   mark [],
-   menu [],
-   meter [Value, Min, Max, Low, High, Optimum, Form],
-   nav [],
-   noscript [],
-   object [Data, Form, Height, Name, /* Type, */Usemap, Width],
-   ol [Reversed, Start/* , Type */],
-   optgroup [Disabled, Label],
-   // option, // creates conflict with core Option
-   output [/* For, */ Form, Name], */
-   p [],
-   /* picture [],
-   portal [Referrerpolicy, Src],
-   pre [],
-   progress [Max, Value],
-   q [Cite],
-   rp [],
-   rt [],
-   ruby [],
-   s [],
-   samp [],
-   script [/* Async, */ Crossorigin, Defer, Fetchpriority, Integrity, Nomodule, Referrerpolicy, Src, /* Type, */Blocking],
-   search [],
-   section [],
-   select [Autocomplete, Disabled, Form, Multiple, Name, Required, Size],
-   slot [Name],
-   small [],*/
-   span [],
-   /*strong [],
-   style [Media, Blocking],
-   sub [],
-   summary [],
-   sup [],
-   table [],
-   tbody [],
-   td [Colspan, Headers, Rowspan],
-   template [],
-   textarea [Autocomplete, Cols, Dirname, Disabled, Form, Maxlength, Minlength, Name, Placeholder, Readonly, Required, Rows, Wrap],
-   tfoot [],
-   th [Abbr, Colspan, Headers, Rowspan, Scope],
-   thead [],
-   time [Datetime],
-   title [],
-   tr [],
-   u [],
-   ul [],
-   var [],
-   video [Controls, Controlslist, Crossorigin, Disablepictureinpicture, Disableremoteplayback, Height, /* Loop, */ Muted, Playsinline, Poster, Preload, Src, Width],
- */}
+  a [download, href, hreflang, ping, rel, target, r#type ],
+  abbr [],
+  address [],
+  article [],
+  aside [],
+  audio [autoplay, controls, crossorigin, r#loop, muted, preload, src],
+  b [],
+  bdi [],
+  bdo [],
+  blink [],
+  blockquote [cite],
+  body [],
+  button [disabled, form, formaction, formenctype, formmethod, formnovalidate, formtarget, name, r#type, value],
+  canvas [height, width],
+  caption [],
+  cite [],
+  code [],
+  colgroup [span],
+  data [value],
+  datalist [],
+  dd [],
+  del [cite, datetime],
+  details [open],
+  dfn [],
+  dialog [open],
+  div [],
+  dl [],
+  dt [],
+  em [],
+  fieldset [],
+  figcaption [],
+  figure [],
+  footer [],
+  form [accept_charset, action, autocomplete, enctype, method, name, novalidate, target],
+  h1 [],
+  h2 [],
+  h3 [],
+  h4 [],
+  h5 [],
+  h6 [],
+  head [],
+  header [],
+  hgroup [],
+  html [],
+  i [],
+  iframe [allow, allowfullscreen, allowpaymentrequest, height, name, referrerpolicy, sandbox, src, srcdoc, width],
+  ins [cite, datetime],
+  kbd [],
+  label [r#for, form],
+  legend [],
+  li [value],
+   main [],
+   map [name],
+  mark [],
+  menu [],
+  meter [value, min, max, low, high, optimum, form],
+  nav [],
+  noscript [],
+  object [data, form, height, name, r#type, usemap, width],
+  ol [reversed, start, r#type],
+  optgroup [disabled, label],
+  // option, // creates conflict with core Option
+  output [r#for, form, name],
+  p [],
+  picture [],
+  portal [referrerpolicy, src],
+  pre [],
+  progress [max, value],
+  q [cite],
+  rp [],
+  rt [],
+  ruby [],
+  s [],
+  samp [],
+  script [r#async, crossorigin, defer, fetchpriority, integrity, nomodule, referrerpolicy, src, r#type, blocking],
+  search [],
+  section [],
+  select [autocomplete, disabled, form, multiple, name, required, size],
+  slot [name],
+  small [],
+  span [],
+  strong [],
+  style [media, blocking],
+  sub [],
+  summary [],
+  sup [],
+  table [],
+  tbody [],
+  td [colspan, headers, rowspan],
+  template [],
+  textarea [autocomplete, cols, dirname, disabled, form, maxlength, minlength, name, placeholder, readonly, required, rows, wrap],
+  tfoot [],
+  th [abbr, colspan, headers, rowspan, scope],
+  thead [],
+  time [datetime],
+  title [],
+  tr [],
+  u [],
+  ul [],
+  var [],
+  video [controls, controlslist, crossorigin, disablepictureinpicture, disableremoteplayback, height, r#loop, muted, playsinline, poster, preload, src, width],
+}
 
 pub fn option<At, Ch, Rndr>(
     attributes: At,

@@ -23,7 +23,7 @@ impl Renderer for Dom {
     }
 
     fn set_text(node: &Self::Text, text: &str) {
-        node.set_data(text);
+        node.set_node_value(Some(text));
     }
 
     fn set_attribute(node: &Self::Element, name: &str, value: &str) {

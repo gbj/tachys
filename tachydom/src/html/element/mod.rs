@@ -2,12 +2,12 @@ use crate::{
     html::attribute::Attribute,
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
-    tuple_builder::TupleBuilder,
     view::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
 use std::marker::PhantomData;
+use next_tuple::TupleBuilder;
 
 mod elements;
 use super::attribute::{id, Attr, AttributeValue, Id};

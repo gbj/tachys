@@ -6,9 +6,9 @@ use crate::{
     },
     hydration::Cursor,
     renderer::{dom::Dom, DomRenderer, Renderer},
-    tuple_builder::TupleBuilder,
     view::{PositionState, Render, RenderHtml},
 };
+use next_tuple::TupleBuilder;
 use once_cell::unsync::Lazy;
 use std::{fmt::Debug, marker::PhantomData};
 

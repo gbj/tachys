@@ -6,6 +6,12 @@ pub trait TupleBuilder<Next> {
     fn next_tuple(self, next: Next) -> Self::Output;
 }
 
+pub trait ConcatTuples<Next> {
+    type Output;
+
+    fn concat(self, next: Next) -> Self::Output;
+}
+
 macro_rules! impl_tuple_builder {
     ($($ty:ident),* => $last:ident) => {
 		impl<$($ty),*, $last> TupleBuilder<$last> for ($($ty,)*) {

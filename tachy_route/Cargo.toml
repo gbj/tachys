@@ -1,0 +1,11 @@
+[package]
+name = "tachy_route"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+next_tuple = { path = "../next_tuple" }
+tachydom = { path = "../tachydom" }
+paste = "1.0.14"
+thiserror = "1.0.49"
+tuplestructops = "0.3.0"

@@ -1,8 +1,9 @@
 mod nested_routes;
+mod params_map;
 mod path_segment;
 use nested_routes::RouteChild;
 pub use path_segment::*;
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 use tachydom::{renderer::Renderer, view::Render};
 use tuplestructops::TupleJoin;
 
@@ -70,6 +71,30 @@ where
         // regather remaining pieces of route for children
         self.children.matches(path)
     }
+
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
+    where
+        I: Iterator<Item = &'a str> + Clone,
+    {
+        let matched_path = self.path.test(path)?;
+        let children = self.children.test(path)?;
+
+        // join paths, if they exist
+        let path = match (matched_path.path, children.path) {
+            (Some(path), Some(children)) => Some(Cow::Owned(
+                "/".to_string() + path.as_ref() + children.as_ref(),
+            )),
+            (Some(path), None) => Some(path),
+            (None, Some(children)) => Some(children),
+            (None, None) => None,
+        };
+
+        // merge params
+        let mut params = matched_path.params;
+        params.extend(&mut children.params.into_iter());
+
+        Some(PathMatch { path, params })
+    }
 }
 
 /// Defines a single route in a nested route tree. This is the return
@@ -134,7 +159,7 @@ mod tests {
     use super::{RouteChild, RouteDefinition, StaticSegment};
     use crate::route::{path_segment::RoutePath, ParamSegment};
     use tachydom::{
-        html::element::{h1, h2, ElementChild},
+        html::element::{h1, h2, h3, ElementChild},
         renderer::mock_dom::MockDom,
     };
 
@@ -193,5 +218,55 @@ mod tests {
         assert!(def.matches_path("/foo"));
         assert!(def.matches_path("/bar"));
         assert!(!def.matches_path("/baz"));
+    }
+
+    #[test]
+    fn should_extract_params_from_nested_route() {
+        let def = RouteDefinition::new(
+            StaticSegment("foo"),
+            || h1::<MockDom>().child("Hello, world!"),
+            (
+                RouteDefinition::new(
+                    StaticSegment("bar"),
+                    || h2::<MockDom>().child("Bar"),
+                    (),
+                ),
+                RouteDefinition::new(
+                    ParamSegment::<i32>::new("baz"),
+                    || h2::<MockDom>().child("Baz"),
+                    (),
+                ),
+            ),
+        );
+        let matches = def.test_path("/foo/42").unwrap();
+        assert_eq!(matches.path.as_deref(), Some("/foo/42"));
+        assert_eq!(matches.params.get("baz"), Some("42"));
+    }
+
+    #[test]
+    fn should_not_have_params_from_unmatched_route() {
+        let def = RouteDefinition::new(
+            StaticSegment("foo"),
+            || h1::<MockDom>().child("Hello, world!"),
+            (
+                RouteDefinition::new(
+                    ParamSegment::<i32>::new("bar"),
+                    || h2::<MockDom>().child("Bar"),
+                    RouteDefinition::new(
+                        StaticSegment("baz"),
+                        || h3::<MockDom>().child("Baz"),
+                        (),
+                    ),
+                ),
+                RouteDefinition::new(
+                    (StaticSegment("42"), StaticSegment("blorp")),
+                    || h2::<MockDom>().child("Blorp"),
+                    (),
+                ),
+            ),
+        );
+        let matches = def.test_path("/foo/42/blorp").unwrap();
+        assert_eq!(matches.path.as_deref(), Some("/foo/42/blorp"));
+        assert_eq!(matches.params.get("bar"), None);
     }
 }

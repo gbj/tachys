@@ -1,22 +1,24 @@
-use std::str::FromStr;
+use super::params_map::ParamsMap;
+use std::{borrow::Cow, str::FromStr, vec::IntoIter};
 
 pub trait RoutePath {
     type Params;
 
-    fn exhaustive_match(&self, path: &str) -> Option<PathMatch<Self::Params>> {
+    fn exhaustive_match(&self, path: &str) -> Option<PathMatch> {
         let mut segments = path.split('/').filter(|n| !n.is_empty());
         let matched = self.test(&mut segments)?;
         segments.next().is_none().then_some(matched)
     }
 
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>;
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct PathMatch<T> {
-    pub params: T,
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct PathMatch {
+    pub path: Option<Cow<'static, str>>,
+    pub params: ParamsMap,
 }
 
 trait InitialOrMiddleSegment {}
@@ -25,11 +27,11 @@ impl InitialOrMiddleSegment for () {}
 impl RoutePath for () {
     type Params = ();
 
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>,
     {
-        Some(PathMatch { params: () })
+        Some(Default::default())
     }
 }
 
@@ -40,15 +42,18 @@ impl InitialOrMiddleSegment for StaticSegment {}
 
 impl RoutePath for StaticSegment {
     type Params = ();
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>,
     {
         if self.0.is_empty() {
-            Some(PathMatch { params: () })
+            Some(Default::default())
         } else {
             let to_match = path.next()?;
-            (self.0 == to_match).then_some(PathMatch { params: () })
+            (self.0 == to_match).then(|| PathMatch {
+                path: Some(self.0.into()),
+                params: Default::default(),
+            })
         }
     }
 }
@@ -82,14 +87,15 @@ where
 {
     type Params = (&'static str, T);
 
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>,
     {
         let segment = path.next()?;
         let value = (self.validator)(segment)?;
         Some(PathMatch {
-            params: (self.field_name, value),
+            path: Some(segment.to_string().into()),
+            params: ParamsMap::single(self.field_name, segment),
         })
     }
 }
@@ -101,7 +107,7 @@ pub struct SplatSegment {
 impl RoutePath for SplatSegment {
     type Params = (&'static str, String);
 
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>,
     {
@@ -114,7 +120,8 @@ impl RoutePath for SplatSegment {
             matched.push_str(next);
         }
         Some(PathMatch {
-            params: (self.field_name, matched),
+            path: Some(matched.clone().into()),
+            params: ParamsMap::single(self.field_name, matched),
         })
     }
 }
@@ -125,7 +132,7 @@ where
 {
     type Params = A::Params;
 
-    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch<Self::Params>>
+    fn test<'a, I>(&self, path: &mut I) -> Option<PathMatch>
     where
         I: Iterator<Item = &'a str>,
     {
@@ -148,15 +155,49 @@ macro_rules! impl_route_path_tuple {
 		{
 			type Params = ($($ty::Params,)* $last::Params);
 
-			fn test<'a, It>(&self, path: &mut It) -> Option<PathMatch<Self::Params>>
+			fn test<'a, It>(&self, path: &mut It) -> Option<PathMatch>
 			where
 				It: Iterator<Item = &'a str>,
 			{
 				paste::paste! {
+                    // destructure into path segment in tuple
 					let ($([<$ty:lower>],)* [<$last:lower>]) = self;
-					$(let [<$ty:lower _params>] = [<$ty:lower>].test(path)?.params);*;
-					let [<$last:lower _params>] = [<$last:lower>].test(path)?.params;
-					Some(PathMatch { params: (($([<$ty:lower _params>],)* [<$last:lower _params>])) })
+
+                    // test each segment of path to see if it was matched
+                    // if any weren't matched, just return
+					$(let [<$ty:lower _match>] = [<$ty:lower>].test(path)?);*;
+					let [<$last:lower _match>] = [<$last:lower>].test(path)?;
+
+                    // join all paths, prepending `/` to actual matched segments
+                    let path = [
+                        // if path is None, it means it didn't correspond to any
+                        // actual text: for example, it was () or a "" segment
+                        // it it is Some, it needs to have its `/` inserted again
+                        $([<$ty:lower _match>].path.map(|n| ["/".into(), n].into_iter()),)*
+                        [<$last:lower _match>].path.map(|n| ["/".into(), n].into_iter())
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .collect::<String>();
+                    // if this path is still empty, though (i.e., ((), ()))
+                    // then we should still ignore it
+                    let path = if path.is_empty() || path == "/" {
+                        None
+                    } else {
+                        Some(Cow::Owned(path))
+                    };
+
+                    // join all params
+                    let params = [
+                        $([<$ty:lower _match>].params.into_iter(),)*
+                        [<$last:lower _match>].params.into_iter()
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect();
+
+					Some(PathMatch { path, params })
 				}
 			}
 		}
@@ -242,13 +283,9 @@ mod tests {
     #[test]
     pub fn should_capture_params() {
         let path = (StaticSegment("foo"), ParamSegment::<i32>::new("bar"));
-        let matched = path.exhaustive_match("/foo/42");
-        assert_eq!(
-            matched,
-            Some(PathMatch {
-                params: ((), ("bar", 42))
-            })
-        );
+        let matched = path.exhaustive_match("/foo/42").unwrap();
+        assert_eq!(matched.path.as_deref(), Some("/foo/42"));
+        assert_eq!(matched.params.get("bar"), Some("42"));
     }
 
     #[test]
@@ -267,12 +304,8 @@ mod tests {
             (),
             ((), ParamSegment::<i32>::new("bar"), ()),
         );
-        let matched = path.exhaustive_match("/foo/42");
-        assert_eq!(
-            matched,
-            Some(PathMatch {
-                params: ((), ((), ()), (), (), ((), ("bar", 42), ()))
-            })
-        );
+        let matched = path.exhaustive_match("/foo/42").unwrap();
+        assert_eq!(matched.path.as_deref(), Some("/foo/42"));
+        assert_eq!(matched.params.get("bar"), Some("42"));
     }
 }

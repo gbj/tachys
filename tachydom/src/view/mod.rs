@@ -7,7 +7,7 @@ pub mod keyed;
 #[cfg(feature = "nightly")]
 pub mod static_types;
 pub mod strings;
-//pub mod template;
+pub mod template;
 pub mod tuples;
 
 /// The `Render` trait allows rendering something as part of the user interface.

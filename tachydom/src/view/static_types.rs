@@ -37,7 +37,12 @@ impl<K, const V: &'static str> ToTemplate for StaticAttr<K, V>
 where
     K: AttributeKey,
 {
-    fn to_template(buf: &mut String, _position: &mut Position) {
+    fn to_template(
+        buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+        _position: &mut Position,
+    ) {
         buf.push(' ');
         buf.push_str(K::KEY);
         buf.push_str("=\"");
@@ -124,7 +129,12 @@ where
 }
 
 impl<const V: &'static str> ToTemplate for Static<V> {
-    fn to_template(buf: &mut String, position: &mut Position) {
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
         if matches!(*position, Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
         }

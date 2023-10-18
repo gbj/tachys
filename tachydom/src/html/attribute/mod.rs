@@ -56,7 +56,7 @@ where
     V: AttributeValue<R>,
     R: Renderer,
 {
-    fn to_template(buf: &mut String, _position: &mut Position) {
+    fn to_template(buf: &mut String, class: &mut String, style: &mut String, _position: &mut Position) {
         V::to_template(K::KEY, buf);
     }
 }

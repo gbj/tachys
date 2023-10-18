@@ -150,7 +150,12 @@ pub trait ToTemplate {
     /// Renders a view type to a template. This does not take actual view data,
     /// but can be used for constructing part of an HTML `<template>` that corresponds
     /// to a view of a particular type.
-    fn to_template(buf: &mut String, position: &mut Position);
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    );
 }
 
 #[derive(Debug, Default, Clone)]

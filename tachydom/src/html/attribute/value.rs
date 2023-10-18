@@ -81,6 +81,41 @@ where
     }
 }
 
+#[cfg(feature = "nightly")]
+impl<R, const V: &'static str> AttributeValue<R>
+    for crate::view::static_types::Static<V>
+where
+    R::Element: Clone,
+    R: Renderer,
+{
+    type State = ();
+
+    fn to_html(self, key: &str, buf: &mut String) {
+        <&str as AttributeValue<R>>::to_html(V, key, buf);
+    }
+
+    fn to_template(key: &str, buf: &mut String) {
+        buf.push(' ');
+        buf.push_str(key);
+        buf.push_str("=\"");
+        buf.push_str(&escape_attr(V));
+        buf.push('"');
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        key: &str,
+        el: &R::Element,
+    ) -> Self::State {
+    }
+
+    fn build(self, el: &R::Element, key: &str) -> Self::State {
+        <&str as AttributeValue<R>>::build(V, el, key);
+    }
+
+    fn rebuild(self, key: &str, state: &mut Self::State) {}
+}
+
 impl<R> AttributeValue<R> for String
 where
     R: Renderer,

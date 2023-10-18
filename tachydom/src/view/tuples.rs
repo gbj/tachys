@@ -43,7 +43,13 @@ impl<R: Renderer> Mountable<R> for () {
 }
 
 impl ToTemplate for () {
-    fn to_template(_buf: &mut String, _position: &mut Position) {}
+    fn to_template(
+        _buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        _position: &mut Position,
+    ) {
+    }
 }
 
 impl<A: Render<R>, R: Renderer> Render<R> for (A,) {
@@ -79,8 +85,13 @@ where
 }
 
 impl<A: ToTemplate> ToTemplate for (A,) {
-    fn to_template(buf: &mut String, position: &mut Position) {
-        A::to_template(buf, position)
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        A::to_template(buf, class, style, position)
     }
 }
 
@@ -147,10 +158,10 @@ macro_rules! impl_view_for_tuples {
 			$first: ToTemplate,
 			$($ty: ToTemplate),*
 		{
-			fn to_template(buf: &mut String, position: &mut Position)  {
+			fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position)  {
 				paste::paste! {
-					$first ::to_template(buf, position);
-					$($ty::to_template(buf, position));*;
+					$first ::to_template(buf, class, style, position);
+					$($ty::to_template(buf, class, style, position));*;
 				}
 			}
 		}

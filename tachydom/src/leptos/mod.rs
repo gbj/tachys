@@ -15,8 +15,14 @@ where
     F: Fn() -> V,
     V: ToTemplate,
 {
-    fn to_template(buf: &mut String, position: &mut Position) {
-        V::to_template(buf, position)
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        // FIXME this seems wrong
+        V::to_template(buf, class, style, position)
     }
 }
 
@@ -124,7 +130,7 @@ where
         .unwrap_or(false)
     }
 }
-/* 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{

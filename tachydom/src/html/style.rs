@@ -1,5 +1,8 @@
 use super::attribute::Attribute;
-use crate::{renderer::DomRenderer, view::ToTemplate};
+use crate::{
+    renderer::DomRenderer,
+    view::{Position, ToTemplate},
+};
 use std::{borrow::Cow, marker::PhantomData};
 
 /// Adds to the style attribute of the parent element.
@@ -60,7 +63,12 @@ where
     S: IntoStyle<R>,
     R: DomRenderer,
 {
-    fn to_template(buf: &mut String, position: &mut crate::view::Position) {
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
         todo!()
     }
 }
@@ -224,7 +232,7 @@ where
         *prev = value;
     }
 }
-/* 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{

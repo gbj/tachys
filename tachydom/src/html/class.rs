@@ -1,5 +1,8 @@
 use super::attribute::Attribute;
-use crate::{renderer::DomRenderer, view::ToTemplate};
+use crate::{
+    renderer::DomRenderer,
+    view::{Position, ToTemplate},
+};
 use std::marker::PhantomData;
 
 #[inline(always)]
@@ -58,8 +61,13 @@ where
     C: IntoClass<R>,
     R: DomRenderer,
 {
-    fn to_template(buf: &mut String, position: &mut crate::view::Position) {
-        todo!()
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        C::to_template(class);
     }
 }
 
@@ -67,6 +75,8 @@ pub trait IntoClass<R: DomRenderer> {
     type State;
 
     fn to_html(self, class: &mut String);
+
+    fn to_template(class: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -87,6 +97,9 @@ where
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        if !FROM_SERVER {
+            R::set_attribute(el, "class", self);
+        }
         (el.clone(), self)
     }
 
@@ -116,6 +129,9 @@ where
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        if !FROM_SERVER {
+            R::set_attribute(el, "class", &self);
+        }
         (el.clone(), self)
     }
 
@@ -147,7 +163,11 @@ where
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        let (name, include) = self;
         let class_list = R::class_list(el);
+        if !FROM_SERVER && include {
+            R::add_class(&class_list, name);
+        }
         (class_list, self.1)
     }
 
@@ -172,6 +192,35 @@ where
         }
         *prev_include = include;
     }
+}
+
+#[cfg(feature = "nightly")]
+impl<R, const V: &'static str> IntoClass<R>
+    for crate::view::static_types::Static<V>
+where
+    R: DomRenderer,
+{
+    type State = ();
+
+    fn to_html(self, class: &mut String) {
+        class.push_str(V);
+    }
+
+    fn to_template(class: &mut String) {
+        class.push_str(V);
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        if !FROM_SERVER {
+            R::set_attribute(el, "class", V);
+        }
+    }
+
+    fn build(self, el: &R::Element) -> Self::State {
+        R::set_attribute(el, "class", V);
+    }
+
+    fn rebuild(self, state: &mut Self::State) {}
 }
 
 /* #[cfg(test)]

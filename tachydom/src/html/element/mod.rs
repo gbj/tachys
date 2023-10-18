@@ -6,8 +6,8 @@ use crate::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
-use std::marker::PhantomData;
 use next_tuple::TupleBuilder;
+use std::marker::PhantomData;
 
 mod elements;
 use super::attribute::{id, Attr, AttributeValue, Id};
@@ -307,16 +307,39 @@ where
     Ch: Render<Rndr> + ToTemplate,
     Rndr: Renderer,
 {
-    fn to_template(buf: &mut String, position: &mut Position) {
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
         // opening tag and attributes
+        let mut class = String::new();
+        let mut style = String::new();
+
         buf.push('<');
         buf.push_str(E::TAG);
-        <At as ToTemplate>::to_template(buf, position);
+        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
+
+        if !class.is_empty() {
+            buf.push(' ');
+            buf.push_str("class=\"");
+            buf.push_str(class.trim_start().trim_end());
+            buf.push('"');
+        }
+        if !style.is_empty() {
+            buf.push(' ');
+            buf.push_str("style=\"");
+            buf.push_str(style.trim_start().trim_end());
+            buf.push('"');
+        }
         buf.push('>');
 
         // children
         *position = Position::FirstChild;
-        Ch::to_template(buf, position);
+        class.clear();
+        style.clear();
+        Ch::to_template(buf, &mut class, &mut style, position);
 
         // closing tag
         buf.push_str("</");

@@ -6,7 +6,7 @@ use crate::{
     },
     hydration::Cursor,
     renderer::{dom::Dom, DomRenderer, Renderer},
-    view::{PositionState, Render, RenderHtml},
+    view::{Position, PositionState, Render, RenderHtml, ToTemplate},
 };
 use next_tuple::TupleBuilder;
 use once_cell::unsync::Lazy;
@@ -225,6 +225,49 @@ macro_rules! html_elements {
                         }.hydrate::<FROM_SERVER>(cursor, position)
                     }
                 }
+
+                // ToTemplate implementation uses type information
+                impl<At, Ch, Rndr> ToTemplate for [<Html $tag:camel>]<At, Ch, Rndr>
+                where
+                    At: ToTemplate + Attribute<Rndr>,
+                    Ch: ToTemplate + Render<Rndr>,
+                    Rndr: Renderer,
+                    Rndr::Node: Clone,
+                {
+                    fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
+                        // opening tag and attributes
+                        let mut class = String::new();
+                        let mut style = String::new();
+
+                        buf.push_str(concat!("<", stringify!($tag)));
+                        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
+
+                        if !class.is_empty() {
+                            buf.push(' ');
+                            buf.push_str("class=\"");
+                            buf.push_str(class.trim_start().trim_end());
+                            buf.push('"');
+                        }
+                        if !style.is_empty() {
+                            buf.push(' ');
+                            buf.push_str("style=\"");
+                            buf.push_str(style.trim_start().trim_end());
+                            buf.push('"');
+                        }
+
+                        buf.push('>');
+
+                        // children
+                        *position = Position::FirstChild;
+                        class.clear();
+                        style.clear();
+                        Ch::to_template(buf, &mut class, &mut style, position);
+
+                        // closing tag
+                        buf.push_str(concat!("</", stringify!($tag), ">"));
+                        *position = Position::NextChild;
+                    }
+                }
             )*
 		}
     }
@@ -398,6 +441,39 @@ macro_rules! html_self_closing_elements {
                             ty: PhantomData,
                             rndr,
                         }.hydrate::<FROM_SERVER>(cursor, position)
+                    }
+                }
+
+                // ToTemplate implementation uses type information
+                 // ToTemplate implementation uses type information
+                impl<At, Rndr> ToTemplate for [<Html $tag:camel>]<At, Rndr>
+                where
+                    At: ToTemplate + Attribute<Rndr>,
+                    Rndr: Renderer,
+                    Rndr::Node: Clone,
+                {
+                    fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
+                        // opening tag and attributes
+                        let mut class = String::new();
+                        let mut style = String::new();
+                        
+                        buf.push_str(concat!("<", stringify!($tag)));
+                        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
+
+                        if !class.is_empty() {
+                            buf.push(' ');
+                            buf.push_str("class=\"");
+                            buf.push_str(class.trim_start().trim_end());
+                            buf.push('"');
+                        }
+                        if !style.is_empty() {
+                            buf.push(' ');
+                            buf.push_str("style=\"");
+                            buf.push_str(style.trim_start().trim_end());
+                            buf.push('"');
+                        }
+
+                        buf.push('>');
                     }
                 }
             )*

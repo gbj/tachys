@@ -95,7 +95,7 @@ impl DomRenderer for Dom {
         let cb = wasm_bindgen::closure::Closure::wrap(cb).into_js_value();
         or_debug!(
             el.add_event_listener_with_callback(
-                name,
+                intern(name),
                 cb.as_ref().unchecked_ref()
             ),
             el,
@@ -108,11 +108,15 @@ impl DomRenderer for Dom {
     }
 
     fn add_class(list: &Self::ClassList, name: &str) {
-        or_debug!(list.add_1(name), list.unchecked_ref(), "add()");
+        or_debug!(list.add_1(intern(name)), list.unchecked_ref(), "add()");
     }
 
     fn remove_class(list: &Self::ClassList, name: &str) {
-        or_debug!(list.remove_1(name), list.unchecked_ref(), "remove()");
+        or_debug!(
+            list.remove_1(intern(name)),
+            list.unchecked_ref(),
+            "remove()"
+        );
     }
 
     fn style(el: &Self::Element) -> Self::CssStyleDeclaration {
@@ -125,7 +129,7 @@ impl DomRenderer for Dom {
         value: &str,
     ) {
         or_debug!(
-            style.set_property(name, value),
+            style.set_property(intern(name), value),
             style.unchecked_ref(),
             "setProperty"
         );

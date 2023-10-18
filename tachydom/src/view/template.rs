@@ -23,7 +23,7 @@ impl<V: Render<Dom> + ToTemplate> ViewTemplate<V> {
             static TEMPLATE: OnceCell<HtmlTemplateElement> = OnceCell::new();
         }
 
-        TEMPLATE.with(|t| {
+        let tpl = TEMPLATE.with(|t| {
             t.get_or_init(|| {
                 let tpl = TEMPLATE_ELEMENT.with(|t| {
                     t.clone_node()
@@ -31,12 +31,22 @@ impl<V: Render<Dom> + ToTemplate> ViewTemplate<V> {
                         .unchecked_into::<HtmlTemplateElement>()
                 });
                 let mut buf = String::new();
-                V::to_template(&mut buf, &mut Default::default());
+                let mut class = String::new();
+                let mut style = String::new();
+                V::to_template(
+                    &mut buf,
+                    &mut class,
+                    &mut style,
+                    &mut Default::default(),
+                );
                 tpl.set_inner_html(&buf);
                 tpl
             })
             .clone()
-        })
+        });
+        #[cfg(debug_assertions)]
+        web_sys::console::log_1(&tpl);
+        tpl
     }
 }
 

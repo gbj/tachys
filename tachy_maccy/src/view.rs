@@ -320,33 +320,17 @@ fn attribute_to_tokens(
                 style_to_tokens(node, style.into_token_stream(), None)
             } else {
                 let key = attribute_name(&node.key);
-                let value = attribute_value(node);
+                let (value, is_static) = attribute_value(node);
                 quote! {
                     .#key(#value)
                 }
-                // TODO fix static attrs
-                /* if let Expr::Lit(lit) = value {
-                    if cfg!(feature = "nightly") {
-                        Some(quote! {
-                            ::tachydom::view::static_types::static_attr::<#key::<#lit>, #lit>()
-                        })
-                    } else {
-                    Some(quote! {
-                        #key(#value)
-                    })
-                    //}
-                } else {
-                    Some(quote! {
-                        #key(#value)
-                    })
-                }*/
             }
         }
     }
 }
 
 fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
-    let handler = attribute_value(node);
+    let (handler, _) = attribute_value(node);
 
     let (event_type, is_custom, is_force_undelegated) = parse_event_name(name);
 
@@ -410,12 +394,18 @@ fn class_to_tokens(
     class: TokenStream,
     class_name: Option<&str>,
 ) -> TokenStream {
-    let value = attribute_value(node);
+    let (value, is_static) = attribute_value(node);
     if let Some(class_name) = class_name {
         quote! {
             .#class((#class_name, #value))
         }
-    } else {
+    }
+    /* else if is_static {
+        quote! {
+            .attr(::tachydom::view::static_types::static_attr::<::tachydom::html::attribute::class, #value>())
+        }
+    } */
+    else {
         quote! {
             .#class(#value)
         }
@@ -427,7 +417,7 @@ fn style_to_tokens(
     style: TokenStream,
     style_name: Option<&str>,
 ) -> TokenStream {
-    let value = attribute_value(node);
+    let (value, is_static) = attribute_value(node);
     if let Some(style_name) = style_name {
         quote! {
             .#style((#style_name, #value))
@@ -587,10 +577,25 @@ fn attribute_name(name: &NodeName) -> TokenStream {
     }
 }
 
-fn attribute_value(attr: &KeyedAttribute) -> TokenStream {
+fn attribute_value(attr: &KeyedAttribute) -> (TokenStream, bool) {
     match attr.value() {
-        Some(value) => quote! { #value },
-        None => quote! { true },
+        Some(value) => {
+            if let Expr::Lit(lit) = value {
+                if cfg!(feature = "nightly") {
+                    (
+                        quote! {
+                            ::tachydom::view::static_types::Static::<#lit>
+                        },
+                        true,
+                    )
+                } else {
+                    (quote! { #value }, false)
+                }
+            } else {
+                (quote! { #value }, false)
+            }
+        }
+        None => (quote! { true }, true),
     }
 }
 

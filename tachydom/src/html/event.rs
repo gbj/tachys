@@ -76,7 +76,7 @@ where
     R: DomRenderer,
 {
     #[inline(always)]
-    fn to_template(_buf: &mut String, _position: &mut Position) {}
+    fn to_template(_buf: &mut String, class: &mut String, style: &mut String, _position: &mut Position) {}
 }
 
 /// A trait for converting types into [web_sys events](web_sys).

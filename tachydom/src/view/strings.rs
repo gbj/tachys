@@ -49,7 +49,8 @@ where
         }
 
         let node = cursor.current();
-        let mut node = R::Text::cast_from(node).unwrap();
+        let mut node = R::Text::cast_from(node)
+            .expect("couldn't cast text node from node");
 
         if FROM_SERVER
             && matches!(
@@ -60,9 +61,7 @@ where
             cursor.sibling();
         }
         if !FROM_SERVER {
-            let mut new = R::create_text_node(self);
-            R::mount_before(&mut new, node.as_ref());
-            node = new;
+            R::set_text(&node, self);
         }
         position.set(Position::NextChild);
 
@@ -71,8 +70,16 @@ where
 }
 
 impl<'a> ToTemplate for &'a str {
-    fn to_template(buf: &mut String, position: &mut Position) {
-        buf.push_str("<!>");
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        buf.push(' ');
+        if matches!(*position, Position::NextChild | Position::LastChild) {
+            buf.push_str("<!>")
+        }
         *position = Position::NextChild;
     }
 }
@@ -116,8 +123,13 @@ where
 }
 
 impl ToTemplate for String {
-    fn to_template(buf: &mut String, position: &mut Position) {
-        <&str as ToTemplate>::to_template(buf, position)
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        <&str as ToTemplate>::to_template(buf, class, style, position)
     }
 }
 

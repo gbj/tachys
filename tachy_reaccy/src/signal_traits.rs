@@ -1,0 +1,140 @@
+use std::panic::Location;
+
+macro_rules! unwrap_signal {
+    ($signal:ident) => {
+        || {
+            #[cfg(debug_assertions)]
+            {
+                panic!(
+                    "{}",
+                    panic_getting_disposed_signal(
+                        $signal.defined_at(),
+                        Location::caller()
+                    )
+                );
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                panic!(
+                    "Tried to access a reactive value that has already been \
+                     disposed."
+                );
+            }
+        }
+    };
+}
+pub trait Track {
+    fn track(&self);
+}
+pub trait SignalWithUntracked: DefinedAt {
+    type Value;
+
+    #[track_caller]
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U>;
+
+    #[track_caller]
+    fn with_untracked<U>(&self, fun: impl FnOnce(&Self::Value) -> U) -> U {
+        self.try_with_untracked(fun)
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+pub trait SignalWith: SignalWithUntracked + Track {
+    fn try_with<U>(&self, fun: impl FnOnce(&Self::Value) -> U) -> Option<U> {
+        self.track();
+        self.try_with_untracked(fun)
+    }
+
+    #[track_caller]
+    fn with<U>(&self, fun: impl FnOnce(&Self::Value) -> U) -> U {
+        self.try_with(fun).unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+pub trait SignalGetUntracked: SignalWithUntracked
+where
+    Self::Value: Clone,
+{
+    fn try_get_untracked(&self) -> Option<Self::Value> {
+        self.try_with_untracked(Self::Value::clone)
+    }
+
+    #[track_caller]
+    fn get_untracked(&self) -> Self::Value {
+        self.try_get_untracked()
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+pub trait SignalGet: SignalWith
+where
+    Self::Value: Clone,
+{
+    fn try_get(&self) -> Option<Self::Value> {
+        self.try_with(Self::Value::clone)
+    }
+
+    #[track_caller]
+    fn get(&self) -> Self::Value {
+        self.try_with(Self::Value::clone)
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+pub trait SignalUpdate {
+    type Value;
+
+    fn update(&self, fun: impl FnOnce(&mut Self::Value));
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U>;
+}
+
+pub trait SignalSet: SignalUpdate + SignalIsDisposed {
+    fn set(&self, value: Self::Value) {
+        self.update(|n| *n = value);
+    }
+
+    fn try_set(&self, value: Self::Value) -> Option<Self::Value> {
+        if self.is_disposed() {
+            Some(value)
+        } else {
+            self.set(value);
+            None
+        }
+    }
+}
+
+pub trait SignalDispose {
+    fn dispose(self);
+}
+
+pub trait SignalIsDisposed {
+    fn is_disposed(&self) -> bool;
+}
+
+pub trait DefinedAt {
+    fn defined_at(&self) -> Option<&'static Location<'static>>;
+}
+
+fn panic_getting_disposed_signal(
+    defined_at: Option<&'static Location<'static>>,
+    location: &'static Location<'static>,
+) -> String {
+    if let Some(defined_at) = defined_at {
+        format!(
+            "At {location}, you tried to access a reactive value which was \
+             defined at {defined_at}, but it has already been disposed."
+        )
+    } else {
+        format!(
+            "At {location}, you tried to access a reactive value, but it has \
+             already been disposed."
+        )
+    }
+}

@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["next_tuple", "tachydom", "tachy_maccy", "tachy_route"]
+members = [
+	"browser_only_send",
+	"next_tuple",
+	"tachydom",
+	"tachy_maccy",
+	"tachy_reaccy",
+	"tachy_route",
+]

@@ -11,8 +11,11 @@ pub mod hydration;
 pub mod renderer;
 pub mod view;
 
-#[cfg(feature = "leptos")]
+#[cfg(all(feature = "leptos", not(feature = "reaccy")))]
 mod leptos;
+
+#[cfg(feature = "reaccy")]
+mod tachy_reaccy;
 
 pub fn log(text: &str) {
     web_sys::console::log_1(&JsValue::from_str(text));

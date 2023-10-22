@@ -1,0 +1,18 @@
+[package]
+name = "tachy_reaccy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+browser_only_send = { path = "../browser_only_send" }
+futures = "0.3.28"
+lazy_static = "1.4.0"
+parking_lot = "0.12.1"
+pin-project-lite = "0.2.13"
+serde = { version = "1.0.189", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+slotmap = "1.0.6"
+wasm-bindgen-futures = "0.4.37"
+
+[features]
+serde = ["dep:serde", "dep:serde_json"]

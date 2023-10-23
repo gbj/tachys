@@ -9,7 +9,7 @@ use crate::{
 };
 use slotmap::{new_key_type, SlotMap};
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
-
+use wasm_bindgen::JsValue;
 pub struct MockDom;
 
 new_key_type! {
@@ -211,6 +211,10 @@ impl DomRenderer for MockDom {
     type Event = ();
     type ClassList = ();
     type CssStyleDeclaration = ();
+
+    fn set_property(el: &Self::Element, key: &str, value: &JsValue) {
+        todo!()
+    }
 
     fn add_event_listener(
         el: &Self::Element,

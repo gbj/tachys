@@ -1,9 +1,7 @@
 use super::{CastFrom, DomRenderer, Renderer};
 use crate::{dom::document, ok_or_debug, or_debug, view::Mountable};
-use std::cell::RefCell;
-use wasm_bindgen::{
-    convert::IntoWasmAbi, intern, prelude::wasm_bindgen, JsCast, JsValue,
-};
+//use std::cell::RefCell;
+use wasm_bindgen::{intern, JsCast, JsValue};
 use web_sys::{
     Comment, CssStyleDeclaration, DocumentFragment, DomTokenList, Element,
     HtmlElement, Node, Text,
@@ -11,7 +9,7 @@ use web_sys::{
 
 pub struct Dom;
 
-#[derive(Debug, Default)]
+/* #[derive(Debug, Default)]
 struct PendingStuff {
     pub text: String,
     pub nodes: Vec<u32>,
@@ -20,7 +18,7 @@ struct PendingStuff {
 
 thread_local! {
     static PENDING: RefCell<PendingStuff> = Default::default();
-}
+} */
 
 /* #[wasm_bindgen(inline_js = "
 let __NODE_HEAP = [];
@@ -36,7 +34,7 @@ export function flush_nodes(bytes, lengths, nodes) {
         }
         __NODE_HEAP = [];
     }
-    
+
     export function add_node_to_heap(node) {
         __NODE_HEAP.push(node);
         return __NODE_HEAP.length - 1;
@@ -145,6 +143,18 @@ impl DomRenderer for Dom {
     type Event = JsValue;
     type ClassList = DomTokenList;
     type CssStyleDeclaration = CssStyleDeclaration;
+
+    fn set_property(el: &Self::Element, key: &str, value: &JsValue) {
+        or_debug!(
+            js_sys::Reflect::set(
+                el,
+                &wasm_bindgen::JsValue::from_str(intern(key)),
+                &value,
+            ),
+            el,
+            "setProperty"
+        );
+    }
 
     fn add_event_listener(
         el: &Self::Element,

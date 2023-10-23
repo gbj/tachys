@@ -1,4 +1,5 @@
 use crate::{html::element::CreateElement, view::Mountable};
+use wasm_bindgen::JsValue;
 
 pub mod dom;
 #[cfg(feature = "testing")]
@@ -97,6 +98,9 @@ pub trait DomRenderer: Renderer {
     type ClassList;
     /// The CSS styles for an element.
     type CssStyleDeclaration;
+
+    /// Sets a JavaScript object property on a DOM element.
+    fn set_property(el: &Self::Element, key: &str, value: &JsValue);
 
     /// Adds an event listener to an element.
     fn add_event_listener(

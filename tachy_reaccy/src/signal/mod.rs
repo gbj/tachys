@@ -104,13 +104,8 @@ impl<T: Send + Sync + 'static> SignalUpdate for Signal<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> SignalWith for Signal<T> {}
-impl<T: Send + Sync + 'static + Clone> SignalGetUntracked for Signal<T> {}
-impl<T: Send + Sync + 'static + Clone> SignalGet for Signal<T> {}
-
 impl<T: Send + Sync + 'static> SignalIsDisposed for Signal<T> {
     fn is_disposed(&self) -> bool {
         self.inner.exists()
     }
 }
-impl<T: Send + Sync + 'static> SignalSet for Signal<T> {}

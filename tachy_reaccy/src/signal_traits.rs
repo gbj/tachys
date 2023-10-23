@@ -54,6 +54,8 @@ pub trait SignalWith: SignalWithUntracked + Track {
     }
 }
 
+impl<T> SignalWith for T where T: SignalWithUntracked + Track {}
+
 pub trait SignalGetUntracked: SignalWithUntracked
 where
     Self::Value: Clone,
@@ -69,6 +71,13 @@ where
     }
 }
 
+impl<T> SignalGetUntracked for T
+where
+    T: SignalWithUntracked,
+    T::Value: Clone,
+{
+}
+
 pub trait SignalGet: SignalWith
 where
     Self::Value: Clone,
@@ -82,6 +91,13 @@ where
         self.try_with(Self::Value::clone)
             .unwrap_or_else(unwrap_signal!(self))
     }
+}
+
+impl<T> SignalGet for T
+where
+    T: SignalWith,
+    T::Value: Clone,
+{
 }
 
 pub trait SignalUpdate {
@@ -109,6 +125,8 @@ pub trait SignalSet: SignalUpdate + SignalIsDisposed {
         }
     }
 }
+
+impl<T> SignalSet for T where T: SignalUpdate + SignalIsDisposed {}
 
 pub trait SignalDispose {
     fn dispose(self);

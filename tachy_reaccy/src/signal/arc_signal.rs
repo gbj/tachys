@@ -53,7 +53,7 @@ impl<T> ArcSignal<T> {
     }
 }
 
-impl<T: 'static> Track for ArcSignal<T> {
+impl<T: Send + Sync + 'static> Track for ArcSignal<T> {
     fn track(&self) {
         if let Some(waker) = Observer::get() {
             waker.add_remover(Box::new({
@@ -132,17 +132,12 @@ impl<T> SignalUpdate for ArcSignal<T> {
     }
 }
 
-impl<T: 'static> SignalWith for ArcSignal<T> {}
-impl<T: Clone + 'static> SignalGetUntracked for ArcSignal<T> {}
-impl<T: Clone + 'static> SignalGet for ArcSignal<T> {}
-
 impl<T> SignalIsDisposed for ArcSignal<T> {
     #[inline(always)]
     fn is_disposed(&self) -> bool {
         false
     }
 }
-impl<T> SignalSet for ArcSignal<T> {}
 
 struct SignalInner<T> {
     value: T,

@@ -5,8 +5,7 @@ use crate::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
-use tachy_reaccy::{RenderEffect, Signal};
-use tachy_reaccy::signal_traits::SignalGet;
+use tachy_reaccy::{signal_traits::SignalGet, RenderEffect, Signal};
 
 mod class;
 mod style;
@@ -50,43 +49,10 @@ where
 
     #[track_caller]
     fn rebuild(self, state: &mut Self::State) {
-        crate::log(&format!(
+        /* crate::log(&format!(
             "[REBUILDING EFFECT] Is this a mistake? {}",
             std::panic::Location::caller(),
-        ));
-        let old_effect = std::mem::replace(state, self.build());
-    }
-}
-
-impl<V, R> Render<R> for Signal<V>
-where
-    V: Send + Sync + Render<R> + Clone + 'static,
-    V::State: 'static,
-    R: Renderer,
-{
-    type State = RenderEffect<V::State>;
-
-    fn build(self) -> Self::State {
-        RenderEffect::new({
-            let this = self.clone();
-            move |prev| {
-                let value = this.get();
-                if let Some(mut state) = prev {
-                    value.rebuild(&mut state);
-                    state
-                } else {
-                    value.build()
-                }
-            }
-        })
-    }
-
-    #[track_caller]
-    fn rebuild(self, state: &mut Self::State) {
-        crate::log(&format!(
-            "[REBUILDING EFFECT] Is this a mistake? {}",
-            std::panic::Location::caller(),
-        ));
+        )); */
         let old_effect = std::mem::replace(state, self.build());
     }
 }

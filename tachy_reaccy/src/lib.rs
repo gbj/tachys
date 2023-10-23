@@ -1,32 +1,32 @@
 mod arena;
 pub mod context;
-mod effect;
+//mod effect;
 mod render_effect;
 #[cfg(feature = "serde")]
 mod serde;
 mod signal;
 pub mod signal_traits;
 mod waker;
-use crate::waker::MaybeWaker;
 pub use arena::{global_root, Root};
-pub use effect::*;
+//pub use effect::*;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 pub use render_effect::*;
 pub use signal::*;
+use waker::Notifier;
 
 pub mod prelude {
     pub use crate::signal_traits::*;
 }
 
 lazy_static! {
-    static ref OBSERVER: RwLock<Option<MaybeWaker>> = RwLock::new(None);
+    static ref OBSERVER: RwLock<Option<Notifier>> = RwLock::new(None);
 }
 
 pub(crate) struct Observer {}
 
 impl Observer {
-    fn get() -> Option<MaybeWaker> {
+    fn get() -> Option<Notifier> {
         OBSERVER.read().clone()
     }
 }

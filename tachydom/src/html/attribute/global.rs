@@ -131,6 +131,14 @@ where
 {
 }
 
+impl<T, P, Rndr> PropAttribute<P, Rndr> for T
+where
+    T: AddAttribute<Property<P, Rndr>, Rndr>,
+    P: IntoProperty<Rndr>,
+    Rndr: DomRenderer,
+{
+}
+
 impl<T, S, Rndr> StyleAttribute<S, Rndr> for T
 where
     T: AddAttribute<Style<S, Rndr>, Rndr>,

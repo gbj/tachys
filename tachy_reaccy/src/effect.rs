@@ -1,4 +1,4 @@
-use crate::{waker::MaybeWaker, OBSERVER};
+use crate::{arena::Owner, waker::MaybeWaker, OBSERVER};
 use futures::{Stream, StreamExt};
 use parking_lot::RwLock;
 use pin_project_lite::pin_project;
@@ -70,7 +70,7 @@ where
         let waker = cx.waker();
         {
             let mut lock = OBSERVER.write();
-            *lock = Some(MaybeWaker::Async(waker.clone()));
+            *lock = Some(MaybeWaker::Async(waker.clone().into()));
         }
         let this = self.project();
         let mut value = this.inner.value.write();

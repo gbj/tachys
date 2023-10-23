@@ -442,7 +442,7 @@ fn prop_to_tokens(
 ) -> TokenStream {
     let (value, _) = attribute_value(node);
     quote! {
-        .#prop((#key, #value))
+        .#prop(#key, #value)
     }
 }
 

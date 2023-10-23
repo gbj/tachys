@@ -3,7 +3,7 @@ use crate::{
     OBSERVER,
 };
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 
 pub struct RenderEffect<T>
 where
@@ -27,10 +27,6 @@ where
                 *value.write() = Some(new);
             }
         });
-        {
-            let mut lock = OBSERVER.write();
-            *lock = Some(MaybeWaker::BrowserOnly(waker.clone()));
-        }
         waker.wake_by_ref();
         Self { value, waker }
     }

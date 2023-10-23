@@ -1,6 +1,7 @@
 use crate::{signal_traits::*, MaybeWaker, Observer};
 use parking_lot::RwLock;
-use std::{fmt::Debug, panic::Location, sync::Arc};
+use rustc_hash::FxHashSet;
+use std::{fmt::Debug, mem, panic::Location, sync::Arc};
 
 pub struct ArcSignal<T> {
     #[cfg(debug_assertions)]
@@ -28,6 +29,10 @@ impl<T> Debug for ArcSignal<T> {
 }
 
 impl<T> ArcSignal<T> {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
     pub fn new(value: T) -> Self {
         Self {
             #[cfg(debug_assertions)]
@@ -36,17 +41,30 @@ impl<T> ArcSignal<T> {
         }
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
     pub fn notify(&self) {
-        let subs = { std::mem::take(&mut self.inner.write().subscribers) };
+        let subs = { mem::take(&mut self.inner.write().subscribers) };
         for waker in subs {
             waker.wake_by_ref()
         }
     }
 }
 
-impl<T> Track for ArcSignal<T> {
+impl<T: 'static> Track for ArcSignal<T> {
     fn track(&self) {
         if let Some(waker) = Observer::get() {
+            waker.add_remover(Box::new({
+                let inner = Arc::downgrade(&self.inner);
+                let waker = waker.clone();
+                move || {
+                    if let Some(inner) = inner.upgrade() {
+                        inner.write().unsubscribe(&waker);
+                    }
+                }
+            }));
             self.inner.write().subscribe(waker);
         }
     }
@@ -69,6 +87,10 @@ impl<T> DefinedAt for ArcSignal<T> {
 impl<T> SignalWithUntracked for ArcSignal<T> {
     type Value = T;
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
     fn try_with_untracked<U>(
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
@@ -81,6 +103,10 @@ impl<T> SignalWithUntracked for ArcSignal<T> {
 impl<T> SignalUpdate for ArcSignal<T> {
     type Value = T;
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
     fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
         {
             let mut lock = self.inner.write();
@@ -89,6 +115,10 @@ impl<T> SignalUpdate for ArcSignal<T> {
         self.notify();
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
     fn try_update<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
@@ -102,9 +132,9 @@ impl<T> SignalUpdate for ArcSignal<T> {
     }
 }
 
-impl<T> SignalWith for ArcSignal<T> {}
-impl<T: Clone> SignalGetUntracked for ArcSignal<T> {}
-impl<T: Clone> SignalGet for ArcSignal<T> {}
+impl<T: 'static> SignalWith for ArcSignal<T> {}
+impl<T: Clone + 'static> SignalGetUntracked for ArcSignal<T> {}
+impl<T: Clone + 'static> SignalGet for ArcSignal<T> {}
 
 impl<T> SignalIsDisposed for ArcSignal<T> {
     #[inline(always)]
@@ -116,18 +146,22 @@ impl<T> SignalSet for ArcSignal<T> {}
 
 struct SignalInner<T> {
     value: T,
-    subscribers: Vec<MaybeWaker>,
+    subscribers: FxHashSet<MaybeWaker>,
 }
 
 impl<T> SignalInner<T> {
     pub fn new(value: T) -> Self {
         Self {
             value,
-            subscribers: Vec::new(),
+            subscribers: Default::default(),
         }
     }
 
     pub fn subscribe(&mut self, waker: MaybeWaker) {
-        self.subscribers.push(waker);
+        self.subscribers.insert(waker);
+    }
+
+    pub fn unsubscribe(&mut self, waker: &MaybeWaker) {
+        self.subscribers.remove(waker);
     }
 }

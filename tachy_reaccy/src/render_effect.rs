@@ -1,5 +1,5 @@
 use crate::{
-    owner::{BrowserOnlyWaker, MaybeWaker},
+    waker::{BrowserOnlyWaker, MaybeWaker},
     OBSERVER,
 };
 use parking_lot::RwLock;

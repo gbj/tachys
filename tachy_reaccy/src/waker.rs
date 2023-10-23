@@ -1,21 +1,6 @@
 use browser_only_send::BrowserOnly;
 use std::{fmt::Debug, rc::Rc, sync::Arc, task::Waker};
 
-pub struct Owner {
-    inner: Arc<OwnerInner>,
-}
-
-impl Owner {
-    /*     pub fn store<T: 'static>(&self, value: T) -> GenerationalBox<T> {
-        self.inner.owner.insert(value)
-    } */
-}
-
-pub struct OwnerInner {
-    //owner: generational_box::Owner,
-    waker: MaybeWaker,
-}
-
 #[derive(Clone)]
 pub struct BrowserOnlyWaker(BrowserOnly<Rc<dyn Fn()>>);
 

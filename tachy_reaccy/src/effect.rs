@@ -1,4 +1,4 @@
-use crate::{owner::MaybeWaker, OBSERVER};
+use crate::{waker::MaybeWaker, OBSERVER};
 use futures::{Stream, StreamExt};
 use parking_lot::RwLock;
 use pin_project_lite::pin_project;

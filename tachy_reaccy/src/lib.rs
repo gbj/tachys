@@ -1,16 +1,15 @@
 mod arena;
 mod effect;
-mod owner;
 mod render_effect;
 #[cfg(feature = "serde")]
 mod serde;
 mod signal;
 pub mod signal_traits;
+mod waker;
 
-use crate::owner::MaybeWaker;
+use crate::waker::MaybeWaker;
 pub use effect::*;
 use lazy_static::lazy_static;
-use owner::Owner;
 use parking_lot::RwLock;
 pub use render_effect::*;
 pub use signal::*;

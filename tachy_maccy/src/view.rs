@@ -318,6 +318,12 @@ fn attribute_to_tokens(
                     _ => unreachable!(),
                 };
                 style_to_tokens(node, style.into_token_stream(), None)
+            } else if let Some(name) = name.strip_prefix("prop:") {
+                let prop = match &node.key {
+                    NodeName::Punctuated(parts) => &parts[0],
+                    _ => unreachable!(),
+                };
+                prop_to_tokens(node, prop.into_token_stream(), name)
             } else {
                 let key = attribute_name(&node.key);
                 let (value, is_static) = attribute_value(node);
@@ -426,6 +432,17 @@ fn style_to_tokens(
         quote! {
             .#style(#value)
         }
+    }
+}
+
+fn prop_to_tokens(
+    node: &KeyedAttribute,
+    prop: TokenStream,
+    key: &str,
+) -> TokenStream {
+    let (value, _) = attribute_value(node);
+    quote! {
+        .#prop((#key, #value))
     }
 }
 

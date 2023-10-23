@@ -4,11 +4,12 @@ use crate::{
         attribute::*,
         class::{class, Class, IntoClass},
         event::{on, EventDescriptor, On},
+        property::{property, IntoProperty, Property},
         style::{style, IntoStyle, Style},
     },
     renderer::DomRenderer,
 };
-
+use std::borrow::Cow;
 pub trait AddAttribute<NewAttr, Rndr>
 where
     Rndr: Renderer,
@@ -60,6 +61,21 @@ where
         value: C,
     ) -> <Self as AddAttribute<Class<C, Rndr>, Rndr>>::Output {
         self.add_attr(class(value))
+    }
+}
+
+pub trait PropAttribute<P, Rndr>
+where
+    P: IntoProperty<Rndr>,
+    Rndr: DomRenderer,
+    Self: Sized + AddAttribute<Property<P, Rndr>, Rndr>,
+{
+    fn prop(
+        self,
+        key: impl Into<Cow<'static, str>>,
+        value: P,
+    ) -> <Self as AddAttribute<Property<P, Rndr>, Rndr>>::Output {
+        self.add_attr(property(key, value))
     }
 }
 

@@ -1,5 +1,5 @@
 use browser_only_send::BrowserOnly;
-use std::{fmt::Debug, rc::Rc, sync::Arc, task::Waker};
+use std::{fmt::Debug, rc::Rc, task::Waker};
 
 #[derive(Clone)]
 pub struct BrowserOnlyWaker(BrowserOnly<Rc<dyn Fn()>>);
@@ -14,7 +14,7 @@ impl BrowserOnlyWaker {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum MaybeWaker {
     Async(Waker),
     BrowserOnly(BrowserOnlyWaker),
@@ -29,11 +29,8 @@ impl MaybeWaker {
     }
 }
 
-impl Debug for MaybeWaker {
+impl Debug for BrowserOnlyWaker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Async(arg0) => f.debug_tuple("Async").field(arg0).finish(),
-            Self::BrowserOnly(arg0) => f.debug_tuple("BrowserOnly").finish(),
-        }
+        f.debug_tuple("BrowserOnlyWaker").finish()
     }
 }

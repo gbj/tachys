@@ -82,12 +82,11 @@ impl<T> SignalUpdate for ArcSignal<T> {
     type Value = T;
 
     fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        let value = {
+        {
             let mut lock = self.inner.write();
-            fun(&mut lock.value)
-        };
+            fun(&mut lock.value);
+        }
         self.notify();
-        value
     }
 
     fn try_update<U>(

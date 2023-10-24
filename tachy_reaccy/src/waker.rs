@@ -1,31 +1,50 @@
-use crate::{arena::Owner, log, Observer, OBSERVER};
+use crate::{arena::Owner, OBSERVER};
 //use browser_only_send::BrowserOnly;
-use futures::{
-    channel::mpsc::{channel, Receiver, Sender},
-    Future, Stream,
-};
+use futures::channel::mpsc::{channel, Receiver, Sender};
 use parking_lot::RwLock;
-use std::{
-    cell::RefCell, fmt::Debug, hash::Hash, mem, ptr, rc::Rc, sync::Arc,
-    task::Waker,
-};
+use std::{fmt::Debug, hash::Hash, mem, sync::Arc};
+
+#[derive(Debug, Clone)]
+pub struct NotificationSender(Sender<()>);
+
+impl NotificationSender {
+    pub fn notify(&mut self) {
+        // if this fails, it's because there's already a message
+        // in the buffer. but we're just sending () to wake it up;
+        // we really don't care if multiple signals try to notify it synchronously
+        // and it fails to send, as long as it's sent the one time
+        _ = self.0.try_send(());
+    }
+}
+
+impl Hash for NotificationSender {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash_receiver(state);
+    }
+}
+
+impl PartialEq for NotificationSender {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.same_receiver(&other.0)
+    }
+}
 
 #[derive(Clone)]
 pub struct Notifier {
-    tx: Arc<RwLock<Sender<()>>>,
+    tx: NotificationSender,
     removers: Arc<RwLock<Vec<Box<dyn FnOnce() + Send + Sync>>>>,
     owner: Owner,
 }
 
 impl Hash for Notifier {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        ptr::hash(self.tx.as_ref(), state);
+        self.tx.hash(state);
     }
 }
 
 impl PartialEq for Notifier {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.tx, &other.tx)
+        self.tx == other.tx
     }
 }
 
@@ -36,7 +55,7 @@ impl Notifier {
         let (tx, rx) = channel::<()>(4);
         (
             Self {
-                tx: Arc::new(RwLock::new(tx)),
+                tx: NotificationSender(tx),
                 removers: Arc::new(RwLock::new(Vec::new())),
                 owner: Owner::new(),
             },
@@ -55,9 +74,10 @@ impl Notifier {
         for remover in mem::take(&mut *self.removers.write()) {
             remover();
         }
+        let mut tx = self.tx.clone();
         self.with_observer(|| {
             self.owner.with(|| {
-                self.tx.write().try_send(());
+                tx.notify();
             })
         })
     }

@@ -36,16 +36,6 @@ where
             }
         });
         Self { value, observer }
-        /* let waker = Notifier::new({
-            let value = Arc::clone(&value);
-            move || {
-                let prev = { value.write().take() };
-                let new = fun(prev);
-                *value.write() = Some(new);
-            }
-        });
-        waker.wake_by_ref();
-        Self { value, waker } */
     }
 
     pub fn with_value_mut<U>(

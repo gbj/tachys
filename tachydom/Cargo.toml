@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-browser_only_send = { path = "../browser_only_send", optional = true }
 next_tuple = { path = "../next_tuple" }
 tachy_reaccy = { path = "../tachy_reaccy", optional = true }
 slotmap = { version = "1", optional = true }
@@ -71,4 +70,4 @@ ssr = []
 nightly = ["leptos_reactive/nightly"]
 testing = ["dep:slotmap"]
 leptos = ["dep:leptos_reactive"]
-reaccy = ["dep:tachy_reaccy", "dep:browser_only_send"]
+reaccy = ["dep:tachy_reaccy"]

@@ -1,8 +1,7 @@
-use crate::{log, waker::Notifier, OBSERVER};
+use crate::{spawn::spawn_local, waker::Notifier};
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::{mem, sync::Arc};
-use wasm_bindgen_futures::spawn_local;
 
 pub struct RenderEffect<T>
 where

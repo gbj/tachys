@@ -1,14 +1,12 @@
 use crate::{
     html::{
-        attribute::{global::AddAttribute, *},
-        class::{Class, IntoClass},
-        element::{CreateElement, ElementChild, ElementType, HtmlElement},
+        attribute::{Attr, Attribute, AttributeValue},
+        element::{
+            CreateElement, ElementType, ElementWithChildren, HtmlElement,
+        },
     },
-    hydration::Cursor,
-    renderer::{dom::Dom, DomRenderer, Renderer},
-    view::{
-        template::*, Position, PositionState, Render, RenderHtml, ToTemplate,
-    },
+    renderer::{dom::Dom, Renderer},
+    view::Render,
 };
 use next_tuple::TupleBuilder;
 use once_cell::unsync::Lazy;
@@ -19,11 +17,12 @@ macro_rules! html_elements {
         paste::paste! {
             $(
                 // `tag()` function
-                pub fn $tag<Rndr>() -> [<Html $tag:camel>]<(), (), Rndr>
+                pub fn $tag<Rndr>() -> HtmlElement<[<$tag:camel>], (), (), Rndr>
                 where
                     Rndr: Renderer
                 {
-                     [<Html $tag:camel>] {
+                    HtmlElement {
+                        ty: PhantomData,
                         attributes: (),
                         children: (),
                         rndr: PhantomData,
@@ -31,53 +30,22 @@ macro_rules! html_elements {
                 }
 
                 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                pub struct [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Ch: Render<Rndr>,
-                    Rndr: Renderer {
-                    attributes: At,
-                    children: Ch,
-                    rndr: PhantomData<Rndr>
-                }
+                pub struct [<$tag:camel>];
 
-                // .child()
-                impl<At, Ch, NewChild, Rndr> ElementChild<NewChild> for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Ch: Render<Rndr> + TupleBuilder<NewChild>,
-                    <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
-                    Rndr: Renderer
-                {
-                    type Output = [<Html $tag:camel>]<At, <Ch as TupleBuilder<NewChild>>::Output, Rndr>;
+                // Element creation
+                //#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+                //pub struct [<$tag:camel>];
 
-                    fn child(
-                        self,
-                        child: NewChild,
-                    ) -> Self::Output
-                    {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        [<Html $tag:camel>] {
-                            attributes,
-                            children: children.next_tuple(child),
-                            rndr
-                        }
-                    }
-                }
-
-                // Typed attribute methods
+                                // Typed attribute methods
                 $(
-                    impl<At, Ch, Rndr> [<Html $tag:camel>]<At, Ch, Rndr>
+                    impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
                     where
                         At: Attribute<Rndr>,
                         Ch: Render<Rndr>,
                         Rndr: Renderer,
                     {
-                        pub fn $attr<V>(self, value: V) -> [<Html $tag:camel>] <
+                        pub fn $attr<V>(self, value: V) -> HtmlElement <
+                            [<$tag:camel>],
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
                             Ch, Rndr
                         >
@@ -86,52 +54,23 @@ macro_rules! html_elements {
                             At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
                         {
-                            let [<Html $tag:camel>] {
-                                attributes,
+                            let HtmlElement { ty, rndr, children, attributes } = self;
+                            HtmlElement {
+                                ty,
+                                rndr,
                                 children,
-                                rndr
-                            } = self;
-                            [<Html $tag:camel>] {
-                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value)),
-                                children,
-                                rndr
+                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
                             }
                         }
                     }
                 )*
 
-                // Global Attributes
-                impl<At, Ch, Rndr, NewAttr> AddAttribute<NewAttr, Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: Attribute<Rndr> + TupleBuilder<NewAttr>,
-                    <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
-                    Ch: Render<Rndr>,
-                    Rndr: Renderer
-                {
-                    type Output = [<Html $tag:camel>]<<At as TupleBuilder<NewAttr>>::Output, Ch, Rndr>;
-
-                    fn add_attr(self, attr: NewAttr) -> Self::Output {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        [<Html $tag:camel>] {
-                            attributes: attributes.next_tuple(attr),
-                            children,
-                            rndr
-                        }
-                    }
-                }
-
-                // Element creation
-                #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                pub struct [<$tag:camel>];
-
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
                 }
+
+                impl ElementWithChildren for [<$tag:camel>] {}
 
                 impl CreateElement<Dom> for [<$tag:camel>] {
                     fn create_element() -> <Dom as Renderer>::Element {
@@ -143,142 +82,6 @@ macro_rules! html_elements {
                             });
                         }
                         ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
-                    }
-                }
-
-                // Render and RenderHtml implementations simply delegate to HtmlElement
-                impl<At, Ch, Rndr> Render<Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Ch: Render<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                    HtmlElement<[<$tag:camel>], At, Ch, Rndr>: Render<Rndr>
-                {
-                    type State = <HtmlElement<[<$tag:camel>], At, Ch, Rndr> as Render<Rndr>>::State;
-
-                    fn build(self) -> Self::State {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children,
-                            ty: PhantomData,
-                            rndr,
-                        }.build()
-                    }
-
-                    fn rebuild(self, state: &mut Self::State) {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children,
-                            ty: PhantomData,
-                            rndr,
-                        }.rebuild(state);
-                    }
-                }
-
-                impl<At, Ch, Rndr> RenderHtml<Rndr> for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Ch: Render<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                    Rndr::Element: Clone,
-                    HtmlElement<[<$tag:camel>], At, Ch, Rndr>: RenderHtml<Rndr>
-                {
-                    fn to_html(self, buf: &mut String, position: &PositionState) {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children,
-                            ty: PhantomData,
-                            rndr,
-                        }.to_html(buf, position)
-                    }
-
-                    fn hydrate<const FROM_SERVER: bool>(
-                        self,
-                        cursor: &Cursor<Rndr>,
-                        position: &PositionState,
-                    ) -> Self::State {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            children,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children,
-                            ty: PhantomData,
-                            rndr,
-                        }.hydrate::<FROM_SERVER>(cursor, position)
-                    }
-                }
-
-                // ToTemplate implementation uses type information
-                impl<At, Ch, Rndr> ToTemplate for [<Html $tag:camel>]<At, Ch, Rndr>
-                where
-                    At: ToTemplate + Attribute<Rndr>,
-                    Ch: ToTemplate + Render<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                {
-                    const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
-                        "<",
-                        stringify!($tag),
-                        At::TEMPLATE,
-                        ">",
-                        Ch::TEMPLATE,
-                        "</",
-                        stringify!($tag),
-                        ">",
-                    ]));
-
-                    fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
-                        // opening tag and attributes
-                        let mut class = String::new();
-                        let mut style = String::new();
-
-                        buf.push_str(concat!("<", stringify!($tag)));
-                        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
-
-                        if !class.is_empty() {
-                            buf.push(' ');
-                            buf.push_str("class=\"");
-                            buf.push_str(class.trim_start().trim_end());
-                            buf.push('"');
-                        }
-                        if !style.is_empty() {
-                            buf.push(' ');
-                            buf.push_str("style=\"");
-                            buf.push_str(style.trim_start().trim_end());
-                            buf.push('"');
-                        }
-
-                        buf.push('>');
-
-                        // children
-                        *position = Position::FirstChild;
-                        class.clear();
-                        style.clear();
-                        Ch::to_template(buf, &mut class, &mut style, position);
-
-                        // closing tag
-                        buf.push_str(concat!("</", stringify!($tag), ">"));
-                        *position = Position::NextChild;
                     }
                 }
             )*
@@ -291,34 +94,32 @@ macro_rules! html_self_closing_elements {
         paste::paste! {
             $(
                 // `tag()` function
-                pub fn $tag<Rndr>() -> [<Html $tag:camel>]<(), Rndr>
+                pub fn $tag<Rndr>() -> HtmlElement<[<$tag:camel>], (), (), Rndr>
                 where
                     Rndr: Renderer
                 {
-                     [<Html $tag:camel>] {
+                    HtmlElement {
                         attributes: (),
+                        children: (),
                         rndr: PhantomData,
+                        ty: PhantomData
                     }
                 }
 
                 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                pub struct [<Html $tag:camel>]<At, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Rndr: Renderer {
-                    attributes: At,
-                    rndr: PhantomData<Rndr>
-                }
+                pub struct [<$tag:camel>];
 
                 // Typed attribute methods
                 $(
-                    impl<At, Rndr> [<Html $tag:camel>]<At, Rndr>
+                    impl<At, Rndr> HtmlElement<[<$tag:camel>], At, (), Rndr>
                     where
                         At: Attribute<Rndr>,
                         Rndr: Renderer,
                     {
-                        pub fn $attr<V>(self, value: V) -> [<Html $tag:camel>] <
+                        pub fn $attr<V>(self, value: V) -> HtmlElement<
+                            [<$tag:camel>],
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
+                            (),
                             Rndr
                         >
                         where
@@ -326,42 +127,20 @@ macro_rules! html_self_closing_elements {
                             At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
                         {
-                            let [<Html $tag:camel>] {
-                                attributes,
-                                rndr
-                            } = self;
-                            [<Html $tag:camel>] {
-                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value)),
-                                rndr
+                            let HtmlElement { ty, rndr, children, attributes } = self;
+                            HtmlElement {
+                                ty,
+                                rndr,
+                                children,
+                                attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
                             }
                         }
                     }
                 )*
 
-                // Global Attributes
-                impl<At, Rndr, NewAttr> AddAttribute<NewAttr, Rndr> for [<Html $tag:camel>]<At, Rndr>
-                where
-                    At: Attribute<Rndr> + TupleBuilder<NewAttr>,
-                    <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
-                    Rndr: Renderer
-                {
-                    type Output = [<Html $tag:camel>]<<At as TupleBuilder<NewAttr>>::Output, Rndr>;
-
-                    fn add_attr(self, attr: NewAttr) -> Self::Output {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            rndr
-                        } = self;
-                        [<Html $tag:camel>] {
-                            attributes: attributes.next_tuple(attr),
-                            rndr
-                        }
-                    }
-                }
-
                 // Element creation
-                #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                pub struct [<$tag:camel>];
+                //#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+                //pub struct [<$tag:camel>];
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
@@ -378,121 +157,6 @@ macro_rules! html_self_closing_elements {
                             });
                         }
                         ELEMENT.with(|e| e.clone_node()).unwrap().unchecked_into()
-                    }
-                }
-
-                // Render and RenderHtml implementations simply delegate to HtmlElement
-                impl<At, Rndr> Render<Rndr> for [<Html $tag:camel>]<At, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                    HtmlElement<[<$tag:camel>], At, (), Rndr>: Render<Rndr>
-                {
-                    type State = <HtmlElement<[<$tag:camel>], At, (), Rndr> as Render<Rndr>>::State;
-
-                    fn build(self) -> Self::State {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children: (),
-                            ty: PhantomData,
-                            rndr,
-                        }.build()
-                    }
-
-                    fn rebuild(self, state: &mut Self::State) {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children: (),
-                            ty: PhantomData,
-                            rndr,
-                        }.rebuild(state);
-                    }
-                }
-
-                impl<At, Rndr> RenderHtml<Rndr> for [<Html $tag:camel>]<At, Rndr>
-                where
-                    At: Attribute<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                    Rndr::Element: Clone,
-                    HtmlElement<[<$tag:camel>], At, (), Rndr>: RenderHtml<Rndr>
-                {
-                    fn to_html(self, buf: &mut String, position: &PositionState) {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children: (),
-                            ty: PhantomData,
-                            rndr,
-                        }.to_html(buf, position)
-                    }
-
-                    fn hydrate<const FROM_SERVER: bool>(
-                        self,
-                        cursor: &Cursor<Rndr>,
-                        position: &PositionState,
-                    ) -> Self::State {
-                        let [<Html $tag:camel>] {
-                            attributes,
-                            rndr
-                        } = self;
-                        HtmlElement {
-                            attributes,
-                            children: (),
-                            ty: PhantomData,
-                            rndr,
-                        }.hydrate::<FROM_SERVER>(cursor, position)
-                    }
-                }
-
-                // ToTemplate implementation uses type information
-                 // ToTemplate implementation uses type information
-                impl<At, Rndr> ToTemplate for [<Html $tag:camel>]<At, Rndr>
-                where
-                    At: ToTemplate + Attribute<Rndr>,
-                    Rndr: Renderer,
-                    Rndr::Node: Clone,
-                {
-                    const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
-        "<",
-       stringify!($tag),
-        At::TEMPLATE,
-        "/>"
-    ]));
-                    fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
-                        // opening tag and attributes
-                        let mut class = String::new();
-                        let mut style = String::new();
-
-                        buf.push_str(concat!("<", stringify!($tag)));
-                        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
-
-                        if !class.is_empty() {
-                            buf.push(' ');
-                            buf.push_str("class=\"");
-                            buf.push_str(class.trim_start().trim_end());
-                            buf.push('"');
-                        }
-                        if !style.is_empty() {
-                            buf.push(' ');
-                            buf.push_str("style=\"");
-                            buf.push_str(style.trim_start().trim_end());
-                            buf.push('"');
-                        }
-
-                        buf.push('>');
                     }
                 }
             )*

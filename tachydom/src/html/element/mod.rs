@@ -11,7 +11,7 @@ use next_tuple::TupleBuilder;
 use std::marker::PhantomData;
 
 mod elements;
-use super::attribute::{id, Attr, AttributeValue, Id};
+use super::attribute::{global::AddAttribute, id, Attr, AttributeValue, Id};
 pub use elements::*;
 
 pub struct HtmlElement<E, At, Ch, Rndr>
@@ -25,14 +25,70 @@ where
     attributes: At,
     children: Ch,
 }
-/*
+
+impl<E, At, Ch, NewChild, Rndr> ElementChild<NewChild>
+    for HtmlElement<E, At, Ch, Rndr>
+where
+    E: ElementType + ElementWithChildren,
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr> + TupleBuilder<NewChild>,
+    <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
+    Rndr: Renderer,
+{
+    type Output =
+        HtmlElement<E, At, <Ch as TupleBuilder<NewChild>>::Output, Rndr>;
+
+    fn child(self, child: NewChild) -> Self::Output {
+        let HtmlElement {
+            ty,
+            rndr,
+            attributes,
+            children,
+        } = self;
+        HtmlElement {
+            ty,
+            rndr,
+            attributes,
+            children: children.next_tuple(child),
+        }
+    }
+}
+
+impl<E, At, Ch, Rndr, NewAttr> AddAttribute<NewAttr, Rndr>
+    for HtmlElement<E, At, Ch, Rndr>
+where
+    E: ElementType,
+    At: Attribute<Rndr> + TupleBuilder<NewAttr>,
+    <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
+{
+    type Output =
+        HtmlElement<E, <At as TupleBuilder<NewAttr>>::Output, Ch, Rndr>;
+
+    fn add_attr(self, attr: NewAttr) -> Self::Output {
+        let HtmlElement {
+            ty,
+            attributes,
+            children,
+            rndr,
+        } = self;
+        HtmlElement {
+            ty,
+            attributes: attributes.next_tuple(attr),
+            children,
+            rndr,
+        }
+    }
+}
+
 impl<E, At, Ch, Rndr> HtmlElement<E, At, Ch, Rndr>
 where
     At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
 {
-    /// Adds an attribute to the element. This is a compile-time operation, and modifies
+    /// Adds any attribute to the element. This is a compile-time operation, and modifies
     /// the type of the view tree.
     /// ```rust
     /// use tachydom::{
@@ -56,8 +112,8 @@ where
     ) -> HtmlElement<E, <At as TupleBuilder<NewAttr>>::Output, Ch, Rndr>
     where
         E: ElementType,
-        NewAttr: HtmlAttribute<E>,
         At: TupleBuilder<NewAttr>,
+        At: Attribute<Rndr> + TupleBuilder<NewAttr>,
         <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
     {
         let HtmlElement {
@@ -73,68 +129,7 @@ where
             attributes: attributes.next_tuple(attr),
         }
     }
-
-    /// Adds a child to the element. This is a compile-time operation, and modifies
-    /// the type of the view tree.
-    /// ```rust
-    /// use tachydom::{
-    ///     html::{
-    ///         attribute::id,
-    ///         class::class,
-    ///         element::{p, HtmlElement},
-    ///     },
-    ///     renderer::mock_dom::MockDom,
-    ///     view::Render,
-    /// };
-    /// let el: HtmlElement<_, _, _, MockDom> =
-    ///     p((), ()).attr(id("foo")).attr(class("bar"));
-    /// let el = el.build();
-    /// assert_eq!(el.el.to_debug_html(), "<p id=\"foo\" class=\"bar\"></p>");
-    /// ```
-    #[inline(always)]
-    pub fn child<NewChild>(
-        self,
-        child: NewChild,
-    ) -> HtmlElement<E, At, <Ch as TupleBuilder<NewChild>>::Output, Rndr>
-    where
-        Ch: TupleBuilder<NewChild>,
-        <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
-    {
-        let HtmlElement {
-            ty,
-            rndr,
-            attributes,
-            children,
-        } = self;
-        HtmlElement {
-            ty,
-            rndr,
-            attributes,
-            children: children.next_tuple(child),
-        }
-    }
-} */
-
-/* pub trait GlobalAttributes<E, At, Ch, Rndr>
-where
-    Self: Sized,
-    E: Element<Rndr, Attributes = At, Children = Ch>,
-    At: Attribute<Rndr>,
-    Ch: Render<Rndr>,
-    Rndr: Renderer,
-{
-    fn id<V>(
-        self,
-        value: V,
-    ) -> E::Element<<At as TupleBuilder<Attr<Id, V, Rndr>>>::Output, Ch, Rndr>
-    where
-        V: AttributeValue<Rndr>,
-        At: TupleBuilder<Attr<Id, V, Rndr>>,
-        <At as TupleBuilder<Attr<Id, V, Rndr>>>::Output: Attribute<Rndr>,
-    {
-        self.set_attr(id(value))
-    }
-} */
+}
 
 pub trait ElementChild<NewChild> {
     type Output;
@@ -146,6 +141,8 @@ pub trait ElementType {
     const TAG: &'static str;
     const SELF_CLOSING: bool;
 }
+
+pub trait ElementWithChildren {}
 
 pub trait CreateElement<R: Renderer> {
     fn create_element() -> R::Element;
@@ -368,7 +365,7 @@ mod tests {
         html::{
             attribute::{global::GlobalAttributes, id, src},
             class::class,
-            element::{em, ElementChild, HtmlMain},
+            element::{em, ElementChild, Main},
         },
         renderer::mock_dom::MockDom,
         view::Render,
@@ -376,7 +373,7 @@ mod tests {
 
     #[test]
     fn mock_dom_creates_element() {
-        let el: HtmlMain<_, _, MockDom> =
+        let el: HtmlElement<Main, _, _, MockDom> =
             main().child(p().id("test").lang("en").child("Hello, world!"));
         let el = el.build();
         assert_eq!(
@@ -387,7 +384,7 @@ mod tests {
 
     #[test]
     fn mock_dom_creates_element_with_several_children() {
-        let el: HtmlMain<_, _, MockDom> = main().child(p().child((
+        let el: HtmlElement<Main, _, _, MockDom> = main().child(p().child((
             "Hello, ",
             em().child("beautiful"),
             " world!",

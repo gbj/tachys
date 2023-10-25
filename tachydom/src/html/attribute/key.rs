@@ -1,5 +1,5 @@
 use super::{Attr, AttributeValue};
-use crate::renderer::{DomRenderer, Renderer};
+use crate::renderer::Renderer;
 use std::{fmt::Debug, marker::PhantomData};
 
 pub trait AttributeKey {

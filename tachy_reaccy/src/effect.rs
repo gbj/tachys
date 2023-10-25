@@ -16,11 +16,11 @@ where
 {
     pub fn new(fun: impl Fn(Option<T>) -> T + Send + Sync + 'static) -> Self {
         let value = Arc::new(RwLock::new(None));
-        let (observer, mut rx) = Notifier::new();
+        let (mut observer, mut rx) = Notifier::new();
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,
         // to register observed values
-        observer.wake_by_ref();
+        observer.mark_dirty();
         spawn({
             let value = value.clone();
             let observer = observer.clone();
@@ -28,6 +28,7 @@ where
                 while rx.next().await.is_some() {
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
+                    observer.cleanup();
                     *value = Some(observer.with_observer(|| fun(old_value)));
                 }
             }

@@ -1,8 +1,15 @@
 use crate::{arena::Owner, Queue, OBSERVER};
 //use browser_only_send::BrowserOnly;
 use futures::channel::mpsc::{channel, Receiver, Sender};
-use parking_lot::RwLock;
-use std::{fmt::Debug, hash::Hash, mem, sync::Arc};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    mem,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct NotificationSender(Sender<()>);
@@ -32,6 +39,8 @@ impl PartialEq for NotificationSender {
 #[derive(Clone)]
 pub struct Notifier {
     tx: NotificationSender,
+    is_dirty: Arc<AtomicBool>,
+    checks: Queue<Box<dyn FnOnce() -> bool + Send + Sync>>,
     removers: Queue<Box<dyn FnOnce() + Send + Sync>>,
     owner: Owner,
 }
@@ -52,11 +61,13 @@ impl Eq for Notifier {}
 
 impl Notifier {
     pub fn new() -> (Self, Receiver<()>) {
-        let (tx, rx) = channel::<()>(4);
+        let (tx, rx) = channel::<()>(1);
         (
             Self {
                 tx: NotificationSender(tx),
-                removers: Arc::new(RwLock::new(Vec::new())),
+                is_dirty: Arc::new(AtomicBool::new(false)),
+                checks: Default::default(),
+                removers: Default::default(),
                 owner: Owner::new(),
             },
             rx,
@@ -65,24 +76,38 @@ impl Notifier {
 
     pub fn with_observer<T>(&self, fun: impl FnOnce() -> T) -> T {
         let prev = mem::replace(&mut *OBSERVER.write(), Some(self.clone()));
-        let val = fun();
+        let val = self.owner.with(fun);
         *OBSERVER.write() = prev;
         val
     }
 
-    pub fn wake_by_ref(&self) {
+    pub fn mark_dirty(&mut self) {
+        self.is_dirty.store(true, Ordering::Relaxed);
+        self.tx.notify();
+    }
+
+    pub fn add_check(
+        &mut self,
+        source_is_dirty: Box<dyn FnOnce() -> bool + Send + Sync>,
+    ) {
+        self.checks.write().push(source_is_dirty);
+        self.tx.notify();
+    }
+
+    pub fn cleanup(&self) {
         for remover in mem::take(&mut *self.removers.write()) {
             remover();
         }
-        let mut tx = self.tx.clone();
-        self.with_observer(|| {
-            self.owner.with(|| {
-                tx.notify();
-            })
-        })
     }
 
     pub fn add_remover(&self, remover: Box<dyn FnOnce() + Send + Sync>) {
         self.removers.write().push(remover);
+    }
+
+    // Checks whether this notifier is dirty, marking it clean in the process.
+    pub fn is_dirty(&self) -> bool {
+        let checks = mem::take(&mut *self.checks.write());
+        self.is_dirty.swap(false, Ordering::Relaxed)
+            || checks.into_iter().any(|is_dirty| is_dirty())
     }
 }

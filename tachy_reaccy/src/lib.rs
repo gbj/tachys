@@ -1,6 +1,7 @@
 mod arena;
 pub mod context;
 pub mod effect;
+pub mod memo;
 pub mod render_effect;
 #[cfg(feature = "serde")]
 mod serde;
@@ -19,6 +20,7 @@ pub mod prelude {
         context::{provide_context, use_context},
         effect::Effect,
         global_root,
+        memo::{ArcMemo, Memo},
         signal::{ArcSignal, Signal},
         signal_traits::*,
         Root,

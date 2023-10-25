@@ -41,14 +41,10 @@ impl<T> ArcSignal<T> {
         }
     }
 
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "trace", skip_all,)
-    )]
-    pub fn notify(&self) {
+    fn notify(&self) {
         let subs = { mem::take(&mut self.inner.write().subscribers) };
-        for waker in subs {
-            waker.wake_by_ref()
+        for mut waker in subs {
+            waker.mark_dirty();
         }
     }
 }

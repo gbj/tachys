@@ -2,7 +2,10 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, Renderer,
     ToTemplate,
 };
-use crate::hydration::Cursor;
+use crate::{
+    hydration::Cursor,
+    view::template::{const_concat, str_from_buffer},
+};
 
 impl<R: Renderer> Render<R> for () {
     type State = ();
@@ -43,6 +46,8 @@ impl<R: Renderer> Mountable<R> for () {
 }
 
 impl ToTemplate for () {
+    const TEMPLATE: &'static str = "";
+
     fn to_template(
         _buf: &mut String,
         class: &mut String,
@@ -85,6 +90,8 @@ where
 }
 
 impl<A: ToTemplate> ToTemplate for (A,) {
+    const TEMPLATE: &'static str = A::TEMPLATE;
+
     fn to_template(
         buf: &mut String,
         class: &mut String,
@@ -158,6 +165,10 @@ macro_rules! impl_view_for_tuples {
 			$first: ToTemplate,
 			$($ty: ToTemplate),*
 		{
+			const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
+				$first::TEMPLATE, $($ty::TEMPLATE),*
+			]));
+
 			fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position)  {
 				paste::paste! {
 					$first ::to_template(buf, class, style, position);

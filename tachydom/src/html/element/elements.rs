@@ -6,7 +6,9 @@ use crate::{
     },
     hydration::Cursor,
     renderer::{dom::Dom, DomRenderer, Renderer},
-    view::{Position, PositionState, Render, RenderHtml, ToTemplate},
+    view::{
+        template::*, Position, PositionState, Render, RenderHtml, ToTemplate,
+    },
 };
 use next_tuple::TupleBuilder;
 use once_cell::unsync::Lazy;
@@ -234,6 +236,17 @@ macro_rules! html_elements {
                     Rndr: Renderer,
                     Rndr::Node: Clone,
                 {
+                    const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
+                        "<",
+                        stringify!($tag),
+                        At::TEMPLATE,
+                        ">",
+                        Ch::TEMPLATE,
+                        "</",
+                        stringify!($tag),
+                        ">",
+                    ]));
+
                     fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
                         // opening tag and attributes
                         let mut class = String::new();
@@ -452,11 +465,17 @@ macro_rules! html_self_closing_elements {
                     Rndr: Renderer,
                     Rndr::Node: Clone,
                 {
+                    const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
+        "<",
+       stringify!($tag),
+        At::TEMPLATE,
+        "/>"
+    ]));
                     fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position) {
                         // opening tag and attributes
                         let mut class = String::new();
                         let mut style = String::new();
-                        
+
                         buf.push_str(concat!("<", stringify!($tag)));
                         <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
 

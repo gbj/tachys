@@ -49,15 +49,10 @@ where
         }
 
         let node = cursor.current();
-        let mut node = R::Text::cast_from(node)
+        let node = R::Text::cast_from(node)
             .expect("couldn't cast text node from node");
 
-        if FROM_SERVER
-            && matches!(
-                position.get(),
-                Position::NextChild | Position::LastChild
-            )
-        {
+        if matches!(position.get(), Position::NextChild | Position::LastChild) {
             cursor.sibling();
         }
         if !FROM_SERVER {
@@ -70,6 +65,8 @@ where
 }
 
 impl<'a> ToTemplate for &'a str {
+    const TEMPLATE: &'static str = " <!>";
+
     fn to_template(
         buf: &mut String,
         class: &mut String,
@@ -123,6 +120,8 @@ where
 }
 
 impl ToTemplate for String {
+    const TEMPLATE: &'static str = <&str as ToTemplate>::TEMPLATE;
+
     fn to_template(
         buf: &mut String,
         class: &mut String,

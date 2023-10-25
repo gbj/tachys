@@ -129,6 +129,8 @@ where
 }
 
 impl<const V: &'static str> ToTemplate for Static<V> {
+    const TEMPLATE: &'static str = V;
+
     fn to_template(
         buf: &mut String,
         class: &mut String,

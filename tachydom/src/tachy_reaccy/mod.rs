@@ -5,7 +5,9 @@ use crate::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
-use tachy_reaccy::{signal_traits::SignalGet, RenderEffect, Signal};
+use tachy_reaccy::{
+    render_effect::RenderEffect, signal::Signal, signal_traits::SignalGet,
+};
 
 mod class;
 mod style;

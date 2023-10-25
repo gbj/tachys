@@ -1,5 +1,5 @@
 use crate::{html::class::IntoClass, renderer::DomRenderer};
-use tachy_reaccy::RenderEffect;
+use tachy_reaccy::render_effect::RenderEffect;
 
 impl<F, C, R> IntoClass<R> for F
 where

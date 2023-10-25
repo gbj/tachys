@@ -3,6 +3,7 @@ use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
     view::{
+        template::{const_concat, str_from_buffer},
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
@@ -307,6 +308,17 @@ where
     Ch: Render<Rndr> + ToTemplate,
     Rndr: Renderer,
 {
+    const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
+        "<",
+        E::TAG,
+        At::TEMPLATE,
+        ">",
+        Ch::TEMPLATE,
+        "</",
+        E::TAG,
+        ">",
+    ]));
+
     fn to_template(
         buf: &mut String,
         class: &mut String,

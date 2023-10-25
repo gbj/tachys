@@ -1,6 +1,5 @@
 #![allow(incomplete_features)] // yolo
 #![cfg_attr(feature = "nightly", feature(adt_const_params))]
-#![feature(return_position_impl_trait_in_trait)]
 
 use wasm_bindgen::JsValue;
 use web_sys::Node;

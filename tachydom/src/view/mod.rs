@@ -147,6 +147,9 @@ where
 
 /// Allows data to be added to a static template.
 pub trait ToTemplate {
+    const TEMPLATE: &'static str = "";
+    const LEN: usize = Self::TEMPLATE.as_bytes().len();
+
     /// Renders a view type to a template. This does not take actual view data,
     /// but can be used for constructing part of an HTML `<template>` that corresponds
     /// to a view of a particular type.

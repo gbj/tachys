@@ -8,7 +8,6 @@ where
     T: 'static,
 {
     pub(crate) value: Arc<RwLock<Option<T>>>,
-    pub(crate) observer: Notifier,
 }
 
 impl<T> RenderEffect<T>
@@ -25,7 +24,6 @@ where
         // then spawn async
         spawn_local({
             let value = value.clone();
-            let observer = observer.clone();
             async move {
                 while rx.next().await.is_some() {
                     let mut value = value.write();
@@ -34,7 +32,7 @@ where
                 }
             }
         });
-        Self { value, observer }
+        Self { value }
     }
 
     pub fn with_value_mut<U>(

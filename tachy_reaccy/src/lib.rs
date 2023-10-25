@@ -11,6 +11,7 @@ mod waker;
 pub use arena::{global_root, Root};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
+use std::sync::Arc;
 use waker::Notifier;
 
 pub mod prelude {
@@ -35,6 +36,8 @@ impl Observer {
         OBSERVER.read().clone()
     }
 }
+
+pub(crate) type Queue<T> = Arc<RwLock<Vec<T>>>;
 
 #[cfg(feature = "web")]
 pub fn log(s: &str) {

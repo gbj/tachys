@@ -1,7 +1,7 @@
 mod arc_signal;
 use crate::{arena::Stored, signal_traits::*};
 pub use arc_signal::ArcSignal;
-use std::{fmt::Debug, mem, panic::Location};
+use std::{fmt::Debug, panic::Location};
 
 pub struct Signal<T: Send + Sync + 'static> {
     inner: Stored<ArcSignal<T>>,

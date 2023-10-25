@@ -8,7 +8,6 @@ where
     T: 'static,
 {
     pub(crate) value: Arc<RwLock<Option<T>>>,
-    pub(crate) observer: Notifier,
 }
 
 impl<T> Effect<T>
@@ -19,6 +18,9 @@ where
         let value = Arc::new(RwLock::new(None));
         let (observer, mut rx) = Notifier::new();
         // spawn the effect asynchronously
+        // we'll notify once so it runs on the next tick,
+        // to register observed values
+        observer.wake_by_ref();
         spawn({
             let value = value.clone();
             let observer = observer.clone();
@@ -30,9 +32,7 @@ where
                 }
             }
         });
-        // notify once to run and get observers
-        observer.wake_by_ref();
-        Self { value, observer }
+        Self { value }
     }
 
     pub fn with_value_mut<U>(

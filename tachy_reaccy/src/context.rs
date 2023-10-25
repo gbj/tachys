@@ -1,4 +1,4 @@
-use crate::{arena::Owner, log};
+use crate::arena::Owner;
 use std::any::{Any, TypeId};
 
 impl Owner {

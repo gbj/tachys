@@ -1,4 +1,4 @@
-use crate::{arena::Owner, OBSERVER};
+use crate::{arena::Owner, Queue, OBSERVER};
 //use browser_only_send::BrowserOnly;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use parking_lot::RwLock;
@@ -32,7 +32,7 @@ impl PartialEq for NotificationSender {
 #[derive(Clone)]
 pub struct Notifier {
     tx: NotificationSender,
-    removers: Arc<RwLock<Vec<Box<dyn FnOnce() + Send + Sync>>>>,
+    removers: Queue<Box<dyn FnOnce() + Send + Sync>>,
     owner: Owner,
 }
 

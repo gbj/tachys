@@ -1,5 +1,11 @@
 mod arc_signal;
-use crate::{arena::Stored, signal_traits::*};
+use crate::{
+    arena::Stored,
+    signal_traits::*,
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+    },
+};
 pub use arc_signal::ArcSignal;
 use std::{fmt::Debug, panic::Location};
 
@@ -33,18 +39,6 @@ impl<T: Send + Sync + 'static> Debug for Signal<T> {
             .field("type", &std::any::type_name::<T>())
             .field("store", &self.inner)
             .finish()
-    }
-}
-
-impl<T: Send + Sync + 'static> Track for Signal<T> {
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn track(&self) {
-        if let Some(signal) = self.inner.get() {
-            signal.track()
-        }
     }
 }
 
@@ -107,5 +101,59 @@ impl<T: Send + Sync + 'static> SignalUpdate for Signal<T> {
 impl<T: Send + Sync + 'static> SignalIsDisposed for Signal<T> {
     fn is_disposed(&self) -> bool {
         self.inner.exists()
+    }
+}
+
+impl<T: Send + Sync + 'static> ReactiveNode for Signal<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        if let Some(inner) = self.inner.get() {
+            inner.set_state(state)
+        }
+    }
+
+    fn mark_dirty(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_dirty();
+        }
+    }
+
+    fn mark_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_check();
+        }
+    }
+
+    fn mark_subscribers_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_subscribers_check();
+        }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        self.inner
+            .get()
+            .map(|inner| inner.update_if_necessary())
+            .unwrap()
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for Signal<T> {
+    fn to_any_source(&self) -> AnySource {
+        self.inner
+            .get()
+            .map(|inner| inner.to_any_source())
+            .expect("boo")
+    }
+
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.add_subscriber(subscriber);
+        }
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.remove_subscriber(subscriber);
+        }
     }
 }

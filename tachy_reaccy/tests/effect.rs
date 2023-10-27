@@ -28,6 +28,7 @@ async fn effect_runs() {
     tick().await;
     assert_eq!(b.read().as_str(), "Value is -1");
 
+    println!("setting to 1");
     a.set(1);
 
     tick().await;

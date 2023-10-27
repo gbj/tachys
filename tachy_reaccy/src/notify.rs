@@ -1,4 +1,8 @@
-use crate::{arena::Owner, Queue, OBSERVER};
+use crate::{
+    arena::Owner,
+    source::{ReactiveNodeState, Subscriber},
+    Queue, OBSERVER,
+};
 //use browser_only_send::BrowserOnly;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use parking_lot::RwLock;
@@ -15,85 +19,6 @@ use std::{
         Arc,
     },
 };
-
-pub trait Notifiable {
-    fn mark_dirty(&self);
-
-    fn add_check(
-        &self,
-        check: Box<dyn FnOnce() -> bool + Send + Sync + 'static>,
-    );
-
-    fn add_remover(&self, remover: Box<dyn FnOnce() + Send + Sync>) {}
-}
-
-#[derive(Clone)]
-pub struct Notifier(pub Arc<dyn Notifiable + Send + Sync>);
-
-impl Notifier {
-    pub fn with_observer<T>(&self, fun: impl FnOnce() -> T) -> T {
-        let prev = mem::replace(
-            &mut *OBSERVER.write(),
-            Some(Notifier(Arc::new(self.clone()))),
-        );
-        let val = fun();
-        *OBSERVER.write() = prev;
-        val
-    }
-}
-
-impl Notifiable for Notifier {
-    fn mark_dirty(&self) {
-        self.0.mark_dirty()
-    }
-
-    fn add_check(
-        &self,
-        check: Box<dyn FnOnce() -> bool + Send + Sync + 'static>,
-    ) {
-        self.0.add_check(check)
-    }
-}
-
-impl Hash for Notifier {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        ptr::hash(&self.0, state);
-    }
-}
-
-impl PartialEq for Notifier {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for Notifier {}
-
-#[derive(Default, Clone)]
-pub struct SubscriberSet(FxHashSet<Notifier>);
-
-impl SubscriberSet {
-    pub fn subscribe(&mut self, waker: Notifier) {
-        self.0.insert(waker);
-    }
-
-    pub fn unsubscribe(&mut self, waker: &Notifier) {
-        self.0.remove(waker);
-    }
-
-    pub fn take(&mut self) -> FxHashSet<Notifier> {
-        mem::take(&mut self.0)
-    }
-}
-
-impl IntoIterator for SubscriberSet {
-    type Item = Notifier;
-    type IntoIter = IntoIter<Notifier>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct NotificationSender(Sender<()>);
@@ -152,26 +77,13 @@ impl EffectNotifier {
         )
     }
 
+    pub fn notify(&self) {
+        self.tx.write().notify();
+    }
+
     pub fn cleanup(&self) {
         for remover in mem::take(&mut *self.removers.write()) {
             remover();
         }
-    }
-}
-
-impl Notifiable for EffectNotifier {
-    fn mark_dirty(&self) {
-        self.tx.write().notify();
-    }
-
-    fn add_check(
-        &self,
-        check: Box<dyn FnOnce() -> bool + Send + Sync + 'static>,
-    ) {
-        self.tx.write().notify();
-    }
-
-    fn add_remover(&self, remover: Box<dyn FnOnce() + Send + Sync>) {
-        self.removers.write().push(remover);
     }
 }

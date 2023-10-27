@@ -1,6 +1,9 @@
 use crate::{
-    notify::{Notifiable, SubscriberSet},
     signal_traits::*,
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+        SubscriberSet, Track,
+    },
     Observer,
 };
 use parking_lot::RwLock;
@@ -43,29 +46,51 @@ impl<T> ArcSignal<T> {
             inner: Arc::new(RwLock::new(SignalInner::new(value))),
         }
     }
+}
 
-    fn notify(&self) {
-        let subs = { mem::take(&mut self.inner.write().subscribers) };
-        for mut waker in subs {
-            waker.mark_dirty();
+impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        let mut lock = self.inner.write();
+        lock.dirty = state != ReactiveNodeState::Clean;
+    }
+
+    fn mark_dirty(&self) {
+        self.set_state(ReactiveNodeState::Dirty);
+        self.mark_subscribers_check();
+    }
+
+    fn mark_check(&self) {
+        self.set_state(ReactiveNodeState::Check);
+        self.mark_subscribers_check();
+    }
+
+    fn mark_subscribers_check(&self) {
+        for sub in (&self.inner.read().subscribers).into_iter() {
+            sub.mark_check();
         }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        let mut lock = self.inner.write();
+        let was_dirty = lock.dirty;
+        lock.dirty = false;
+        was_dirty
     }
 }
 
-impl<T: Send + Sync + 'static> Track for ArcSignal<T> {
-    fn track(&self) {
-        if let Some(waker) = Observer::get() {
-            waker.add_remover(Box::new({
-                let inner = Arc::downgrade(&self.inner);
-                let waker = waker.clone();
-                move || {
-                    if let Some(inner) = inner.upgrade() {
-                        inner.write().subscribers.unsubscribe(&waker);
-                    }
-                }
-            }));
-            self.inner.write().subscribers.subscribe(waker);
-        }
+impl<T: Send + Sync + 'static> Source for ArcSignal<T> {
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        let mut lock = self.inner.write();
+        lock.subscribers.subscribe(subscriber)
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        let mut lock = self.inner.write();
+        lock.subscribers.unsubscribe(subscriber)
+    }
+
+    fn to_any_source(&self) -> AnySource {
+        AnySource(Arc::new(self.clone()))
     }
 }
 
@@ -99,7 +124,7 @@ impl<T> SignalWithUntracked for ArcSignal<T> {
     }
 }
 
-impl<T> SignalUpdate for ArcSignal<T> {
+impl<T: Send + Sync + 'static> SignalUpdate for ArcSignal<T> {
     type Value = T;
 
     #[cfg_attr(
@@ -111,7 +136,7 @@ impl<T> SignalUpdate for ArcSignal<T> {
             let mut lock = self.inner.write();
             fun(&mut lock.value);
         }
-        self.notify();
+        self.mark_dirty();
     }
 
     #[cfg_attr(
@@ -126,7 +151,7 @@ impl<T> SignalUpdate for ArcSignal<T> {
             let mut lock = self.inner.write();
             fun(&mut lock.value)
         };
-        self.notify();
+        self.mark_dirty();
         Some(value)
     }
 }
@@ -140,6 +165,7 @@ impl<T> SignalIsDisposed for ArcSignal<T> {
 
 struct SignalInner<T> {
     value: T,
+    dirty: bool,
     subscribers: SubscriberSet,
 }
 
@@ -147,6 +173,7 @@ impl<T> SignalInner<T> {
     pub fn new(value: T) -> Self {
         Self {
             value,
+            dirty: false,
             subscribers: Default::default(),
         }
     }

@@ -1,6 +1,10 @@
 use crate::{
     arena::Owner,
-    notify::{EffectNotifier, Notifiable, Notifier},
+    notify::EffectNotifier,
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, SourceSet,
+        Subscriber, SubscriberSet,
+    },
     spawn::spawn,
 };
 use futures::StreamExt;
@@ -12,6 +16,18 @@ where
     T: 'static,
 {
     pub(crate) value: Arc<RwLock<Option<T>>>,
+    pub(crate) observer: EffectNotifier,
+    pub(crate) sources: Arc<RwLock<SourceSet>>,
+}
+
+impl<T> Clone for Effect<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            observer: self.observer.clone(),
+            sources: self.sources.clone(),
+        }
+    }
 }
 
 impl<T> Effect<T>
@@ -22,26 +38,36 @@ where
         let value = Arc::new(RwLock::new(None));
         let owner = Owner::new();
         let (observer, mut rx) = EffectNotifier::new();
+        let sources = Arc::new(RwLock::new(SourceSet::new()));
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,
         // to register observed values
-        observer.mark_dirty();
+        observer.notify();
         spawn({
             let value = value.clone();
             let observer = observer.clone();
+            let this = Self {
+                value: value.clone(),
+                observer: observer.clone(),
+                sources: sources.clone(),
+            };
             async move {
                 while rx.next().await.is_some() {
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
                     observer.cleanup();
                     *value = Some(owner.with(|| {
-                        Notifier(Arc::new(observer.clone()))
+                        this.to_any_subscriber()
                             .with_observer(|| fun(old_value))
                     }));
                 }
             }
         });
-        Self { value }
+        Self {
+            value,
+            observer,
+            sources,
+        }
     }
 
     pub fn with_value_mut<U>(
@@ -49,5 +75,44 @@ where
         fun: impl FnOnce(&mut T) -> U,
     ) -> Option<U> {
         self.value.write().as_mut().map(fun)
+    }
+}
+
+impl<T> ReactiveNode for Effect<T> {
+    fn set_state(&self, state: ReactiveNodeState) {}
+
+    fn mark_subscribers_check(&self) {}
+
+    fn update_if_necessary(&self) -> bool {
+        for source in self.sources.write().take() {
+            if source.update_if_necessary() {
+                self.observer.notify();
+                return true;
+            }
+        }
+        false
+    }
+
+    // custom implementation: notify if marked
+    fn mark_check(&self) {
+        self.observer.notify()
+    }
+
+    fn mark_dirty(&self) {
+        self.observer.notify()
+    }
+}
+
+impl<T: Send + Sync + 'static> Subscriber for Effect<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        AnySubscriber(Arc::new(self.clone()))
+    }
+
+    fn add_source(&self, source: AnySource) {
+        self.sources.write().insert(source);
+    }
+
+    fn clear_sources(&self) {
+        self.sources.write().take();
     }
 }

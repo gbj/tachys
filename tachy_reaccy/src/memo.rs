@@ -1,7 +1,10 @@
 use crate::{
     arena::{Owner, Stored},
-    notify::{EffectNotifier, Notifiable, Notifier, SubscriberSet},
     signal_traits::*,
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+        SourceSet, Subscriber, SubscriberSet,
+    },
     Observer, Queue,
 };
 use parking_lot::RwLock;
@@ -53,18 +56,6 @@ impl<T: Send + Sync + 'static> Debug for Memo<T> {
             .field("type", &std::any::type_name::<T>())
             .field("store", &self.inner)
             .finish()
-    }
-}
-
-impl<T: Send + Sync + 'static> Track for Memo<T> {
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn track(&self) {
-        if let Some(signal) = self.inner.get() {
-            signal.track()
-        }
     }
 }
 
@@ -124,7 +115,7 @@ impl<T: Send + Sync + 'static> ArcMemo<T> {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
             inner: Arc::new(RwLock::new(MemoInner::new(
-                Box::new(fun),
+                Arc::new(fun),
                 |lhs, rhs| lhs.as_ref() == rhs.as_ref(),
             ))),
         }
@@ -156,123 +147,136 @@ impl<T> Debug for ArcMemo<T> {
 
 struct MemoInner<T> {
     value: Option<T>,
-    fun: Box<dyn Fn(Option<&T>) -> T + Send + Sync>,
+    fun: Arc<dyn Fn(Option<&T>) -> T + Send + Sync>,
     compare_with: fn(Option<&T>, Option<&T>) -> bool,
-    is_dirty: AtomicBool,
-    checks: Vec<Box<dyn FnOnce() -> bool + Send + Sync>>,
-    subscribers: SubscriberSet,
-    removers: Vec<Box<dyn FnOnce() + Send + Sync>>,
     owner: Owner,
+    state: ReactiveNodeState,
+    sources: SourceSet,
+    subscribers: SubscriberSet,
 }
 
-impl<T: Send + Sync + 'static> Notifiable for Arc<RwLock<MemoInner<T>>> {
-    fn mark_dirty(&self) {
-        self.write().mark_dirty(Arc::clone(self))
+impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        self.inner.write().state = state;
     }
 
-    fn add_check(
-        &self,
-        check: Box<dyn FnOnce() -> bool + Send + Sync + 'static>,
-    ) {
-        self.write().add_check(check, Arc::clone(self))
+    fn mark_dirty(&self) {
+        self.set_state(ReactiveNodeState::Dirty);
+        self.mark_subscribers_check();
+    }
+
+    fn mark_check(&self) {
+        println!("mark check on {:?}", Arc::as_ptr(&self.inner));
+        let mut lock = { self.inner.write() };
+        lock.state = ReactiveNodeState::Check;
+        for sub in (&lock.subscribers).into_iter() {
+            sub.mark_check();
+        }
+    }
+
+    fn mark_subscribers_check(&self) {
+        let lock = self.inner.read();
+        for sub in (&lock.subscribers).into_iter() {
+            sub.mark_check();
+        }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        println!("update_if_necessary on {:?}", Arc::as_ptr(&self.inner));
+        let (state, sources) = {
+            let inner = self.inner.read();
+            (inner.state, inner.sources.clone())
+        };
+
+        let needs_update = match state {
+            ReactiveNodeState::Clean => false,
+            ReactiveNodeState::Dirty => true,
+            ReactiveNodeState::Check => sources.into_iter().any(|source| {
+                let needs_change = source.update_if_necessary();
+                println!("needs_change = {needs_change}");
+                needs_change
+            }),
+        };
+
+        if needs_update {
+            let (fun, value, compare_with, owner) = {
+                let mut lock = self.inner.write();
+                (
+                    lock.fun.clone(),
+                    lock.value.take(),
+                    lock.compare_with,
+                    lock.owner.clone(),
+                )
+            };
+            let new_value = owner.with(|| {
+                self.to_any_subscriber()
+                    .with_observer(|| fun(value.as_ref()))
+            });
+
+            let changed = !compare_with(Some(&new_value), value.as_ref());
+            if changed {
+                let subs = {
+                    let mut lock = self.inner.write();
+                    lock.value = Some(new_value);
+                    lock.state = ReactiveNodeState::Clean;
+                    lock.subscribers.take()
+                };
+                for sub in subs {
+                    println!("marking dirty");
+                    sub.mark_dirty();
+                }
+            }
+
+            changed
+        } else {
+            let mut lock = self.inner.write();
+            lock.state = ReactiveNodeState::Clean;
+            false
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for ArcMemo<T> {
+    fn to_any_source(&self) -> AnySource {
+        AnySource(Arc::new(self.clone()))
+    }
+
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        self.inner.write().subscribers.subscribe(subscriber);
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        self.inner.write().subscribers.unsubscribe(subscriber);
+    }
+}
+
+impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        AnySubscriber(Arc::new(self.clone()))
+    }
+
+    fn add_source(&self, source: AnySource) {
+        self.inner.write().sources.insert(source);
+    }
+
+    fn clear_sources(&self) {
+        self.inner.write().sources.take();
     }
 }
 
 impl<T: Send + Sync + 'static> MemoInner<T> {
     pub fn new(
-        fun: Box<dyn Fn(Option<&T>) -> T + Send + Sync>,
+        fun: Arc<dyn Fn(Option<&T>) -> T + Send + Sync>,
         compare_with: fn(Option<&T>, Option<&T>) -> bool,
     ) -> Self {
         Self {
             value: None,
-            subscribers: Default::default(),
-            is_dirty: AtomicBool::new(false),
-            checks: Default::default(),
             fun,
             compare_with,
             owner: Owner::new(),
-            removers: Vec::new(),
-        }
-    }
-
-    // Checks whether this notifier is dirty, marking it clean in the process.
-    pub fn is_dirty(&mut self) -> bool {
-        let checks = mem::take(&mut self.checks);
-        self.is_dirty.swap(false, Ordering::Relaxed)
-            || checks.into_iter().any(|is_dirty| is_dirty())
-    }
-
-    // Checks whether any of the memo's sources have changed,
-    // or if the memo has never run, and if so, re-runs the calculation.
-    // Returns whether or not the memo has actually changed.
-    fn update_if_necessary(&mut self, this: Arc<RwLock<MemoInner<T>>>) -> bool {
-        let p = Arc::as_ptr(&this);
-        println!("update_if_necessary {:?}", p);
-        let v = if self.value.is_none() || self.is_dirty() {
-            println!("  {:?} branch A", p);
-
-            let new_value = self.owner.with(|| {
-                Notifier(Arc::new(this))
-                    .with_observer(|| (self.fun)(self.value.as_ref()))
-            });
-            let is_equal =
-                (self.compare_with)(self.value.as_ref(), Some(&new_value));
-            if !is_equal {
-                self.value = Some(new_value);
-            }
-            is_equal
-        } else if !self.checks.is_empty() {
-            println!("  {:?} branch B", p);
-            false
-        } else {
-            println!("  {:?} branch C", p);
-
-            false
-        };
-        println!("update_if_necessary {:?} {v}", p);
-        v
-    }
-
-    fn mark_dirty(&mut self, this: Arc<RwLock<MemoInner<T>>>) {
-        println!("marking {:?} dirty", Arc::as_ptr(&this));
-        self.is_dirty.store(true, Ordering::Relaxed);
-        for sub in self.subscribers.take() {
-            sub.add_check(Box::new({
-                let this = Arc::clone(&this);
-                move || this.write().update_if_necessary(this.clone())
-            }));
-        }
-    }
-
-    fn add_check(
-        &mut self,
-        source_is_dirty: Box<dyn FnOnce() -> bool + Send + Sync>,
-        this: Arc<RwLock<MemoInner<T>>>,
-    ) {
-        println!("marking {:?} check", Arc::as_ptr(&this));
-        self.checks.push(source_is_dirty);
-        for sub in self.subscribers.take() {
-            sub.add_check(Box::new({
-                let this = this.clone();
-                move || this.write().update_if_necessary(this.clone())
-            }));
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> Track for ArcMemo<T> {
-    fn track(&self) {
-        if let Some(waker) = Observer::get() {
-            waker.add_remover(Box::new({
-                let waker = waker.clone();
-                let inner = Arc::downgrade(&self.inner);
-                move || {
-                    if let Some(inner) = inner.upgrade() {
-                        inner.write().subscribers.unsubscribe(&waker);
-                    }
-                }
-            }));
-            self.inner.write().subscribers.subscribe(waker);
+            state: ReactiveNodeState::Dirty,
+            sources: SourceSet::new(),
+            subscribers: SubscriberSet::new(),
         }
     }
 }
@@ -302,12 +306,86 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
     ) -> Option<U> {
-        let inner = Arc::clone(&self.inner);
-        let mut lock = self.inner.write();
-        lock.update_if_necessary(inner);
+        self.update_if_necessary();
         // safe to unwrap here because update_if_necessary
         // guarantees the value is Some
+        let lock = self.inner.read();
         let value = lock.value.as_ref().unwrap();
         Some(fun(value))
+    }
+}
+
+impl<T: Send + Sync + 'static> ReactiveNode for Memo<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        if let Some(inner) = self.inner.get() {
+            inner.set_state(state);
+        }
+    }
+
+    fn mark_dirty(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_dirty();
+        }
+    }
+
+    fn mark_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_check();
+        }
+    }
+
+    fn mark_subscribers_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_subscribers_check();
+        }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        self.inner
+            .get()
+            .map(|inner| inner.update_if_necessary())
+            .unwrap_or(false)
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for Memo<T> {
+    fn to_any_source(&self) -> AnySource {
+        self.inner
+            .get()
+            .map(|inner| inner.to_any_source())
+            .expect("boooooo")
+    }
+
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.add_subscriber(subscriber)
+        }
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.remove_subscriber(subscriber)
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Subscriber for Memo<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        self.inner
+            .get()
+            .map(|inner| inner.to_any_subscriber())
+            .expect("boooooo")
+    }
+
+    fn add_source(&self, source: AnySource) {
+        if let Some(inner) = self.inner.get() {
+            inner.add_source(source)
+        }
+    }
+
+    fn clear_sources(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.clear_sources()
+        }
     }
 }

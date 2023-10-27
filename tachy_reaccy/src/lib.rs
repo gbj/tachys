@@ -1,17 +1,20 @@
+#![feature(return_position_impl_trait_in_trait)]
+
 mod arena;
 pub mod context;
 pub mod effect;
 pub mod memo;
 mod notify;
 pub mod render_effect;
-#[cfg(feature = "serde")]
-mod serde;
+//#[cfg(feature = "serde")]
+//mod serde;
 pub mod signal;
 pub mod signal_traits;
+mod source;
 pub mod spawn;
+use crate::source::AnySubscriber;
 pub use arena::{global_root, Root};
 use lazy_static::lazy_static;
-use notify::Notifier;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -28,13 +31,13 @@ pub mod prelude {
 }
 
 lazy_static! {
-    static ref OBSERVER: RwLock<Option<Notifier>> = RwLock::new(None);
+    static ref OBSERVER: RwLock<Option<AnySubscriber>> = RwLock::new(None);
 }
 
 pub(crate) struct Observer {}
 
 impl Observer {
-    fn get() -> Option<Notifier> {
+    fn get() -> Option<AnySubscriber> {
         OBSERVER.read().clone()
     }
 }

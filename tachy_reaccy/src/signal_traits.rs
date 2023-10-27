@@ -1,3 +1,4 @@
+use crate::source::Track;
 use std::panic::Location;
 
 macro_rules! unwrap_signal {
@@ -23,9 +24,7 @@ macro_rules! unwrap_signal {
         }
     };
 }
-pub trait Track {
-    fn track(&self);
-}
+
 pub trait SignalWithUntracked: DefinedAt {
     type Value;
 

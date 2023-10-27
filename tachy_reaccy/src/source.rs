@@ -1,0 +1,285 @@
+use crate::{Observer, OBSERVER};
+use rustc_hash::FxHashSet;
+use std::{
+    collections::{
+        hash_set::{IntoIter, Iter},
+        HashSet,
+    },
+    fmt::Debug,
+    hash::Hash,
+    mem, ptr,
+    sync::Arc,
+};
+
+pub trait ReactiveNode {
+    /// Sets the state of this source.
+    fn set_state(&self, state: ReactiveNodeState);
+
+    /// Notifies the source's dependencies that it has changed.
+    fn mark_dirty(&self);
+
+    /// Notifies the source's dependencies that it may have changed.
+    fn mark_check(&self);
+
+    /// Marks that all subscribers need to be checked.
+    fn mark_subscribers_check(&self);
+
+    /// Regenerates the value for this node, if needed, and returns whether
+    /// it has actually changed or not.
+    fn update_if_necessary(&self) -> bool;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ReactiveNodeState {
+    Clean,
+    Check,
+    Dirty,
+}
+
+/// Describes the behavior of any source of reactivity (like a signal, trigger, or memo.)
+pub trait Source: ReactiveNode {
+    /// Converts this type to its type-erased equivalent.
+    fn to_any_source(&self) -> AnySource;
+
+    /// Adds a subscriber to this source's list of dependencies.
+    fn add_subscriber(&self, subscriber: AnySubscriber);
+
+    /// Removes a subscriber from this source's list of dependencies.
+    fn remove_subscriber(&self, subscriber: &AnySubscriber);
+}
+
+pub trait Track: Source {
+    fn track(&self) {
+        if let Some(subscriber) = Observer::get() {
+            subscriber.add_source(self.to_any_source());
+            self.add_subscriber(subscriber);
+        }
+    }
+}
+
+impl<T: Source> Track for T {}
+
+#[derive(Clone)]
+pub struct AnySource(pub Arc<dyn Source + Send + Sync>);
+
+impl Debug for AnySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AnySource")
+            .field(&Arc::as_ptr(&self.0))
+            .finish()
+    }
+}
+
+impl Hash for AnySource {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        ptr::hash(&self.0, state);
+    }
+}
+
+impl PartialEq for AnySource {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for AnySource {}
+
+impl Source for AnySource {
+    fn to_any_source(&self) -> AnySource {
+        self.clone()
+    }
+
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        self.0.add_subscriber(subscriber)
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        self.0.remove_subscriber(subscriber)
+    }
+}
+
+impl ReactiveNode for AnySource {
+    fn set_state(&self, state: ReactiveNodeState) {
+        self.0.set_state(state)
+    }
+
+    fn mark_dirty(&self) {
+        self.0.mark_dirty()
+    }
+
+    fn mark_subscribers_check(&self) {
+        self.0.mark_subscribers_check()
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        self.0.update_if_necessary()
+    }
+
+    fn mark_check(&self) {
+        self.0.mark_check()
+    }
+}
+
+/// Any type that can track reactive values (like an effect or a memo).
+pub trait Subscriber: ReactiveNode {
+    /// Converts this type to its type-erased equivalent.
+    fn to_any_subscriber(&self) -> AnySubscriber;
+
+    /// Adds a subscriber to this subscriber's list of dependencies.
+    fn add_source(&self, source: AnySource);
+
+    /// Clears the set of sources for this subscriber.
+    fn clear_sources(&self);
+}
+
+/// A type-erased subscriber.
+#[derive(Clone)]
+pub struct AnySubscriber(pub Arc<dyn Subscriber + Send + Sync>);
+
+impl Subscriber for AnySubscriber {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        self.clone()
+    }
+
+    fn add_source(&self, source: AnySource) {
+        self.0.add_source(source);
+    }
+
+    fn clear_sources(&self) {
+        self.0.clear_sources();
+    }
+}
+
+impl ReactiveNode for AnySubscriber {
+    fn set_state(&self, state: ReactiveNodeState) {
+        self.0.set_state(state)
+    }
+
+    fn mark_dirty(&self) {
+        self.0.mark_dirty()
+    }
+
+    fn mark_subscribers_check(&self) {
+        self.0.mark_subscribers_check()
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        self.0.update_if_necessary()
+    }
+
+    fn mark_check(&self) {
+        self.0.mark_check()
+    }
+}
+
+impl AnySubscriber {
+    pub fn with_observer<T>(&self, fun: impl FnOnce() -> T) -> T {
+        let prev = mem::replace(
+            &mut *OBSERVER.write(),
+            Some(AnySubscriber(Arc::new(self.clone()))),
+        );
+        let val = fun();
+        *OBSERVER.write() = prev;
+        val
+    }
+}
+
+impl Debug for AnySubscriber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AnySubscriber")
+            .field(&Arc::as_ptr(&self.0))
+            .finish()
+    }
+}
+
+impl Hash for AnySubscriber {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        ptr::hash(&self.0, state);
+    }
+}
+
+impl PartialEq for AnySubscriber {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for AnySubscriber {}
+
+#[derive(Default, Clone)]
+pub struct SourceSet(FxHashSet<AnySource>);
+
+impl SourceSet {
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    pub fn insert(&mut self, source: AnySource) {
+        self.0.insert(source);
+    }
+
+    pub fn remove(&mut self, source: &AnySource) {
+        self.0.remove(source);
+    }
+
+    pub fn take(&mut self) -> FxHashSet<AnySource> {
+        mem::take(&mut self.0)
+    }
+}
+
+impl IntoIterator for SourceSet {
+    type Item = AnySource;
+    type IntoIter = IntoIter<AnySource>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a SourceSet {
+    type Item = &'a AnySource;
+    type IntoIter = Iter<'a, AnySource>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+#[derive(Default)]
+pub struct SubscriberSet(FxHashSet<AnySubscriber>);
+
+impl SubscriberSet {
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    pub fn subscribe(&mut self, subscriber: AnySubscriber) {
+        self.0.insert(subscriber);
+    }
+
+    pub fn unsubscribe(&mut self, subscriber: &AnySubscriber) {
+        self.0.remove(subscriber);
+    }
+
+    pub fn take(&mut self) -> FxHashSet<AnySubscriber> {
+        mem::take(&mut self.0)
+    }
+}
+
+impl IntoIterator for SubscriberSet {
+    type Item = AnySubscriber;
+    type IntoIter = IntoIter<AnySubscriber>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a SubscriberSet {
+    type Item = &'a AnySubscriber;
+    type IntoIter = Iter<'a, AnySubscriber>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}

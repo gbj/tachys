@@ -52,22 +52,94 @@ fn nested_memos() {
         c.get() * 2
     }); // 4
     d.debug_log_inner("d");
-    /* let e = Memo::new(move |_| {
+    let e = Memo::new(move |_| {
         println!("calculating E");
         d.get() + 1
     }); // 5
-    e.debug_log_inner("e"); */
-    //assert_eq!(e.get(), 1);
+    e.debug_log_inner("e");
+    assert_eq!(e.get(), 1);
     assert_eq!(d.get(), 0);
     assert_eq!(c.get(), 0);
     println!("\n\nFirst Set\n\n");
     a.set(5);
     assert_eq!(c.get(), 5);
     assert_eq!(d.get(), 10);
-    //assert_eq!(e.get(), 11);
+    assert_eq!(e.get(), 11);
     println!("\n\nSecond Set\n\n");
     b.set(1);
-    //assert_eq!(e.get(), 13);
+    assert_eq!(e.get(), 13);
     assert_eq!(d.get(), 12);
     assert_eq!(c.get(), 6);
+}
+
+#[test]
+fn memo_runs_only_when_inputs_change() {
+    let call_count = Arc::new(RwLock::new(0));
+    let a = Signal::new(0);
+    let b = Signal::new(0);
+    let c = Signal::new(0);
+
+    // pretend that this is some kind of expensive computation and we need to access its its value often
+    // we could do this with a derived signal, but that would re-run the computation
+    // memos should only run when their inputs actually change: this is the only point
+    let c = Memo::new({
+        let call_count = call_count.clone();
+        move |_| {
+            let mut call_count = call_count.write();
+            *call_count += 1;
+
+            a.get() + b.get() + c.get()
+        }
+    });
+
+    // initially the memo has not been called at all, because it's lazy
+    assert_eq!(*call_count.read(), 0);
+
+    // here we access the value a bunch of times
+    assert_eq!(c.get(), 0);
+    assert_eq!(c.get(), 0);
+    assert_eq!(c.get(), 0);
+    assert_eq!(c.get(), 0);
+    assert_eq!(c.get(), 0);
+
+    // we've still only called the memo calculation once
+    assert_eq!(*call_count.read(), 1);
+
+    // and we only call it again when an input changes
+    a.set(1);
+    assert_eq!(c.get(), 1);
+    assert_eq!(*call_count.read(), 2);
+}
+
+#[test]
+fn diamond_problem() {
+    let name = Signal::new("Greg Johnston".to_string());
+    let first = Memo::new(move |_| {
+        name.get().split_whitespace().next().unwrap().to_string()
+    });
+    let last = Memo::new(move |_| {
+        name.get().split_whitespace().nth(1).unwrap().to_string()
+    });
+
+    let combined_count = Arc::new(RwLock::new(0));
+    let combined = Memo::new({
+        let combined_count = Arc::clone(&combined_count);
+        move |_| {
+            let mut combined_count = combined_count.write();
+            *combined_count += 1;
+
+            format!("{} {}", first.get(), last.get())
+        }
+    });
+
+    assert_eq!(first.get(), "Greg");
+    assert_eq!(last.get(), "Johnston");
+
+    name.set("Will Smith".to_string());
+    assert_eq!(first.get(), "Will");
+    assert_eq!(last.get(), "Smith");
+    assert_eq!(combined.get(), "Will Smith");
+    // should not have run the memo logic twice, even
+    // though both paths have been updated
+    assert_eq!(*combined_count.read(), 1);
 }

@@ -2,12 +2,11 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SubscriberSet, Track,
+        SubscriberSet,
     },
-    Observer,
 };
 use parking_lot::RwLock;
-use std::{fmt::Debug, mem, panic::Location, sync::Arc};
+use std::{fmt::Debug, panic::Location, sync::Arc};
 
 pub struct ArcSignal<T> {
     #[cfg(debug_assertions)]

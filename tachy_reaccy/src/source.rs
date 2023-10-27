@@ -174,10 +174,7 @@ impl ReactiveNode for AnySubscriber {
 
 impl AnySubscriber {
     pub fn with_observer<T>(&self, fun: impl FnOnce() -> T) -> T {
-        let prev = mem::replace(
-            &mut *OBSERVER.write(),
-            Some(AnySubscriber(Arc::new(self.clone()))),
-        );
+        let prev = mem::replace(&mut *OBSERVER.write(), Some(self.clone()));
         let val = fun();
         *OBSERVER.write() = prev;
         val
@@ -225,6 +222,10 @@ impl SourceSet {
     pub fn take(&mut self) -> FxHashSet<AnySource> {
         mem::take(&mut self.0)
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl IntoIterator for SourceSet {
@@ -245,7 +246,7 @@ impl<'a> IntoIterator for &'a SourceSet {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SubscriberSet(FxHashSet<AnySubscriber>);
 
 impl SubscriberSet {
@@ -263,6 +264,10 @@ impl SubscriberSet {
 
     pub fn take(&mut self) -> FxHashSet<AnySubscriber> {
         mem::take(&mut self.0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

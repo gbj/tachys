@@ -3,7 +3,7 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SourceSet, Subscriber, SubscriberSet,
+        SourceSet, Subscriber, SubscriberSet, Track,
     },
     Observer, Queue,
 };
@@ -166,10 +166,11 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
     }
 
     fn mark_check(&self) {
-        println!("mark check on {:?}", Arc::as_ptr(&self.inner));
-        let mut lock = { self.inner.write() };
-        lock.state = ReactiveNodeState::Check;
-        for sub in (&lock.subscribers).into_iter() {
+        {
+            let mut lock = self.inner.write();
+            lock.state = ReactiveNodeState::Check;
+        }
+        for sub in (&self.inner.read().subscribers).into_iter() {
             sub.mark_check();
         }
     }
@@ -182,7 +183,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
     }
 
     fn update_if_necessary(&self) -> bool {
-        println!("update_if_necessary on {:?}", Arc::as_ptr(&self.inner));
         let (state, sources) = {
             let inner = self.inner.read();
             (inner.state, inner.sources.clone())
@@ -193,7 +193,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
             ReactiveNodeState::Dirty => true,
             ReactiveNodeState::Check => sources.into_iter().any(|source| {
                 let needs_change = source.update_if_necessary();
-                println!("needs_change = {needs_change}");
                 needs_change
             }),
         };
@@ -219,10 +218,9 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
                     let mut lock = self.inner.write();
                     lock.value = Some(new_value);
                     lock.state = ReactiveNodeState::Clean;
-                    lock.subscribers.take()
+                    lock.subscribers.clone()
                 };
                 for sub in subs {
-                    println!("marking dirty");
                     sub.mark_dirty();
                 }
             }
@@ -306,7 +304,8 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
     ) -> Option<U> {
-        self.update_if_necessary();
+        let changed = self.update_if_necessary();
+
         // safe to unwrap here because update_if_necessary
         // guarantees the value is Some
         let lock = self.inner.read();

@@ -2,18 +2,18 @@ mod arena;
 pub mod context;
 pub mod effect;
 pub mod memo;
+mod notify;
 pub mod render_effect;
 #[cfg(feature = "serde")]
 mod serde;
 pub mod signal;
 pub mod signal_traits;
 pub mod spawn;
-mod waker;
 pub use arena::{global_root, Root};
 use lazy_static::lazy_static;
+use notify::Notifier;
 use parking_lot::RwLock;
 use std::sync::Arc;
-use waker::Notifier;
 
 pub mod prelude {
     pub use crate::{

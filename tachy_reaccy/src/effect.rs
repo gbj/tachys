@@ -1,4 +1,8 @@
-use crate::{spawn::spawn, waker::Notifier};
+use crate::{
+    arena::Owner,
+    notify::{EffectNotifier, Notifiable, Notifier},
+    spawn::spawn,
+};
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::{mem, sync::Arc};
@@ -16,7 +20,8 @@ where
 {
     pub fn new(fun: impl Fn(Option<T>) -> T + Send + Sync + 'static) -> Self {
         let value = Arc::new(RwLock::new(None));
-        let (mut observer, mut rx) = Notifier::new();
+        let owner = Owner::new();
+        let (observer, mut rx) = EffectNotifier::new();
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,
         // to register observed values
@@ -29,7 +34,10 @@ where
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
                     observer.cleanup();
-                    *value = Some(observer.with_observer(|| fun(old_value)));
+                    *value = Some(owner.with(|| {
+                        Notifier(Arc::new(observer.clone()))
+                            .with_observer(|| fun(old_value))
+                    }));
                 }
             }
         });

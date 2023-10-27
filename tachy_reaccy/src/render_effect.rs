@@ -1,4 +1,8 @@
-use crate::{spawn::spawn_local, waker::Notifier};
+use crate::{
+    arena::Owner,
+    notify::{EffectNotifier, Notifier},
+    spawn::spawn_local,
+};
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::{mem, sync::Arc};
@@ -15,12 +19,14 @@ where
     T: 'static,
 {
     pub fn new(fun: impl Fn(Option<T>) -> T + 'static) -> Self {
-        let (observer, mut rx) = Notifier::new();
+        let owner = Owner::new();
+        let (observer, mut rx) = EffectNotifier::new();
         // run once immediately
         // this allows rendering to happen synchronously
         // while still registering dependencies on signals to be notified async
-        let value =
-            Arc::new(RwLock::new(Some(observer.with_observer(|| fun(None)))));
+        let value = Arc::new(RwLock::new(Some(owner.with(|| {
+            Notifier(Arc::new(observer.clone())).with_observer(|| fun(None))
+        }))));
         // then spawn async
         spawn_local({
             let value = value.clone();
@@ -28,7 +34,10 @@ where
                 while rx.next().await.is_some() {
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
-                    *value = Some(observer.with_observer(|| fun(old_value)));
+                    *value = Some(owner.with(|| {
+                        Notifier(Arc::new(observer.clone()))
+                            .with_observer(|| fun(old_value))
+                    }));
                 }
             }
         });

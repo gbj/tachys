@@ -1,6 +1,9 @@
-use crate::{signal_traits::*, waker::Notifier, Observer};
+use crate::{
+    notify::{Notifiable, SubscriberSet},
+    signal_traits::*,
+    Observer,
+};
 use parking_lot::RwLock;
-use rustc_hash::FxHashSet;
 use std::{fmt::Debug, mem, panic::Location, sync::Arc};
 
 pub struct ArcSignal<T> {
@@ -57,11 +60,11 @@ impl<T: Send + Sync + 'static> Track for ArcSignal<T> {
                 let waker = waker.clone();
                 move || {
                     if let Some(inner) = inner.upgrade() {
-                        inner.write().unsubscribe(&waker);
+                        inner.write().subscribers.unsubscribe(&waker);
                     }
                 }
             }));
-            self.inner.write().subscribe(waker);
+            self.inner.write().subscribers.subscribe(waker);
         }
     }
 }
@@ -137,7 +140,7 @@ impl<T> SignalIsDisposed for ArcSignal<T> {
 
 struct SignalInner<T> {
     value: T,
-    subscribers: FxHashSet<Notifier>,
+    subscribers: SubscriberSet,
 }
 
 impl<T> SignalInner<T> {
@@ -146,13 +149,5 @@ impl<T> SignalInner<T> {
             value,
             subscribers: Default::default(),
         }
-    }
-
-    pub fn subscribe(&mut self, waker: Notifier) {
-        self.subscribers.insert(waker);
-    }
-
-    pub fn unsubscribe(&mut self, waker: &Notifier) {
-        self.subscribers.remove(waker);
     }
 }

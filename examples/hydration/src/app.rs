@@ -3,8 +3,12 @@ use leptos_reactive::{
     SignalUpdate,
 };
 use tachy_maccy::view;
-use tachydom::html::attribute::global::{
-    ClassAttribute, GlobalAttributes, OnAttribute, StyleAttribute,
+use tachydom::{
+    html::attribute::global::{
+        ClassAttribute, GlobalAttributes, OnAttribute, StyleAttribute,
+    },
+    log,
+    view::template::ViewTemplate,
 };
 use tachydom::{
     html::{element::*, event, event::on},
@@ -24,10 +28,10 @@ pub fn my_app() -> impl RenderHtml<Dom> {
     let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
 
     view! {
-        <p
+        /* <p
             class:bar=move || count.get() % 2 == 0
             class="foo"
-            class:baz=true
+            //class:baz=true // FIXME
             class:not=|| false
             style="font-weight: bold"
             style:color=move || if count.get() % 2 == 0 {
@@ -39,7 +43,7 @@ pub fn my_app() -> impl RenderHtml<Dom> {
             style:display="block"
         >
             "This is " <strong>"very"</strong> cool stuff.<span></span>
-        </p>
+        </p> */
         <input type="text" on:input=|ev| {}/>
         {move || if count() % 2 == 0 {
             view! { <div>"even"</div> }.into_any()
@@ -54,9 +58,9 @@ pub fn my_app() -> impl RenderHtml<Dom> {
         >
             {move || count.get().to_string()}
         </button>
-        {move || (count() % 2 == 0).then(|| view! {
-            <p>"Even"</p>
-        })}
+        {move || (count() % 2 == 0).then(|| ViewTemplate::new(view! {
+            <article><div><p><button on:click=|_| log("clicked!")>"Test"</button></p></div></article>
+        }))}
         <button on:click=move |_| {
                         rows.update(|items| {
                             items.swap(1, 3);

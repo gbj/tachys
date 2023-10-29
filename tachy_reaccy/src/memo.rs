@@ -3,21 +3,11 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SourceSet, Subscriber, SubscriberSet, Track,
+        SourceSet, Subscriber, SubscriberSet,
     },
-    Observer, Queue,
 };
 use parking_lot::RwLock;
-use rustc_hash::FxHashSet;
-use std::{
-    fmt::Debug,
-    mem,
-    panic::Location,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Weak,
-    },
-};
+use std::{fmt::Debug, panic::Location, sync::Arc};
 
 pub struct Memo<T: Send + Sync + 'static> {
     inner: Stored<ArcMemo<T>>,
@@ -192,8 +182,8 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
             ReactiveNodeState::Clean => false,
             ReactiveNodeState::Dirty => true,
             ReactiveNodeState::Check => sources.into_iter().any(|source| {
-                let needs_change = source.update_if_necessary();
-                needs_change
+                source.update_if_necessary()
+                    || self.inner.read().state == ReactiveNodeState::Dirty
             }),
         };
 
@@ -304,7 +294,7 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
     ) -> Option<U> {
-        let changed = self.update_if_necessary();
+        self.update_if_necessary();
 
         // safe to unwrap here because update_if_necessary
         // guarantees the value is Some

@@ -1,24 +1,7 @@
-use crate::{
-    arena::Owner,
-    source::{ReactiveNodeState, Subscriber},
-    Queue, OBSERVER,
-};
 //use browser_only_send::BrowserOnly;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use parking_lot::RwLock;
-use rustc_hash::FxHashSet;
-use std::{
-    collections::hash_set::IntoIter,
-    fmt::Debug,
-    hash::Hash,
-    mem,
-    ops::Deref,
-    ptr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{fmt::Debug, hash::Hash, ptr, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct NotificationSender(Sender<()>);
@@ -48,7 +31,6 @@ impl PartialEq for NotificationSender {
 #[derive(Clone)]
 pub struct EffectNotifier {
     pub(crate) tx: Arc<RwLock<NotificationSender>>,
-    removers: Queue<Box<dyn FnOnce() + Send + Sync>>,
 }
 
 impl Hash for EffectNotifier {
@@ -71,7 +53,6 @@ impl EffectNotifier {
         (
             Self {
                 tx: Arc::new(RwLock::new(NotificationSender(tx))),
-                removers: Default::default(),
             },
             rx,
         )
@@ -79,11 +60,5 @@ impl EffectNotifier {
 
     pub fn notify(&self) {
         self.tx.write().notify();
-    }
-
-    pub fn cleanup(&self) {
-        for remover in mem::take(&mut *self.removers.write()) {
-            remover();
-        }
     }
 }

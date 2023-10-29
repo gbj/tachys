@@ -48,18 +48,13 @@ impl<T> ArcSignal<T> {
 }
 
 impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        let mut lock = self.inner.write();
-        lock.dirty = state != ReactiveNodeState::Clean;
-    }
+    fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_dirty(&self) {
-        self.set_state(ReactiveNodeState::Dirty);
         self.mark_subscribers_check();
     }
 
     fn mark_check(&self) {
-        self.set_state(ReactiveNodeState::Check);
         self.mark_subscribers_check();
     }
 
@@ -70,10 +65,8 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
     }
 
     fn update_if_necessary(&self) -> bool {
-        let mut lock = self.inner.write();
-        let was_dirty = lock.dirty;
-        lock.dirty = false;
-        was_dirty
+        // if they're being checked, signals always count as "dirty"
+        true
     }
 }
 
@@ -164,7 +157,6 @@ impl<T> SignalIsDisposed for ArcSignal<T> {
 
 struct SignalInner<T> {
     value: T,
-    dirty: bool,
     subscribers: SubscriberSet,
 }
 
@@ -172,7 +164,6 @@ impl<T> SignalInner<T> {
     pub fn new(value: T) -> Self {
         Self {
             value,
-            dirty: false,
             subscribers: Default::default(),
         }
     }

@@ -14,9 +14,7 @@ mod source;
 pub mod spawn;
 use crate::source::AnySubscriber;
 pub use arena::{global_root, Root};
-use lazy_static::lazy_static;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use std::cell::RefCell;
 
 pub mod prelude {
     pub use crate::{
@@ -30,19 +28,17 @@ pub mod prelude {
     };
 }
 
-lazy_static! {
-    static ref OBSERVER: RwLock<Option<AnySubscriber>> = RwLock::new(None);
+thread_local! {
+    static OBSERVER: RefCell<Option<AnySubscriber>> = RefCell::new(None);
 }
 
 pub(crate) struct Observer {}
 
 impl Observer {
     fn get() -> Option<AnySubscriber> {
-        OBSERVER.read().clone()
+        OBSERVER.with(|o| o.borrow().clone())
     }
 }
-
-pub(crate) type Queue<T> = Arc<RwLock<Vec<T>>>;
 
 #[cfg(feature = "web")]
 pub fn log(s: &str) {

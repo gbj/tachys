@@ -115,9 +115,11 @@ fn memo_runs_only_when_inputs_change() {
 fn diamond_problem() {
     let name = Signal::new("Greg Johnston".to_string());
     let first = Memo::new(move |_| {
+        println!("calculating first");
         name.get().split_whitespace().next().unwrap().to_string()
     });
     let last = Memo::new(move |_| {
+        println!("calculating last");
         name.get().split_whitespace().nth(1).unwrap().to_string()
     });
 
@@ -125,6 +127,7 @@ fn diamond_problem() {
     let combined = Memo::new({
         let combined_count = Arc::clone(&combined_count);
         move |_| {
+            println!("calculating combined");
             let mut combined_count = combined_count.write();
             *combined_count += 1;
 

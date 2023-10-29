@@ -4,6 +4,7 @@ use rustc_hash::FxHashMap;
 use slotmap::{new_key_type, SlotMap};
 use std::{
     any::{Any, TypeId},
+    cell::RefCell,
     fmt::Debug,
     marker::PhantomData,
     mem,
@@ -15,7 +16,9 @@ new_key_type! { struct NodeId; }
 lazy_static! {
     static ref MAP: RwLock<SlotMap<NodeId, Box<dyn Any + Send + Sync>>> =
         Default::default();
-    static ref OWNER: RwLock<Option<Owner>> = Default::default();
+}
+thread_local! {
+    static OWNER: RefCell<Option<Owner>> = Default::default();
 }
 
 pub fn global_root<T>(fun: impl FnOnce() -> T) -> T {
@@ -30,11 +33,13 @@ pub struct Root<T>(Owner, T);
 impl<T> Root<T> {
     pub fn new(fun: impl FnOnce() -> T) -> Self {
         let owner = Owner::default();
-        let prev = std::mem::replace(&mut *OWNER.write(), Some(owner.clone()));
+        let prev = OWNER.with(|o| {
+            std::mem::replace(&mut *o.borrow_mut(), Some(owner.clone()))
+        });
 
         let value = fun();
 
-        *OWNER.write() = prev;
+        OWNER.with(|o| *o.borrow_mut() = prev);
 
         Self(owner, value)
     }
@@ -51,8 +56,10 @@ pub struct Owner {
 
 impl Owner {
     pub fn new() -> Self {
-        let parent =
-            { OWNER.read().as_ref().map(|o| Arc::downgrade(&o.inner)) };
+        let parent = {
+            OWNER
+                .with(|o| o.borrow().as_ref().map(|o| Arc::downgrade(&o.inner)))
+        };
         Self {
             inner: Arc::new(RwLock::new(OwnerInner {
                 parent,
@@ -63,9 +70,15 @@ impl Owner {
     }
 
     pub fn with<T>(&self, fun: impl FnOnce() -> T) -> T {
-        let prev = { mem::replace(&mut *OWNER.write(), Some(self.clone())) };
+        let prev = {
+            OWNER.with(|o| {
+                mem::replace(&mut *o.borrow_mut(), Some(self.clone()))
+            })
+        };
         let val = fun();
-        *OWNER.write() = prev;
+        OWNER.with(|o| {
+            *o.borrow_mut() = prev;
+        });
         val
     }
 
@@ -74,7 +87,7 @@ impl Owner {
     }
 
     pub(crate) fn get() -> Option<Owner> {
-        OWNER.read().clone()
+        OWNER.with(|o| o.borrow().clone())
     }
 }
 
@@ -118,9 +131,12 @@ where
             MAP.write()
                 .insert(Box::new(value) as Box<dyn Any + Send + Sync>)
         };
-        if let Some(owner) = &*OWNER.read() {
-            owner.register(node);
-        }
+        OWNER.with(|o| {
+            if let Some(owner) = &*o.borrow() {
+                owner.register(node);
+            }
+        });
+
         Self {
             node,
             ty: PhantomData,

@@ -3,7 +3,7 @@ use crate::{
     notify::EffectNotifier,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, SourceSet,
-        Subscriber, SubscriberSet,
+        Subscriber,
     },
     spawn::spawn,
 };
@@ -55,7 +55,6 @@ where
                 while rx.next().await.is_some() {
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
-                    observer.cleanup();
                     *value = Some(owner.with(|| {
                         this.to_any_subscriber()
                             .with_observer(|| fun(old_value))
@@ -79,7 +78,7 @@ where
 }
 
 impl<T> ReactiveNode for Effect<T> {
-    fn set_state(&self, state: ReactiveNodeState) {}
+    fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_subscribers_check(&self) {}
 

@@ -1,10 +1,7 @@
 use crate::{Observer, OBSERVER};
 use rustc_hash::FxHashSet;
 use std::{
-    collections::{
-        hash_set::{IntoIter, Iter},
-        HashSet,
-    },
+    collections::hash_set::{IntoIter, Iter},
     fmt::Debug,
     hash::Hash,
     mem, ptr,
@@ -174,9 +171,15 @@ impl ReactiveNode for AnySubscriber {
 
 impl AnySubscriber {
     pub fn with_observer<T>(&self, fun: impl FnOnce() -> T) -> T {
-        let prev = mem::replace(&mut *OBSERVER.write(), Some(self.clone()));
+        let prev = {
+            OBSERVER.with(|o| {
+                mem::replace(&mut *o.borrow_mut(), Some(self.clone()))
+            })
+        };
         let val = fun();
-        *OBSERVER.write() = prev;
+        OBSERVER.with(|o| {
+            *o.borrow_mut() = prev;
+        });
         val
     }
 }

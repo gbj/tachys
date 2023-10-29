@@ -112,6 +112,7 @@ impl<T: Send + Sync + 'static> Subscriber for Effect<T> {
     }
 
     fn clear_sources(&self) {
-        self.sources.write().take();
+        let subscriber = self.to_any_subscriber();
+        self.sources.write().clear_sources(&subscriber);
     }
 }

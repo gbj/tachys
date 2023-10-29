@@ -197,6 +197,7 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
                     lock.owner.clone(),
                 )
             };
+            self.clear_sources();
             let new_value = owner.with(|| {
                 self.to_any_subscriber()
                     .with_observer(|| fun(value.as_ref()))
@@ -248,7 +249,8 @@ impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
     }
 
     fn clear_sources(&self) {
-        self.inner.write().sources.take();
+        let subscriber = self.to_any_subscriber();
+        self.inner.write().sources.clear_sources(&subscriber);
     }
 }
 

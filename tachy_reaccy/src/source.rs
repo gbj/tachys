@@ -229,6 +229,12 @@ impl SourceSet {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn clear_sources(&mut self, subscriber: &AnySubscriber) {
+        for source in self.take() {
+            source.remove_subscriber(subscriber);
+        }
+    }
 }
 
 impl IntoIterator for SourceSet {

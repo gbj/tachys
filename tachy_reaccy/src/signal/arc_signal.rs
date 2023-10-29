@@ -54,12 +54,10 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
         self.mark_subscribers_check();
     }
 
-    fn mark_check(&self) {
-        self.mark_subscribers_check();
-    }
+    fn mark_check(&self) {}
 
     fn mark_subscribers_check(&self) {
-        for sub in (&self.inner.read().subscribers).into_iter() {
+        for sub in self.inner.write().subscribers.take() {
             sub.mark_check();
         }
     }
@@ -71,18 +69,28 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
 }
 
 impl<T: Send + Sync + 'static> Source for ArcSignal<T> {
+    fn to_any_source(&self) -> AnySource {
+        AnySource(self.inner.data_ptr() as usize, Arc::new(self.clone()))
+    }
+
+    fn clear_subscribers(&self) {
+        let mut lock = self.inner.write();
+        lock.subscribers.take();
+    }
+
     fn add_subscriber(&self, subscriber: AnySubscriber) {
         let mut lock = self.inner.write();
         lock.subscribers.subscribe(subscriber)
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        println!(
+            "removing subscriber {} from {}",
+            subscriber.0,
+            self.inner.data_ptr() as usize,
+        );
         let mut lock = self.inner.write();
         lock.subscribers.unsubscribe(subscriber)
-    }
-
-    fn to_any_source(&self) -> AnySource {
-        AnySource(Arc::new(self.clone()))
     }
 }
 

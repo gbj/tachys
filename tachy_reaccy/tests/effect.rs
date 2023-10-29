@@ -6,7 +6,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use tachy_reaccy::prelude::*;
 
-async fn tick() {
+pub async fn tick() {
     tokio::time::sleep(std::time::Duration::from_micros(1)).await;
 }
 
@@ -34,6 +34,66 @@ async fn effect_runs() {
     tick().await;
     assert_eq!(b.read().as_str(), "Value is 1");
 }
+
+#[tokio::test]
+async fn dynamic_dependencies() {
+    let first = Signal::new("Greg");
+    let last = Signal::new("Johnston");
+    let use_last = Signal::new(true);
+
+    let combined_count = Arc::new(RwLock::new(0));
+
+    Effect::new({
+        let combined_count = Arc::clone(&combined_count);
+        move |_| {
+            *combined_count.write() += 1;
+            if use_last.get() {
+                println!("{} {}", first.get(), last.get());
+            } else {
+                println!("{}", first.get());
+            }
+        }
+    });
+
+    tick().await;
+    assert_eq!(*combined_count.read(), 1);
+
+    println!("\nsetting `first` to Bob");
+    first.set("Bob");
+    tick().await;
+    assert_eq!(*combined_count.read(), 2);
+
+    println!("\nsetting `last` to Bob");
+    last.set("Thompson");
+    tick().await;
+    assert_eq!(*combined_count.read(), 3);
+
+    println!("\nsetting `use_last` to false");
+    use_last.set(false);
+    tick().await;
+    assert_eq!(*combined_count.read(), 4);
+
+    println!("\nsetting `last` to Jones");
+    last.set("Jones");
+    tick().await;
+    assert_eq!(*combined_count.read(), 4);
+
+    println!("\nsetting `last` to Jones");
+    last.set("Smith");
+    tick().await;
+    assert_eq!(*combined_count.read(), 4);
+
+    println!("\nsetting `last` to Stevens");
+    last.set("Stevens");
+    tick().await;
+    assert_eq!(*combined_count.read(), 4);
+
+    println!("\nsetting `use_last` to true");
+    use_last.set(true);
+    tick().await;
+    assert_eq!(*combined_count.read(), 5);
+}
+
 /*
 #[test]
 fn effect_tracks_memo() {

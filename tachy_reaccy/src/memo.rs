@@ -227,7 +227,7 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
 
 impl<T: Send + Sync + 'static> Source for ArcMemo<T> {
     fn to_any_source(&self) -> AnySource {
-        AnySource(Arc::new(self.clone()))
+        AnySource(self.inner.data_ptr() as usize, Arc::new(self.clone()))
     }
 
     fn add_subscriber(&self, subscriber: AnySubscriber) {
@@ -237,11 +237,15 @@ impl<T: Send + Sync + 'static> Source for ArcMemo<T> {
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
         self.inner.write().subscribers.unsubscribe(subscriber);
     }
+
+    fn clear_subscribers(&self) {
+        self.inner.write().subscribers.take();
+    }
 }
 
 impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
     fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(Arc::new(self.clone()))
+        AnySubscriber(self.inner.data_ptr() as usize, Arc::new(self.clone()))
     }
 
     fn add_source(&self, source: AnySource) {
@@ -356,6 +360,12 @@ impl<T: Send + Sync + 'static> Source for Memo<T> {
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
         if let Some(inner) = self.inner.get() {
             inner.remove_subscriber(subscriber)
+        }
+    }
+
+    fn clear_subscribers(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.clear_subscribers()
         }
     }
 }

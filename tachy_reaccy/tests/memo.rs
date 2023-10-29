@@ -2,6 +2,10 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use tachy_reaccy::prelude::*;
 
+pub async fn tick() {
+    tokio::time::sleep(std::time::Duration::from_micros(1)).await;
+}
+
 #[test]
 fn memo_calculates_value() {
     let a = Signal::new(1);
@@ -145,4 +149,69 @@ fn diamond_problem() {
     // should not have run the memo logic twice, even
     // though both paths have been updated
     assert_eq!(*combined_count.read(), 1);
+}
+
+#[tokio::test]
+async fn dynamic_dependencies() {
+    let first = Signal::new("Greg");
+    let last = Signal::new("Johnston");
+    let use_last = Signal::new(true);
+    let name = Memo::new(move |_| {
+        if use_last.get() {
+            format!("{} {}", first.get(), last.get())
+        } else {
+            first.get().to_string()
+        }
+    });
+
+    let combined_count = Arc::new(RwLock::new(0));
+
+    Effect::new({
+        let combined_count = Arc::clone(&combined_count);
+        move |_| {
+            _ = name.get();
+            *combined_count.write() += 1;
+        }
+    });
+    tick().await;
+
+    assert_eq!(*combined_count.read(), 1);
+
+    first.set("Bob");
+    tick().await;
+
+    assert_eq!(name.get(), "Bob Johnston");
+
+    assert_eq!(*combined_count.read(), 2);
+
+    last.set("Thompson");
+    tick().await;
+
+    assert_eq!(*combined_count.read(), 3);
+
+    use_last.set(false);
+    tick().await;
+
+    assert_eq!(name.get(), "Bob");
+    assert_eq!(*combined_count.read(), 4);
+
+    assert_eq!(*combined_count.read(), 4);
+    last.set("Jones");
+    tick().await;
+
+    assert_eq!(*combined_count.read(), 4);
+    last.set("Smith");
+    tick().await;
+
+    assert_eq!(*combined_count.read(), 4);
+    last.set("Stevens");
+    tick().await;
+
+    assert_eq!(*combined_count.read(), 4);
+
+    use_last.set(true);
+    tick().await;
+    assert_eq!(name.get(), "Bob Stevens");
+
+    assert_eq!(*combined_count.read(), 5);
 }

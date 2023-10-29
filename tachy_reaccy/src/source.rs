@@ -4,7 +4,7 @@ use std::{
     collections::hash_set::{IntoIter, Iter},
     fmt::Debug,
     hash::Hash,
-    mem, ptr,
+    mem,
     sync::Arc,
 };
 
@@ -43,6 +43,9 @@ pub trait Source: ReactiveNode {
 
     /// Removes a subscriber from this source's list of dependencies.
     fn remove_subscriber(&self, subscriber: &AnySubscriber);
+
+    /// Remove all subscribers from this source's list of dependencies.
+    fn clear_subscribers(&self);
 }
 
 pub trait Track: Source {
@@ -57,25 +60,23 @@ pub trait Track: Source {
 impl<T: Source> Track for T {}
 
 #[derive(Clone)]
-pub struct AnySource(pub Arc<dyn Source + Send + Sync>);
+pub struct AnySource(pub usize, pub Arc<dyn Source + Send + Sync>);
 
 impl Debug for AnySource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AnySource")
-            .field(&Arc::as_ptr(&self.0))
-            .finish()
+        f.debug_tuple("AnySource").field(&self.0).finish()
     }
 }
 
 impl Hash for AnySource {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        ptr::hash(&self.0, state);
+        self.0.hash(state);
     }
 }
 
 impl PartialEq for AnySource {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        self.0 == other.0
     }
 }
 
@@ -87,33 +88,37 @@ impl Source for AnySource {
     }
 
     fn add_subscriber(&self, subscriber: AnySubscriber) {
-        self.0.add_subscriber(subscriber)
+        self.1.add_subscriber(subscriber)
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        self.0.remove_subscriber(subscriber)
+        self.1.remove_subscriber(subscriber)
+    }
+
+    fn clear_subscribers(&self) {
+        self.1.clear_subscribers();
     }
 }
 
 impl ReactiveNode for AnySource {
     fn set_state(&self, state: ReactiveNodeState) {
-        self.0.set_state(state)
+        self.1.set_state(state)
     }
 
     fn mark_dirty(&self) {
-        self.0.mark_dirty()
+        self.1.mark_dirty()
     }
 
     fn mark_subscribers_check(&self) {
-        self.0.mark_subscribers_check()
+        self.1.mark_subscribers_check()
     }
 
     fn update_if_necessary(&self) -> bool {
-        self.0.update_if_necessary()
+        self.1.update_if_necessary()
     }
 
     fn mark_check(&self) {
-        self.0.mark_check()
+        self.1.mark_check()
     }
 }
 
@@ -131,7 +136,7 @@ pub trait Subscriber: ReactiveNode {
 
 /// A type-erased subscriber.
 #[derive(Clone)]
-pub struct AnySubscriber(pub Arc<dyn Subscriber + Send + Sync>);
+pub struct AnySubscriber(pub usize, pub Arc<dyn Subscriber + Send + Sync>);
 
 impl Subscriber for AnySubscriber {
     fn to_any_subscriber(&self) -> AnySubscriber {
@@ -139,33 +144,33 @@ impl Subscriber for AnySubscriber {
     }
 
     fn add_source(&self, source: AnySource) {
-        self.0.add_source(source);
+        self.1.add_source(source);
     }
 
     fn clear_sources(&self) {
-        self.0.clear_sources();
+        self.1.clear_sources();
     }
 }
 
 impl ReactiveNode for AnySubscriber {
     fn set_state(&self, state: ReactiveNodeState) {
-        self.0.set_state(state)
+        self.1.set_state(state)
     }
 
     fn mark_dirty(&self) {
-        self.0.mark_dirty()
+        self.1.mark_dirty()
     }
 
     fn mark_subscribers_check(&self) {
-        self.0.mark_subscribers_check()
+        self.1.mark_subscribers_check()
     }
 
     fn update_if_necessary(&self) -> bool {
-        self.0.update_if_necessary()
+        self.1.update_if_necessary()
     }
 
     fn mark_check(&self) {
-        self.0.mark_check()
+        self.1.mark_check()
     }
 }
 
@@ -186,21 +191,19 @@ impl AnySubscriber {
 
 impl Debug for AnySubscriber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AnySubscriber")
-            .field(&Arc::as_ptr(&self.0))
-            .finish()
+        f.debug_tuple("AnySubscriber").field(&self.0).finish()
     }
 }
 
 impl Hash for AnySubscriber {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        ptr::hash(&self.0, state);
+        self.0.hash(state);
     }
 }
 
 impl PartialEq for AnySubscriber {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        self.0 == other.0
     }
 }
 

@@ -56,6 +56,7 @@ where
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
                     *value = Some(owner.with(|| {
+                        this.clear_sources();
                         this.to_any_subscriber()
                             .with_observer(|| fun(old_value))
                     }));
@@ -83,6 +84,7 @@ impl<T> ReactiveNode for Effect<T> {
     fn mark_subscribers_check(&self) {}
 
     fn update_if_necessary(&self) -> bool {
+        eprintln!("effect::update_if_necessary");
         for source in self.sources.write().take() {
             if source.update_if_necessary() {
                 self.observer.notify();
@@ -97,14 +99,12 @@ impl<T> ReactiveNode for Effect<T> {
         self.observer.notify()
     }
 
-    fn mark_dirty(&self) {
-        self.observer.notify()
-    }
+    fn mark_dirty(&self) {}
 }
 
 impl<T: Send + Sync + 'static> Subscriber for Effect<T> {
     fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(Arc::new(self.clone()))
+        AnySubscriber(self.value.data_ptr() as usize, Arc::new(self.clone()))
     }
 
     fn add_source(&self, source: AnySource) {

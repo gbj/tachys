@@ -110,11 +110,14 @@ impl<T> ReactiveNode for RenderEffect<T> {
 
 impl<T> Subscriber for RenderEffect<T> {
     fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(Arc::new(Effect {
-            value: Arc::new(RwLock::new(None::<()>)),
-            observer: self.observer.clone(),
-            sources: self.sources.clone(),
-        }))
+        AnySubscriber(
+            self.value.data_ptr() as usize,
+            Arc::new(Effect {
+                value: Arc::new(RwLock::new(None::<()>)),
+                observer: self.observer.clone(),
+                sources: self.sources.clone(),
+            }),
+        )
     }
 
     fn add_source(&self, source: AnySource) {

@@ -117,11 +117,7 @@ impl<T: Send + Sync + 'static> ReactiveNode for Signal<T> {
         }
     }
 
-    fn mark_check(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_check();
-        }
-    }
+    fn mark_check(&self) {}
 
     fn mark_subscribers_check(&self) {
         if let Some(inner) = self.inner.get() {
@@ -154,6 +150,12 @@ impl<T: Send + Sync + 'static> Source for Signal<T> {
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
         if let Some(inner) = self.inner.get() {
             inner.remove_subscriber(subscriber);
+        }
+    }
+
+    fn clear_subscribers(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.clear_subscribers();
         }
     }
 }

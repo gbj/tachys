@@ -84,7 +84,6 @@ impl<T> ReactiveNode for Effect<T> {
     fn mark_subscribers_check(&self) {}
 
     fn update_if_necessary(&self) -> bool {
-        eprintln!("effect::update_if_necessary");
         for source in self.sources.write().take() {
             if source.update_if_necessary() {
                 self.observer.notify();

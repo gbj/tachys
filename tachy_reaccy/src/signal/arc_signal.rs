@@ -84,11 +84,6 @@ impl<T: Send + Sync + 'static> Source for ArcSignal<T> {
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        println!(
-            "removing subscriber {} from {}",
-            subscriber.0,
-            self.inner.data_ptr() as usize,
-        );
         let mut lock = self.inner.write();
         lock.subscribers.unsubscribe(subscriber)
     }

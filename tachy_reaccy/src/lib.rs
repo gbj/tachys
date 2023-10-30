@@ -6,8 +6,9 @@ pub mod effect;
 pub mod memo;
 mod notify;
 pub mod render_effect;
-//#[cfg(feature = "serde")]
-//mod serde;
+pub mod selector;
+#[cfg(feature = "serde")]
+mod serde;
 pub mod signal;
 pub mod signal_traits;
 mod source;

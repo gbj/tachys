@@ -6,7 +6,7 @@ use crate::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
     },
 };
-pub use arc_signal::ArcSignal;
+pub use arc_signal::{ArcSignal, WeakSignal};
 use std::{fmt::Debug, panic::Location};
 
 pub struct Signal<T: Send + Sync + 'static> {

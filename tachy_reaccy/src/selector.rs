@@ -77,4 +77,10 @@ where
         let mut subs = self.subs.write();
         subs.remove(key);
     }
+
+    /// Clears the listeners for all keys.
+    pub fn clear(&self) {
+        let mut subs = self.subs.write();
+        subs.clear();
+    }
 }

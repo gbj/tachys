@@ -34,7 +34,7 @@ impl<V: Render<Dom> + ToTemplate> ViewTemplate<V> {
                         .unwrap()
                         .unchecked_into::<HtmlTemplateElement>()
                 });
-                /* let mut buf = String::new();
+                let mut buf = String::new();
                 let mut class = String::new();
                 let mut style = String::new();
                 V::to_template(
@@ -42,10 +42,10 @@ impl<V: Render<Dom> + ToTemplate> ViewTemplate<V> {
                     &mut class,
                     &mut style,
                     &mut Default::default(),
-                ); */
-                //tpl.set_inner_html(&buf);
-                log(&format!("setting template to {:?}", V::TEMPLATE));
-                tpl.set_inner_html(V::TEMPLATE);
+                );
+                tpl.set_inner_html(&buf);
+                //log(&format!("setting template to {:?}", V::TEMPLATE));
+                //tpl.set_inner_html(V::TEMPLATE);
                 tpl
             })
             .clone()

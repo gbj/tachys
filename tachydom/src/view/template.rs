@@ -85,8 +85,10 @@ where
     V: RenderHtml<Dom> + ToTemplate + 'static,
     V::State: Mountable<Dom>,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
-        self.view.to_html(buf, position)
+    const MIN_LENGTH: usize = V::MIN_LENGTH;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        self.view.to_html_with_buf(buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(

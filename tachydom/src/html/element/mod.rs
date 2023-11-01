@@ -189,7 +189,20 @@ where
     Rndr::Node: Clone,
     Rndr::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
+    const MIN_LENGTH: usize = if E::SELF_CLOSING {
+        3 // < ... />
+        + E::TAG.len()
+        + At::MIN_LENGTH
+    } else {
+        2 // < ... >
+        + E::TAG.len()
+        + At::MIN_LENGTH
+        + Ch::MIN_LENGTH
+        + 3 // </ ... >
+        + E::TAG.len()
+    };
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);
@@ -229,7 +242,7 @@ where
         if !E::SELF_CLOSING {
             // children
             position.set(Position::FirstChild);
-            self.children.to_html(buf, position);
+            self.children.to_html_with_buf(buf, position);
 
             // closing tag
             buf.push_str("</");
@@ -378,7 +391,7 @@ mod tests {
             element::{em, ElementChild, Main},
         },
         renderer::mock_dom::MockDom,
-        view::Render,
+        view::{static_types::Static, Render, RenderHtml},
     };
 
     #[test]
@@ -404,5 +417,21 @@ mod tests {
             el.el.to_debug_html(),
             "<main><p>Hello, <em>beautiful</em> world!</p></main>"
         );
+    }
+
+    #[test]
+    fn html_render_allocates_appropriate_buffer() {
+        let el: HtmlElement<Main, _, _, MockDom> = main().child(p().child((
+            Static::<"Hello, ">,
+            em().child(Static::<"beautiful">),
+            Static::<" world!">,
+        )));
+        let allocated_len = el.min_length();
+        let html = el.to_html();
+        assert_eq!(
+            html,
+            "<main><p>Hello, <em>beautiful</em> world!</p></main>"
+        );
+        assert_eq!(html.len(), allocated_len);
     }
 }

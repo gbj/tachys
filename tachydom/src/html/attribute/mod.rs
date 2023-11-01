@@ -10,6 +10,8 @@ use std::{fmt::Debug, marker::PhantomData};
 pub use value::*;
 
 pub trait Attribute<R: Renderer> {
+    const MIN_LENGTH: usize;
+
     type State;
 
     fn to_html(self, buf: &mut String, class: &mut String, style: &mut String);
@@ -25,6 +27,8 @@ impl<R> Attribute<R> for ()
 where
     R: Renderer,
 {
+    const MIN_LENGTH: usize = 0;
+
     type State = ();
 
     fn to_html(
@@ -72,6 +76,8 @@ where
     V: AttributeValue<R>,
     R: Renderer,
 {
+    const MIN_LENGTH: usize = 0;
+
     type State = V::State;
 
     fn to_html(
@@ -104,6 +110,8 @@ macro_rules! impl_attr_for_tuples {
 			$($ty: Attribute<Rndr>),*,
             Rndr: Renderer
 		{
+            const MIN_LENGTH: usize = $first::MIN_LENGTH $(+ $ty::MIN_LENGTH)*;
+
 			type State = ($first::State, $($ty::State,)*);
 
 			fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {
@@ -151,6 +159,8 @@ where
     A: Attribute<Rndr>,
     Rndr: Renderer,
 {
+    const MIN_LENGTH: usize = A::MIN_LENGTH;
+
     type State = A::State;
 
     fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {

@@ -37,6 +37,7 @@ where
     P: IntoProperty<R>,
     R: DomRenderer,
 {
+    const MIN_LENGTH: usize = 0;
     type State = P::State;
 
     fn to_html(

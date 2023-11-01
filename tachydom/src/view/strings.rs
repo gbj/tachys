@@ -29,7 +29,9 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")
@@ -104,8 +106,10 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
-        <&str as RenderHtml<R>>::to_html(&self.as_str(), buf, position)
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        <&str as RenderHtml<R>>::to_html_with_buf(&self.as_str(), buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(

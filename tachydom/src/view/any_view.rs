@@ -71,6 +71,7 @@ where
         .downcast_mut::<T::State>()
         .expect("AnyViewState::unmount couldn't downcast state");
     state.unmount();
+    // TODO remove placeholder?
 }
 
 fn insert_before_this<R, T>(
@@ -106,7 +107,7 @@ where
             let value = value
                 .downcast::<T>()
                 .expect("AnyView::to_html could not be downcast");
-            value.to_html(buf, position);
+            value.to_html_with_buf(buf, position);
             // insert marker node
             buf.push_str("<!>");
         };
@@ -234,7 +235,9 @@ where
     R::Element: Clone,
     R::Node: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         (self.to_html)(self.value, buf, position)
     }
 
@@ -271,7 +274,7 @@ where
         (self.insert_before_this)(self, parent, child)
     }
 }
-/* 
+/*
 #[cfg(test)]
 mod tests {
     use super::IntoAny;

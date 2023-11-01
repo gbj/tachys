@@ -139,10 +139,12 @@ where
     Rndr::Node: Clone,
     Rndr::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         for item in self.items.into_iter() {
             let item = (self.view_fn)(item);
-            item.to_html(buf, position);
+            item.to_html_with_buf(buf, position);
             position.set(Position::NextChild);
         }
     }
@@ -566,7 +568,7 @@ fn unpack_moves(diff: &Diff) -> (Vec<DiffOpMove>, Vec<DiffOpAdd>) {
 
     (moves, adds)
 }
-/* 
+/*
 #[cfg(test)]
 mod tests {
     use crate::{

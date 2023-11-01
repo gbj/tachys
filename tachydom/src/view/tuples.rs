@@ -23,7 +23,9 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(self, _buf: &mut String, _position: &PositionState) {}
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, _buf: &mut String, _position: &PositionState) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -78,8 +80,10 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
-        self.0.to_html(buf, position);
+    const MIN_LENGTH: usize = A::MIN_LENGTH;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        self.0.to_html_with_buf(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -144,12 +148,14 @@ macro_rules! impl_view_for_tuples {
 			Rndr::Node: Clone,
 			Rndr::Element: Clone
 		{
-			fn to_html(self, buf: &mut String, position: &PositionState) {
+			const MIN_LENGTH: usize = $first::MIN_LENGTH $(+ $ty::MIN_LENGTH)*;
+
+			fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
-					[<$first:lower>].to_html(buf, position);
+					[<$first:lower>].to_html_with_buf(buf, position);
 					position.set(Position::NextChild);
-					$([<$ty:lower>].to_html(buf, position));*
+					$([<$ty:lower>].to_html_with_buf(buf, position));*
 				}
 			}
 

@@ -47,8 +47,27 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
-    /// Renders a view to HTML.
-    fn to_html(self, buf: &mut String, position: &PositionState);
+    const MIN_LENGTH: usize;
+
+    fn min_length(&self) -> usize {
+        Self::MIN_LENGTH
+    }
+
+    /// Renders a view to an HTML string.
+    fn to_html(self) -> String
+    where
+        Self: Sized,
+    {
+        let mut buf = String::with_capacity(Self::MIN_LENGTH);
+        self.to_html_with_buf(
+            &mut buf,
+            &PositionState::new(Position::FirstChild),
+        );
+        buf
+    }
+
+    /// Renders a view to HTML, writing it into the given buffer.
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
 
     /// Makes a set of DOM nodes rendered from HTML interactive.
     ///

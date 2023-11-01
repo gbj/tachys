@@ -57,6 +57,7 @@ where
     R: Renderer,
     R::Element: Clone,
 {
+    const MIN_LENGTH: usize = K::KEY.len() + 3 + V.len(); // K::KEY + ="..." + V
     type State = ();
 
     fn to_html(
@@ -103,7 +104,9 @@ where
     R::Element: Clone,
     R::Text: Mountable<R>,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
+    const MIN_LENGTH: usize = V.len();
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChild | Position::LastChild) {
             buf.push_str("<!>")

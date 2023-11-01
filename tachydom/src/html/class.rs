@@ -31,6 +31,8 @@ where
     C: IntoClass<R>,
     R: DomRenderer,
 {
+    const MIN_LENGTH: usize = C::MIN_LENGTH;
+
     type State = C::State;
 
     fn to_html(
@@ -75,6 +77,7 @@ where
 
 pub trait IntoClass<R: DomRenderer> {
     const TEMPLATE: &'static str = "";
+    const MIN_LENGTH: usize = Self::TEMPLATE.len();
 
     type State;
 

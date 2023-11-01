@@ -34,6 +34,7 @@ where
     S: IntoStyle<R>,
     R: DomRenderer,
 {
+    const MIN_LENGTH: usize = 0;
     type State = S::State;
 
     fn to_html(

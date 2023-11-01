@@ -46,6 +46,7 @@ impl<R> Attribute<R> for On<R>
 where
     R: DomRenderer,
 {
+    const MIN_LENGTH: usize = 0;
     type State = ();
 
     #[inline(always)]
@@ -76,7 +77,13 @@ where
     R: DomRenderer,
 {
     #[inline(always)]
-    fn to_template(_buf: &mut String, class: &mut String, style: &mut String, _position: &mut Position) {}
+    fn to_template(
+        _buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        _position: &mut Position,
+    ) {
+    }
 }
 
 /// A trait for converting types into [web_sys events](web_sys).

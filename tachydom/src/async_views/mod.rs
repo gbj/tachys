@@ -7,9 +7,9 @@ use crate::{
         Mountable, PositionState, Render, RenderHtml,
     },
 };
-use futures::FutureExt;
+use futures::{pin_mut, FutureExt};
 use parking_lot::RwLock;
-use std::{fmt::Debug, future::Future, sync::Arc};
+use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
 pub trait FutureViewExt: Sized {
     fn suspend(self) -> Suspend<(), Self>
@@ -43,7 +43,7 @@ impl<Fal, Fut> Debug for Suspend<Fal, Fut> {
     }
 }
 
-// TODO make this cancelable?
+// TODO make this cancelable
 impl<Fal, Fut, Rndr> Render<Rndr> for Suspend<Fal, Fut>
 where
     Fal: Render<Rndr> + 'static,
@@ -54,19 +54,35 @@ where
     type State = Arc<RwLock<EitherState<Fal, Fut::Output, Rndr>>>;
 
     fn build(self) -> Self::State {
-        // begin with the fallback state
-        let state = Arc::new(RwLock::new(Either::Left(self.fallback).build()));
+        // poll the future once immediately
+        // if it's already available, start in the ready state
+        // otherwise, start with the fallback
+        let mut fut = Box::pin(self.fut);
+        let initial = match fut.as_mut().now_or_never() {
+            Some(resolved) => Either::Right(resolved),
+            None => Either::Left(self.fallback),
+        };
 
-        // spawn the future, and rebuild the state when it resolves
-        Rndr::Spawn::spawn_local({
-            let state = Arc::clone(&state);
-            async move {
-                let value = self.fut.await;
-                Either::Right(value).rebuild(&mut *state.write());
-            }
-        });
+        // store whether this was pending at first
+        // by the time we need to know, we will have consumed `initial`
+        let initially_pending = matches!(initial, Either::Left(_));
 
-        // return that state
+        // now we can build the initial state
+        let state = Arc::new(RwLock::new(initial.build()));
+
+        // if the initial state was pending, spawn a future to wait for it
+        // spawning immediately means that our now_or_never poll result isn't lost
+        // if it wasn't pending at first, we don't need to poll the Future again
+        if initially_pending {
+            Rndr::Spawn::spawn_local({
+                let state = Arc::clone(&state);
+                async move {
+                    let value = fut.as_mut().await;
+                    Either::Right(value).rebuild(&mut *state.write());
+                }
+            });
+        }
+
         state
     }
 

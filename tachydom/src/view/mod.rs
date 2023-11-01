@@ -1,5 +1,6 @@
-use crate::{hydration::Cursor, renderer::Renderer};
-use std::{cell::Cell, rc::Rc};
+use crate::{hydration::Cursor, renderer::Renderer, ssr::StreamChunk};
+use futures::Stream;
+use std::{cell::Cell, collections::VecDeque, future::Future, rc::Rc};
 
 pub mod any_view;
 pub mod either;
@@ -66,8 +67,42 @@ where
         buf
     }
 
+    /// Renders a view to an HTML string, asynchronously.
+    /* fn to_html_stream(self) -> impl Stream<Item = String>
+    where
+        Self: Sized,
+    {
+        use crate::ssr::handle_chunks;
+        use futures::channel::mpsc::unbounded;
+
+        let mut chunks = VecDeque::new();
+        let mut curr = String::new();
+        self.to_html_async_buffered(
+            &mut chunks,
+            &mut curr,
+            &PositionState::new(Position::FirstChild),
+        );
+        let (tx, rx) = unbounded();
+
+        handle_chunks(tx, chunks).await;
+
+        rx
+    } */
+
     /// Renders a view to HTML, writing it into the given buffer.
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
+
+    /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
+    fn to_html_async_buffered(
+        self,
+        chunks: &mut VecDeque<StreamChunk>,
+        curr: &mut String,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        self.to_html_with_buf(curr, position);
+    }
 
     /// Makes a set of DOM nodes rendered from HTML interactive.
     ///

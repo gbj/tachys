@@ -62,6 +62,9 @@ web-sys = { version = "0.3.64", features = [
 drain_filter_polyfill = "0.1.3"
 indexmap = "2.0.2"
 rustc-hash = "1.1.0"
+tokio = { version = "1", optional = true, features = ["rt"] }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+futures = "0.3"
 
 [features]
 default = ["testing", "leptos"]
@@ -71,3 +74,5 @@ nightly = ["leptos_reactive/nightly"]
 testing = ["dep:slotmap"]
 leptos = ["dep:leptos_reactive"]
 reaccy = ["dep:tachy_reaccy"]
+tokio = ["dep:tokio"]
+web = ["dep:wasm-bindgen-futures"]

@@ -1,4 +1,4 @@
-use super::{CastFrom, DomRenderer, Renderer};
+use super::{CastFrom, DomRenderer, Renderer, SpawningRenderer};
 use crate::{dom::document, ok_or_debug, or_debug, view::Mountable};
 //use std::cell::RefCell;
 use wasm_bindgen::{intern, JsCast, JsValue};
@@ -316,4 +316,9 @@ impl CastFrom<Node> for Element {
     fn cast_from(node: Node) -> Option<Element> {
         node.clone().dyn_into().ok()
     }
+}
+
+#[cfg(feature = "web")]
+impl SpawningRenderer for Dom {
+    type Spawn = crate::spawner::wasm::Wasm;
 }

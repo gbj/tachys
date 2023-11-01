@@ -1,4 +1,4 @@
-use crate::{html::element::CreateElement, view::Mountable};
+use crate::{html::element::CreateElement, spawner::Spawner, view::Mountable};
 use wasm_bindgen::JsValue;
 
 pub mod dom;
@@ -127,6 +127,11 @@ pub trait DomRenderer: Renderer {
         name: &str,
         value: &str,
     );
+}
+
+/// A renderer that is able to spawn async tasks during rendering.
+pub trait SpawningRenderer {
+    type Spawn: Spawner;
 }
 
 /// Attempts to cast from one type to another.

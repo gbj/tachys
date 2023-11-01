@@ -11,13 +11,38 @@ pub trait Spawner {
         Fut: Future + 'static;
 }
 
+/// A spawner that will block in place when spawning an async task.
+///
+/// This is mostly useful for testing, and especially for synchronous-only code.
+pub struct BlockSpawn;
+
+impl Spawner for BlockSpawn {
+    fn spawn<Fut>(fut: Fut)
+    where
+        Fut: Future + Send + Sync + 'static,
+    {
+        futures::executor::block_on(async move {
+            fut.await;
+        });
+    }
+
+    fn spawn_local<Fut>(fut: Fut)
+    where
+        Fut: Future + 'static,
+    {
+        futures::executor::block_on(async move {
+            fut.await;
+        });
+    }
+}
+
 #[cfg(feature = "web")]
 pub mod wasm {
     use super::Spawner;
     use wasm_bindgen_futures::spawn_local;
 
     #[derive(Debug, Copy, Clone)]
-    struct Wasm;
+    pub struct Wasm;
 
     impl Spawner for Wasm {
         fn spawn<Fut>(fut: Fut)
@@ -44,7 +69,7 @@ pub mod tokio {
     use tokio::task::{spawn, spawn_local};
 
     #[derive(Debug, Copy, Clone)]
-    struct Tokio;
+    pub struct Tokio;
 
     impl Spawner for Tokio {
         fn spawn<Fut>(fut: Fut)

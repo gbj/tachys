@@ -61,6 +61,8 @@ where
     C: IntoClass<R>,
     R: DomRenderer,
 {
+    const CLASS: &'static str = C::TEMPLATE;
+
     fn to_template(
         buf: &mut String,
         class: &mut String,
@@ -72,6 +74,8 @@ where
 }
 
 pub trait IntoClass<R: DomRenderer> {
+    const TEMPLATE: &'static str = "";
+
     type State;
 
     fn to_html(self, class: &mut String);
@@ -200,6 +204,8 @@ impl<R, const V: &'static str> IntoClass<R>
 where
     R: DomRenderer,
 {
+    const TEMPLATE: &'static str = V;
+
     type State = ();
 
     fn to_html(self, class: &mut String) {
@@ -210,10 +216,7 @@ where
         class.push_str(V);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
-        if !FROM_SERVER {
-            R::set_attribute(el, "class", V);
-        }
+    fn hydrate<const FROM_SERVER: bool>(self, _el: &R::Element) -> Self::State {
     }
 
     fn build(self, el: &R::Element) -> Self::State {

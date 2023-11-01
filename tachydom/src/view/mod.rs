@@ -2,6 +2,7 @@ use crate::{hydration::Cursor, renderer::Renderer};
 use std::{cell::Cell, rc::Rc};
 
 pub mod any_view;
+pub mod either;
 pub mod iterators;
 pub mod keyed;
 #[cfg(feature = "nightly")]
@@ -148,6 +149,8 @@ where
 /// Allows data to be added to a static template.
 pub trait ToTemplate {
     const TEMPLATE: &'static str = "";
+    const CLASS: &'static str = "";
+    const STYLE: &'static str = "";
     const LEN: usize = Self::TEMPLATE.as_bytes().len();
 
     /// Renders a view type to a template. This does not take actual view data,

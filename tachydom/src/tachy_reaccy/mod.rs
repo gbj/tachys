@@ -17,6 +17,8 @@ where
     F: Fn() -> V,
     V: ToTemplate,
 {
+    const TEMPLATE: &'static str = V::TEMPLATE;
+
     fn to_template(
         buf: &mut String,
         class: &mut String,

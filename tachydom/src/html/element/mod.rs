@@ -3,7 +3,7 @@ use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
     view::{
-        template::{const_concat, str_from_buffer},
+        template::{const_concat, const_concat_with_prefix, str_from_buffer},
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
@@ -309,6 +309,16 @@ where
         "<",
         E::TAG,
         At::TEMPLATE,
+        str_from_buffer(&const_concat_with_prefix(
+            &[At::CLASS],
+            " class=\"",
+            "\"",
+        )),
+        str_from_buffer(&const_concat_with_prefix(
+            &[At::STYLE],
+            " style=\"",
+            "\"",
+        )),
         ">",
         Ch::TEMPLATE,
         "</",

@@ -4,7 +4,9 @@ use super::{
 };
 use crate::{
     hydration::Cursor,
-    view::template::{const_concat, str_from_buffer},
+    view::template::{
+        const_concat, const_concat_with_separator, str_from_buffer,
+    },
 };
 
 impl<R: Renderer> Render<R> for () {
@@ -91,6 +93,8 @@ where
 
 impl<A: ToTemplate> ToTemplate for (A,) {
     const TEMPLATE: &'static str = A::TEMPLATE;
+    const CLASS: &'static str = A::CLASS;
+    const STYLE: &'static str = A::STYLE;
 
     fn to_template(
         buf: &mut String,
@@ -168,6 +172,12 @@ macro_rules! impl_view_for_tuples {
 			const TEMPLATE: &'static str = str_from_buffer(&const_concat(&[
 				$first::TEMPLATE, $($ty::TEMPLATE),*
 			]));
+			const CLASS: &'static str = str_from_buffer(&const_concat_with_separator(&[
+				$first::CLASS, $($ty::CLASS),*
+			], " "));
+			const STYLE: &'static str = str_from_buffer(&const_concat_with_separator(&[
+				$first::STYLE, $($ty::STYLE),*
+			], ";"));
 
 			fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position)  {
 				paste::paste! {

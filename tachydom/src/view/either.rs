@@ -38,14 +38,24 @@ where
         }
     }
 
+    // TODO hold onto old states to avoid rerendering them?
     fn rebuild(self, state: &mut Self::State) {
+        let marker = state.marker.as_ref();
         match (self, &mut state.state) {
             (Either::Left(new), Either::Left(old)) => new.rebuild(old),
             (Either::Right(new), Either::Right(old)) => new.rebuild(old),
             (Either::Right(new), Either::Left(old)) => {
-                todo!()
+                old.unmount();
+                let mut new_state = new.build();
+                Rndr::mount_before(&mut new_state, marker);
+                state.state = Either::Right(new_state);
             }
-            _ => todo!(),
+            (Either::Left(new), Either::Right(old)) => {
+                old.unmount();
+                let mut new_state = new.build();
+                Rndr::mount_before(&mut new_state, marker);
+                state.state = Either::Left(new_state);
+            }
         }
     }
 }

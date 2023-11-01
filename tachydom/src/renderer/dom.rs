@@ -226,7 +226,7 @@ impl Mountable<Dom> for Node {
 
 impl Mountable<Dom> for Text {
     fn unmount(&mut self) {
-        todo!()
+        self.remove();
     }
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
@@ -245,7 +245,7 @@ impl Mountable<Dom> for Text {
 
 impl Mountable<Dom> for Comment {
     fn unmount(&mut self) {
-        todo!()
+        self.remove();
     }
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
@@ -264,7 +264,7 @@ impl Mountable<Dom> for Comment {
 
 impl Mountable<Dom> for Element {
     fn unmount(&mut self) {
-        todo!()
+        self.remove();
     }
 
     fn mount(&mut self, parent: &Element, marker: Option<&Node>) {

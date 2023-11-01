@@ -130,7 +130,7 @@ pub trait DomRenderer: Renderer {
 }
 
 /// A renderer that is able to spawn async tasks during rendering.
-pub trait SpawningRenderer {
+pub trait SpawningRenderer: Renderer {
     type Spawn: Spawner;
 }
 

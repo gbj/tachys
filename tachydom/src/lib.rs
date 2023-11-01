@@ -4,6 +4,7 @@
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 
+pub mod async_views;
 pub mod dom;
 pub mod html;
 pub mod hydration;

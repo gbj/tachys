@@ -1,4 +1,4 @@
-use crate::source::Track;
+pub use crate::source::Track;
 use std::panic::Location;
 
 macro_rules! unwrap_signal {

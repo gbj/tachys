@@ -69,7 +69,7 @@ parking_lot = "0.12"
 pin-project-lite = "0.2"
 
 [features]
-default = ["testing", "leptos"]
+default = ["testing"]
 hydrate = []
 ssr = []
 nightly = ["leptos_reactive/nightly"]

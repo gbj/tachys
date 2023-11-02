@@ -1,28 +1,45 @@
 use gtk::{prelude::*, Application, ApplicationWindow, Button, Orientation};
-use leptos_reactive::*;
+use std::future::pending;
+use tachy_reaccy::prelude::*;
 use tachydom::view::{keyed::keyed, strings::StrState, Mountable, Render};
-use tachygtk::{button, r#box, Element, ElementState, TachyGtk};
+use tachygtk::{button, r#box, Box_, Element, ElementState, TachyGtk};
 mod tachygtk;
 
 const APP_ID: &str = "dev.leptos.Counter";
 
 fn main() {
-    // Create a new application
     let app = Application::builder().application_id(APP_ID).build();
 
-    // Connect to "activate" signal of `app`
-    app.connect_activate(build_ui);
+    app.connect_activate(|app| {
+        println!("X");
+        let view = ui();
 
-    // Run the application
+        // Connect to "activate" signal of `app`
+        let mut state = view.build();
+
+        let window = ApplicationWindow::builder()
+            .application(app)
+            .title("TachyGTK")
+            .child(&state.0 .0)
+            .build();
+
+        // Present window
+        window.present();
+
+        println!("mounting");
+    });
     app.run();
 }
 
-fn build_ui(app: &Application) {
-    let _ = create_runtime();
+fn ui() -> Box_<impl Render<TachyGtk>> {
+    let value = Signal::new(0);
+    let rows = Signal::new(vec![1, 2, 3, 4, 5]);
 
-    let value = RwSignal::new(0);
-    let rows = RwSignal::new(vec![1, 2, 3, 4, 5]);
-    let view = r#box(
+    Effect::new(move |_| {
+        println!("value = {}", value.get());
+    });
+
+    r#box(
         Orientation::Vertical,
         12,
         (
@@ -53,21 +70,10 @@ fn build_ui(app: &Application) {
                         })
                     }),
                     r#box(Orientation::Vertical, 12, move || {
-                        keyed(rows(), |k| *k, |v| v.to_string())
+                        keyed(rows.get(), |k| *k, |v| v.to_string())
                     }),
                 ),
             ),
         ),
-    );
-    let state: ElementState<_> = view.build();
-
-    // Create a window and set the title
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("TachyGTK")
-        .child(&state.0 .0)
-        .build();
-
-    // Present window
-    window.present();
+    )
 }

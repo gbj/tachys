@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3"
+glib = { version = "0.18", optional = true }
 lazy_static = "1"
 parking_lot = "0.12"
 pin-project-lite = "0.2"
@@ -24,6 +25,7 @@ tokio-test = "0.4"
 tokio = { version = "1", features = ["rt", "macros"] }
 
 [features]
+glib = ["dep:glib"]
 serde = ["dep:serde", "dep:serde_json"]
 tracing = ["dep:tracing"]
 tokio = ["dep:tokio"]

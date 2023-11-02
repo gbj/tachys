@@ -8,9 +8,12 @@ where
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             wasm_bindgen_futures::spawn_local(fut)
+        } else if #[cfg(feature = "glib")] {
+            let main_context = glib::MainContext::default();
+            main_context.spawn_local(fut);
         } else if #[cfg(any(test, doctest, feature = "tokio"))] {
             tokio::task::spawn_local(fut);
-        } else {
+        }  else {
             futures::executor::block_on(fut)
         }
     }
@@ -23,6 +26,9 @@ where
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             wasm_bindgen_futures::spawn_local(fut)
+        } else if #[cfg(feature = "glib")] {
+            let main_context = glib::MainContext::default();
+            main_context.spawn(fut);
         } else if #[cfg(any(test, doctest, feature = "tokio"))] {
             tokio::task::spawn(fut);
         }  else {

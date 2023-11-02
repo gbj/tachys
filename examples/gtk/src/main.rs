@@ -1,5 +1,5 @@
 use gtk::{prelude::*, Application, ApplicationWindow, Button, Orientation};
-use std::future::pending;
+use std::{future::pending, thread, time::Duration};
 use tachy_reaccy::prelude::*;
 use tachydom::view::{keyed::keyed, strings::StrState, Mountable, Render};
 use tachygtk::{button, r#box, Box_, Element, ElementState, TachyGtk};
@@ -39,6 +39,12 @@ fn ui() -> Box_<impl Render<TachyGtk>> {
         println!("value = {}", value.get());
     });
 
+    // just an example of multithreaded reactivity
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(250));
+        value.update(|n| *n += 1);
+    });
+
     r#box(
         Orientation::Vertical,
         12,
@@ -56,7 +62,7 @@ fn ui() -> Box_<impl Render<TachyGtk>> {
                             button("+1", move |_| value.update(|n| *n += 1)),
                         ),
                     ),
-                    move || (value.get() % 2 == 0).then_some("Even!"),
+                    //move || (value.get() % 2 == 0).then_some("Even!"),
                 ),
             ),
             r#box(

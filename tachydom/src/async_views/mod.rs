@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
 pub trait FutureViewExt: Sized {
-    fn suspend(self) -> Suspend<(), Self>
+    fn suspend(self) -> Suspend<false, (), Self>
     where
         Self: Future,
     {
@@ -25,26 +25,37 @@ pub trait FutureViewExt: Sized {
 
 impl<F> FutureViewExt for F where F: Future + Sized {}
 
-pub struct Suspend<Fal, Fut> {
+pub struct Suspend<const TRANSITION: bool, Fal, Fut> {
     fallback: Fal,
     fut: Fut,
 }
 
-impl<Fal, Fut> Suspend<Fal, Fut> {
-    pub fn with_fallback<Fal2>(self, fallback: Fal2) -> Suspend<Fal2, Fut> {
+impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
+    pub fn with_fallback<Fal2>(
+        self,
+        fallback: Fal2,
+    ) -> Suspend<TRANSITION, Fal2, Fut> {
         let fut = self.fut;
+        Suspend { fallback, fut }
+    }
+
+    pub fn transition(self) -> Suspend<true, Fal, Fut> {
+        let Suspend { fallback, fut } = self;
         Suspend { fallback, fut }
     }
 }
 
-impl<Fal, Fut> Debug for Suspend<Fal, Fut> {
+impl<const TRANSITION: bool, Fal, Fut> Debug for Suspend<TRANSITION, Fal, Fut> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SuspendedFuture").finish()
+        f.debug_struct("SuspendedFuture")
+            .field("transition", &TRANSITION)
+            .finish()
     }
 }
 
 // TODO make this cancelable
-impl<Fal, Fut, Rndr> Render<Rndr> for Suspend<Fal, Fut>
+impl<const TRANSITION: bool, Fal, Fut, Rndr> Render<Rndr>
+    for Suspend<TRANSITION, Fal, Fut>
 where
     Fal: Render<Rndr> + 'static,
     Fut: Future + 'static,
@@ -87,8 +98,10 @@ where
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        // fall back to fallback state
-        Either::Left(self.fallback).rebuild(&mut *state.write());
+        if !TRANSITION {
+            // fall back to fallback state
+            Either::Left(self.fallback).rebuild(&mut *state.write());
+        }
 
         // spawn the future, and rebuild the state when it resolves
         Rndr::Spawn::spawn_local({
@@ -101,7 +114,8 @@ where
     }
 }
 
-impl<Fal, Fut, Rndr> RenderHtml<Rndr> for Suspend<Fal, Fut>
+impl<const TRANSITION: bool, Fal, Fut, Rndr> RenderHtml<Rndr>
+    for Suspend<TRANSITION, Fal, Fut>
 where
     Fal: RenderHtml<Rndr> + 'static,
     Fut: Future + 'static,

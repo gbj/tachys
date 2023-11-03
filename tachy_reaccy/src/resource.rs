@@ -183,7 +183,12 @@ impl<T> ArcAsyncDerived<T> {
                                 inner.subscribers.clone()
                             };
                             for sub in subs {
-                                sub.mark_dirty();
+                                // don't trigger reruns of effects/memos
+                                // basically: if one of the observers has triggered this memo to
+                                // run, it doesn't need to be re-triggered because of this change
+                                if !Observer::is(&sub) {
+                                    sub.mark_dirty();
+                                }
                             }
                         }
                     } else {

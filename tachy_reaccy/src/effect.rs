@@ -6,6 +6,7 @@ use crate::{
         Subscriber,
     },
     spawn::spawn,
+    Observer,
 };
 use futures::StreamExt;
 use parking_lot::RwLock;
@@ -93,7 +94,6 @@ impl<T> ReactiveNode for Effect<T> {
         false
     }
 
-    // custom implementation: notify if marked
     fn mark_check(&self) {
         self.observer.notify()
     }

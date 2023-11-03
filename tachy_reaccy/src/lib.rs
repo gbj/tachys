@@ -40,6 +40,10 @@ impl Observer {
     fn get() -> Option<AnySubscriber> {
         OBSERVER.with(|o| o.borrow().clone())
     }
+
+    fn is(observer: &AnySubscriber) -> bool {
+        OBSERVER.with(|o| o.borrow().as_ref() == Some(observer))
+    }
 }
 
 #[cfg(feature = "web")]

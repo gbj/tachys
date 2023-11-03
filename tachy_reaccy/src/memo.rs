@@ -5,6 +5,7 @@ use crate::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
         SourceSet, Subscriber, SubscriberSet,
     },
+    Observer,
 };
 use parking_lot::RwLock;
 use std::{fmt::Debug, panic::Location, sync::Arc};
@@ -212,7 +213,12 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
                     lock.subscribers.clone()
                 };
                 for sub in subs {
-                    sub.mark_dirty();
+                    // don't trigger reruns of effects/memos
+                    // basically: if one of the observers has triggered this memo to
+                    // run, it doesn't need to be re-triggered because of this change
+                    if !Observer::is(&sub) {
+                        sub.mark_dirty();
+                    }
                 }
             }
 

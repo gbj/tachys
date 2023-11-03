@@ -6,6 +6,7 @@ pub mod effect;
 pub mod memo;
 mod notify;
 pub mod render_effect;
+pub mod resource;
 pub mod selector;
 #[cfg(feature = "serde")]
 mod serde;

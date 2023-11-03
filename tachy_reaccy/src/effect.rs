@@ -98,7 +98,9 @@ impl<T> ReactiveNode for Effect<T> {
         self.observer.notify()
     }
 
-    fn mark_dirty(&self) {}
+    fn mark_dirty(&self) {
+        self.observer.notify()
+    }
 }
 
 impl<T: Send + Sync + 'static> Subscriber for Effect<T> {

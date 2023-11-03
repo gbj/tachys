@@ -1,4 +1,5 @@
 use crate::{
+    async_views::Suspend,
     hydration::Cursor,
     renderer::Renderer,
     view::{
@@ -6,7 +7,8 @@ use crate::{
     },
 };
 use tachy_reaccy::{
-    render_effect::RenderEffect, signal::Signal, signal_traits::SignalGet,
+    render_effect::RenderEffect, resource::ScopedFuture, signal::Signal,
+    signal_traits::SignalGet,
 };
 
 mod class;
@@ -124,6 +126,18 @@ where
             .unwrap_or(false)
     }
 }
+
+// Extends to track suspense
+impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
+    pub fn track(self) -> Suspend<TRANSITION, Fal, ScopedFuture<Fut>> {
+        let Suspend { fallback, fut } = self;
+        Suspend {
+            fallback,
+            fut: ScopedFuture::new(fut),
+        }
+    }
+}
+
 /*
 #[cfg(test)]
 mod tests {

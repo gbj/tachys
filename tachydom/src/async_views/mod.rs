@@ -26,8 +26,8 @@ pub trait FutureViewExt: Sized {
 impl<F> FutureViewExt for F where F: Future + Sized {}
 
 pub struct Suspend<const TRANSITION: bool, Fal, Fut> {
-    fallback: Fal,
-    fut: Fut,
+    pub fallback: Fal,
+    pub fut: Fut,
 }
 
 impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {

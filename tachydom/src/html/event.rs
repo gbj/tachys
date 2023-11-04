@@ -16,14 +16,21 @@ where
     On {
         name: event.name(),
         setup: Box::new(move |el| {
-            R::add_event_listener(
-                el,
-                &event.name(),
-                Box::new(move |ev: R::Event| {
-                    let specific_event = ev.into();
-                    cb(specific_event);
-                }) as Box<dyn FnMut(R::Event)>,
-            )
+            let cb = Box::new(move |ev: R::Event| {
+                let specific_event = ev.into();
+                cb(specific_event);
+            }) as Box<dyn FnMut(R::Event)>;
+
+            if E::BUBBLES && cfg!(feature = "delegation") {
+                R::add_event_listener_delegated(
+                    el,
+                    event.name(),
+                    event.event_delegation_key(),
+                    cb,
+                )
+            } else {
+                R::add_event_listener(el, &event.name(), cb)
+            }
         }),
     }
 }
@@ -79,8 +86,8 @@ where
     #[inline(always)]
     fn to_template(
         _buf: &mut String,
-        class: &mut String,
-        style: &mut String,
+        _class: &mut String,
+        _style: &mut String,
         _position: &mut Position,
     ) {
     }

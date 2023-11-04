@@ -1,4 +1,5 @@
 use crate::{html::element::CreateElement, spawner::Spawner, view::Mountable};
+use std::borrow::Cow;
 use wasm_bindgen::JsValue;
 
 pub mod dom;
@@ -106,6 +107,14 @@ pub trait DomRenderer: Renderer {
     fn add_event_listener(
         el: &Self::Element,
         name: &str,
+        cb: Box<dyn FnMut(Self::Event)>,
+    );
+
+    /// Adds an event listener to an element, delegated to the window if possible.
+    fn add_event_listener_delegated(
+        el: &Self::Element,
+        name: Cow<'static, str>,
+        delegation_key: Cow<'static, str>,
         cb: Box<dyn FnMut(Self::Event)>,
     );
 

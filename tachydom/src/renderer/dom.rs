@@ -1,13 +1,22 @@
 use super::{CastFrom, DomRenderer, Renderer, SpawningRenderer};
-use crate::{dom::document, ok_or_debug, or_debug, view::Mountable};
-//use std::cell::RefCell;
-use wasm_bindgen::{intern, JsCast, JsValue};
+use crate::{
+    dom::{document, window},
+    ok_or_debug, or_debug,
+    view::Mountable,
+};
+use rustc_hash::FxHashSet;
+use std::{borrow::Cow, cell::RefCell};
+use wasm_bindgen::{intern, prelude::Closure, JsCast, JsValue};
 use web_sys::{
     Comment, CssStyleDeclaration, DocumentFragment, DomTokenList, Element,
     HtmlElement, Node, Text,
 };
 
 pub struct Dom;
+
+thread_local! {
+    pub(crate) static GLOBAL_EVENTS: RefCell<FxHashSet<Cow<'static, str>>> = Default::default();
+}
 
 /* #[derive(Debug, Default)]
 struct PendingStuff {
@@ -149,7 +158,7 @@ impl DomRenderer for Dom {
             js_sys::Reflect::set(
                 el,
                 &wasm_bindgen::JsValue::from_str(intern(key)),
-                &value,
+                value,
             ),
             el,
             "setProperty"
@@ -162,14 +171,98 @@ impl DomRenderer for Dom {
         cb: Box<dyn FnMut(Self::Event)>,
     ) {
         let cb = wasm_bindgen::closure::Closure::wrap(cb).into_js_value();
+        let name = intern(name);
         or_debug!(
             el.add_event_listener_with_callback(
-                intern(name),
+                name,
                 cb.as_ref().unchecked_ref()
             ),
             el,
             "addEventListener"
         );
+    }
+
+    fn add_event_listener_delegated(
+        el: &Self::Element,
+        name: Cow<'static, str>,
+        delegation_key: Cow<'static, str>,
+        cb: Box<dyn FnMut(Self::Event)>,
+    ) {
+        let cb = Closure::wrap(cb).into_js_value();
+        let key = intern(&delegation_key);
+        or_debug!(
+            js_sys::Reflect::set(el, &JsValue::from_str(key), &cb),
+            el,
+            "set property"
+        );
+
+        GLOBAL_EVENTS.with(|global_events| {
+            let mut events = global_events.borrow_mut();
+            if !events.contains(&name) {
+                // create global handler
+                let key = JsValue::from_str(key);
+                let handler = move |ev: web_sys::Event| {
+                    let target = ev.target();
+                    let node = ev.composed_path().get(0);
+                    let mut node = if node.is_undefined() || node.is_null() {
+                        JsValue::from(target)
+                    } else {
+                        node
+                    };
+
+                    // TODO reverse Shadow DOM retargetting
+                    // TODO simulate currentTarget
+
+                    while !node.is_null() {
+                        let node_is_disabled = js_sys::Reflect::get(
+                            &node,
+                            &JsValue::from_str("disabled"),
+                        )
+                        .unwrap()
+                        .is_truthy();
+                        if !node_is_disabled {
+                            let maybe_handler =
+                                js_sys::Reflect::get(&node, &key).unwrap();
+                            if !maybe_handler.is_undefined() {
+                                let f = maybe_handler
+                                    .unchecked_ref::<js_sys::Function>();
+                                let _ = f.call1(&node, &ev);
+
+                                if ev.cancel_bubble() {
+                                    return;
+                                }
+                            }
+                        }
+
+                        // navigate up tree
+                        if let Some(parent) =
+                            node.unchecked_ref::<web_sys::Node>().parent_node()
+                        {
+                            node = parent.into()
+                        } else if let Some(root) =
+                            node.dyn_ref::<web_sys::ShadowRoot>()
+                        {
+                            node = root.host().unchecked_into();
+                        } else {
+                            node = JsValue::null()
+                        }
+                    }
+                };
+
+                let handler =
+                    Box::new(handler) as Box<dyn FnMut(web_sys::Event)>;
+                let handler = Closure::wrap(handler).into_js_value();
+                window()
+                    .add_event_listener_with_callback(
+                        &name,
+                        handler.unchecked_ref(),
+                    )
+                    .unwrap();
+
+                // register that we've created handler
+                events.insert(name);
+            }
+        })
     }
 
     fn class_list(el: &Self::Element) -> Self::ClassList {
@@ -322,3 +415,5 @@ impl CastFrom<Node> for Element {
 impl SpawningRenderer for Dom {
     type Spawn = crate::spawner::wasm::Wasm;
 }
+
+/* Event Delegation */

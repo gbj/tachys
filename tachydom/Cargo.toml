@@ -28,6 +28,7 @@ web-sys = { version = "0.3.64", features = [
 	"DocumentFragment",
 	"DomTokenList",
 	"CssStyleDeclaration",
+	"ShadowRoot",
 	# Events we cast to in leptos_macro -- added here so we don't force users to import them
 	"AddEventListenerOptions",
 	"AnimationEvent",
@@ -71,6 +72,7 @@ pin-project-lite = "0.2"
 
 [features]
 default = ["testing"]
+delegation = []                       # enables event delegation
 hydrate = []
 ssr = []
 nightly = ["leptos_reactive/nightly"]

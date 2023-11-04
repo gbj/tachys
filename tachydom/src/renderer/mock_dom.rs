@@ -224,6 +224,15 @@ impl DomRenderer for MockDom {
         todo!()
     }
 
+    fn add_event_listener_delegated(
+        el: &Self::Element,
+        name: Cow<'static, str>,
+        delegation_key: Cow<'static, str>,
+        cb: Box<dyn FnMut(Self::Event)>,
+    ) {
+        todo!()
+    }
+
     fn class_list(el: &Self::Element) -> Self::ClassList {
         todo!()
     }

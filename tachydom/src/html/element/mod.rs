@@ -3,9 +3,11 @@ use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
     view::{
-        template::{const_concat, const_concat_with_prefix, str_from_buffer},
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
+};
+use const_str_slice_concat::{
+    const_concat, const_concat_with_prefix, str_from_buffer,
 };
 use next_tuple::TupleBuilder;
 use std::marker::PhantomData;

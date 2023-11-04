@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+	"const_str_slice_concat",
 	"next_tuple",
 	"tachydom",
 	"tachy_maccy",

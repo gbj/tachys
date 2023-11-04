@@ -2,11 +2,9 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, Renderer,
     ToTemplate,
 };
-use crate::{
-    hydration::Cursor,
-    view::template::{
-        const_concat, const_concat_with_separator, str_from_buffer,
-    },
+use crate::hydration::Cursor;
+use const_str_slice_concat::{
+    const_concat, const_concat_with_separator, str_from_buffer,
 };
 
 impl<R: Renderer> Render<R> for () {

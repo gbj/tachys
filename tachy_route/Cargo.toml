@@ -4,8 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+const_str_slice_concat = { path = "../const_str_slice_concat" }
 next_tuple = { path = "../next_tuple" }
 tachydom = { path = "../tachydom" }
+tachy_reaccy = { path = "../tachy_reaccy" }
 paste = "1.0.14"
 thiserror = "1.0.49"
 tuplestructops = "0.3.0"
+
+# web dependencies 
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+	"History",
+	"HtmlAnchorElement",
+	"MouseEvent",
+	"Url",
+] }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+web = ["dep:js-sys", "dep:wasm-bindgen", "dep:web-sys"]

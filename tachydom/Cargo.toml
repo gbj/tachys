@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+const_str_slice_concat = { path = "../const_str_slice_concat" }
 next_tuple = { path = "../next_tuple" }
 tachy_reaccy = { path = "../tachy_reaccy", optional = true }
 slotmap = { version = "1", optional = true }

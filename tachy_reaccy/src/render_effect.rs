@@ -3,16 +3,38 @@ use crate::{
     effect::Effect,
     notify::EffectNotifier,
     source::{
-        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, SourceSet,
-        Subscriber,
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+        SourceSet, Subscriber,
     },
     spawn::spawn_local,
 };
-use futures::StreamExt;
+use futures::{
+    channel::oneshot::{channel, Sender},
+    StreamExt,
+};
 use parking_lot::RwLock;
 use std::{mem, sync::Arc};
 
 pub struct RenderEffect<T>
+where
+    T: 'static,
+{
+    cancel: Option<Sender<()>>,
+    inner: EffectInner<T>,
+}
+
+impl<T> Drop for RenderEffect<T> {
+    fn drop(&mut self) {
+        for source in mem::take(&mut *self.inner.sources.write()) {
+            source.remove_subscriber(&self.inner.to_any_subscriber());
+        }
+        if let Some(sender) = self.cancel.take() {
+            sender.send(());
+        }
+    }
+}
+
+pub struct EffectInner<T>
 where
     T: 'static,
 {
@@ -21,7 +43,7 @@ where
     sources: Arc<RwLock<SourceSet>>,
 }
 
-impl<T> Clone for RenderEffect<T> {
+impl<T> Clone for EffectInner<T> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
@@ -36,54 +58,61 @@ where
     T: 'static,
 {
     pub fn new(fun: impl Fn(Option<T>) -> T + 'static) -> Self {
+        let (cancel, cancel_rx) = channel();
         let value = Arc::new(RwLock::new(None));
         let owner = Owner::new();
-        let (observer, mut rx) = EffectNotifier::new();
+        let (observer, rx) = EffectNotifier::new();
         let sources = Arc::new(RwLock::new(SourceSet::new()));
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,
         // to register observed values
-        let this = Self {
+        let inner = EffectInner {
             value: value.clone(),
             observer: observer.clone(),
             sources: sources.clone(),
         };
-        let initial_value = Some(
-            owner.with(|| this.to_any_subscriber().with_observer(|| fun(None))),
-        );
-        *this.value.write() = initial_value;
+        let initial_value =
+            Some(owner.with(|| {
+                inner.to_any_subscriber().with_observer(|| fun(None))
+            }));
+        *inner.value.write() = initial_value;
+        let mut values = rx.take_until(cancel_rx);
 
         spawn_local({
             let value = value.clone();
             let observer = observer.clone();
-            let this = Self {
+            let inner = EffectInner {
                 value: value.clone(),
                 observer: observer.clone(),
                 sources: sources.clone(),
             };
             async move {
-                while rx.next().await.is_some() {
+                while values.next().await.is_some() {
                     let mut value = value.write();
                     let old_value = mem::take(&mut *value);
                     *value = Some(owner.with(|| {
-                        this.to_any_subscriber()
+                        inner
+                            .to_any_subscriber()
                             .with_observer(|| fun(old_value))
                     }));
                 }
             }
         });
-        this
+        RenderEffect {
+            inner,
+            cancel: Some(cancel),
+        }
     }
 
     pub fn with_value_mut<U>(
         &self,
         fun: impl FnOnce(&mut T) -> U,
     ) -> Option<U> {
-        self.value.write().as_mut().map(fun)
+        self.inner.value.write().as_mut().map(fun)
     }
 }
 
-impl<T> ReactiveNode for RenderEffect<T> {
+impl<T> ReactiveNode for EffectInner<T> {
     fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_subscribers_check(&self) {}
@@ -108,7 +137,7 @@ impl<T> ReactiveNode for RenderEffect<T> {
     }
 }
 
-impl<T> Subscriber for RenderEffect<T> {
+impl<T> Subscriber for EffectInner<T> {
     fn to_any_subscriber(&self) -> AnySubscriber {
         AnySubscriber(
             self.value.data_ptr() as usize,

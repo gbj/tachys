@@ -3,7 +3,7 @@ use futures::channel::mpsc::{channel, Receiver, Sender};
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, ptr, sync::Arc};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NotificationSender(Sender<()>);
 
 impl NotificationSender {

@@ -19,12 +19,14 @@ pub struct ArcSignal<T> {
 }
 
 impl<T> Clone for ArcSignal<T> {
+    #[track_caller]
     fn clone(&self) -> Self {
-        Self {
+        let this = Self {
             #[cfg(debug_assertions)]
             defined_at: self.defined_at,
             inner: Arc::clone(&self.inner),
-        }
+        };
+        this
     }
 }
 

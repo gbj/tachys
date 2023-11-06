@@ -1,5 +1,7 @@
 use crate::{
-    prelude::SignalWith, render_effect::RenderEffect, signal::ArcSignal,
+    prelude::SignalWith,
+    render_effect::{EffectInner, RenderEffect},
+    signal::ArcSignal,
     signal_traits::SignalUpdate,
 };
 use parking_lot::RwLock;
@@ -15,7 +17,6 @@ where
 {
     subs: Arc<RwLock<FxHashMap<T, ArcSignal<bool>>>>,
     v: Arc<RwLock<Option<T>>>,
-    #[allow(clippy::type_complexity)] // lol
     f: Arc<dyn Fn(&T, &T) -> bool>,
 }
 

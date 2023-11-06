@@ -5,7 +5,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     mem,
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 pub trait ReactiveNode {
@@ -122,55 +122,76 @@ impl ReactiveNode for AnySource {
     }
 }
 
-/// Any type that can track reactive values (like an effect or a memo).
-pub trait Subscriber: ReactiveNode {
+/// Converts a [`Subscriber`] to a type-erased [`AnySubscriber`].
+pub trait ToAnySubscriber {
     /// Converts this type to its type-erased equivalent.
     fn to_any_subscriber(&self) -> AnySubscriber;
+}
 
+/// Any type that can track reactive values (like an effect or a memo).
+pub trait Subscriber: ReactiveNode {
     /// Adds a subscriber to this subscriber's list of dependencies.
     fn add_source(&self, source: AnySource);
 
-    /// Clears the set of sources for this subscriber.
-    fn clear_sources(&self);
+    // Clears the set of sources for this subscriber.
+    //fn clear_sources(&self);
 }
 
 /// A type-erased subscriber.
 #[derive(Clone)]
-pub struct AnySubscriber(pub usize, pub Arc<dyn Subscriber + Send + Sync>);
+pub struct AnySubscriber(pub usize, pub Weak<dyn Subscriber + Send + Sync>);
 
-impl Subscriber for AnySubscriber {
+impl ToAnySubscriber for AnySubscriber {
     fn to_any_subscriber(&self) -> AnySubscriber {
         self.clone()
     }
+}
 
+impl Subscriber for AnySubscriber {
     fn add_source(&self, source: AnySource) {
-        self.1.add_source(source);
+        if let Some(inner) = self.1.upgrade() {
+            inner.add_source(source);
+        }
     }
 
-    fn clear_sources(&self) {
-        self.1.clear_sources();
-    }
+    /* fn clear_sources(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.1.upgrade() {
+            inner.clear_sources();
+        }
+    } */
 }
 
 impl ReactiveNode for AnySubscriber {
     fn set_state(&self, state: ReactiveNodeState) {
-        self.1.set_state(state)
+        if let Some(inner) = self.1.upgrade() {
+            inner.set_state(state)
+        }
     }
 
     fn mark_dirty(&self) {
-        self.1.mark_dirty()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_dirty()
+        }
     }
 
     fn mark_subscribers_check(&self) {
-        self.1.mark_subscribers_check()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_subscribers_check()
+        }
     }
 
     fn update_if_necessary(&self) -> bool {
-        self.1.update_if_necessary()
+        if let Some(inner) = self.1.upgrade() {
+            inner.update_if_necessary()
+        } else {
+            false
+        }
     }
 
     fn mark_check(&self) {
-        self.1.mark_check()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_check()
+        }
     }
 }
 

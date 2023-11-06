@@ -7,6 +7,11 @@ use std::{fmt::Debug, hash::Hash, ptr, sync::Arc};
 pub struct NotificationSender(Sender<()>);
 
 impl NotificationSender {
+    pub fn channel() -> (NotificationSender, Receiver<()>) {
+        let (tx, rx) = channel::<()>(1);
+        (NotificationSender(tx), rx)
+    }
+
     pub fn notify(&mut self) {
         // if this fails, it's because there's already a message
         // in the buffer. but we're just sending () to wake it up;

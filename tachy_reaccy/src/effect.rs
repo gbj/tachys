@@ -1,32 +1,37 @@
 use crate::{
     arena::Owner,
-    notify::EffectNotifier,
+    notify::NotificationSender,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, SourceSet,
-        Subscriber,
+        Subscriber, ToAnySubscriber,
     },
     spawn::spawn,
-    Observer,
 };
 use futures::StreamExt;
 use parking_lot::RwLock;
-use std::{mem, sync::Arc};
+use std::{
+    mem,
+    sync::{Arc, Weak},
+};
 
 pub struct Effect<T>
 where
     T: 'static,
 {
-    pub(crate) value: Arc<RwLock<Option<T>>>,
-    pub(crate) observer: EffectNotifier,
-    pub(crate) sources: Arc<RwLock<SourceSet>>,
+    value: Arc<RwLock<Option<T>>>,
+    inner: Arc<RwLock<EffectInner>>,
+}
+
+pub(crate) struct EffectInner {
+    pub observer: NotificationSender,
+    pub sources: SourceSet,
 }
 
 impl<T> Clone for Effect<T> {
     fn clone(&self) -> Self {
         Self {
-            value: self.value.clone(),
-            observer: self.observer.clone(),
-            sources: self.sources.clone(),
+            value: Arc::clone(&self.value),
+            inner: Arc::clone(&self.inner),
         }
     }
 }
@@ -36,39 +41,41 @@ where
     T: Send + Sync + 'static,
 {
     pub fn new(fun: impl Fn(Option<T>) -> T + Send + Sync + 'static) -> Self {
-        let value = Arc::new(RwLock::new(None));
-        let owner = Owner::new();
-        let (observer, mut rx) = EffectNotifier::new();
-        let sources = Arc::new(RwLock::new(SourceSet::new()));
+        let (mut observer, mut rx) = NotificationSender::channel();
+
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,
         // to register observed values
         observer.notify();
+
+        let value = Arc::new(RwLock::new(None));
+        let inner = Arc::new(RwLock::new(EffectInner {
+            observer,
+            sources: SourceSet::new(),
+        }));
+        let owner = Owner::new();
+
         spawn({
-            let value = value.clone();
-            let observer = observer.clone();
-            let this = Self {
-                value: value.clone(),
-                observer: observer.clone(),
-                sources: sources.clone(),
-            };
+            let value = Arc::clone(&value);
+            let inner = Arc::clone(&inner);
+            let this = Effect { value, inner };
             async move {
                 while rx.next().await.is_some() {
-                    let mut value = value.write();
-                    let old_value = mem::take(&mut *value);
-                    *value = Some(owner.with(|| {
-                        this.clear_sources();
+                    let any_subscriber = this.to_any_subscriber();
+                    let old_value = {
+                        let mut inner = this.inner.write();
+                        inner.sources.clear_sources(&any_subscriber);
+                        mem::take(&mut *this.value.write())
+                    };
+                    let new_value = owner.with(|| {
                         this.to_any_subscriber()
                             .with_observer(|| fun(old_value))
-                    }));
+                    });
+                    *this.value.write() = Some(new_value);
                 }
             }
         });
-        Self {
-            value,
-            observer,
-            sources,
-        }
+        Self { value, inner }
     }
 
     pub fn with_value_mut<U>(
@@ -79,15 +86,31 @@ where
     }
 }
 
-impl<T> ReactiveNode for Effect<T> {
+impl<T> ToAnySubscriber for Effect<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        self.inner.to_any_subscriber()
+    }
+}
+
+impl ToAnySubscriber for Arc<RwLock<EffectInner>> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        AnySubscriber(
+            self.data_ptr() as usize,
+            Arc::downgrade(self) as Weak<dyn Subscriber + Send + Sync>,
+        )
+    }
+}
+
+impl ReactiveNode for RwLock<EffectInner> {
     fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_subscribers_check(&self) {}
 
     fn update_if_necessary(&self) -> bool {
-        for source in self.sources.write().take() {
+        let mut lock = self.write();
+        for source in lock.sources.take() {
             if source.update_if_necessary() {
-                self.observer.notify();
+                lock.observer.notify();
                 return true;
             }
         }
@@ -95,25 +118,22 @@ impl<T> ReactiveNode for Effect<T> {
     }
 
     fn mark_check(&self) {
-        self.observer.notify()
+        self.write().observer.notify()
     }
 
     fn mark_dirty(&self) {
-        self.observer.notify()
+        self.write().observer.notify()
     }
 }
 
-impl<T: Send + Sync + 'static> Subscriber for Effect<T> {
-    fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(self.value.data_ptr() as usize, Arc::new(self.clone()))
-    }
-
+impl Subscriber for RwLock<EffectInner> {
     fn add_source(&self, source: AnySource) {
-        self.sources.write().insert(source);
+        self.write().sources.insert(source);
     }
 
-    fn clear_sources(&self) {
-        let subscriber = self.to_any_subscriber();
-        self.sources.write().clear_sources(&subscriber);
-    }
+    /*  fn clear_sources(&self) {
+        todo!()
+        /* let subscriber = self.to_any_subscriber();
+        self.write().sources.clear_sources(&subscriber); */
+    } */
 }

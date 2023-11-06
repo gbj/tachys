@@ -1,7 +1,5 @@
 use crate::{
-    prelude::SignalWith,
-    render_effect::{EffectInner, RenderEffect},
-    signal::ArcSignal,
+    prelude::SignalWith, render_effect::RenderEffect, signal::ArcSignal,
     signal_traits::SignalUpdate,
 };
 use parking_lot::RwLock;

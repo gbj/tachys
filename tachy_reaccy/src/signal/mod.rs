@@ -4,9 +4,10 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+        ToAnySource,
     },
 };
-pub use arc_signal::{ArcSignal, WeakSignal};
+pub use arc_signal::ArcSignal;
 use std::{fmt::Debug, panic::Location};
 
 pub struct Signal<T: Send + Sync + 'static> {
@@ -133,14 +134,16 @@ impl<T: Send + Sync + 'static> ReactiveNode for Signal<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> Source for Signal<T> {
+impl<T: Send + Sync + 'static> ToAnySource for Signal<T> {
     fn to_any_source(&self) -> AnySource {
         self.inner
             .get()
             .map(|inner| inner.to_any_source())
             .expect("boo")
     }
+}
 
+impl<T: Send + Sync + 'static> Source for Signal<T> {
     fn add_subscriber(&self, subscriber: AnySubscriber) {
         if let Some(inner) = self.inner.get() {
             inner.add_subscriber(subscriber);

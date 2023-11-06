@@ -15,6 +15,7 @@ where
 {
     subs: Arc<RwLock<FxHashMap<T, ArcSignal<bool>>>>,
     v: Arc<RwLock<Option<T>>>,
+    #[allow(clippy::type_complexity)]
     f: Arc<dyn Fn(&T, &T) -> bool>,
 }
 

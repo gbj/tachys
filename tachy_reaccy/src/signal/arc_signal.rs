@@ -2,7 +2,7 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SubscriberSet,
+        SubscriberSet, ToAnySource,
     },
 };
 use parking_lot::RwLock;
@@ -15,18 +15,19 @@ use std::{
 pub struct ArcSignal<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    inner: Arc<RwLock<SignalInner<T>>>,
+    value: Arc<RwLock<T>>,
+    inner: Arc<RwLock<SubscriberSet>>,
 }
 
 impl<T> Clone for ArcSignal<T> {
     #[track_caller]
     fn clone(&self) -> Self {
-        let this = Self {
+        Self {
             #[cfg(debug_assertions)]
             defined_at: self.defined_at,
+            value: Arc::clone(&self.value),
             inner: Arc::clone(&self.inner),
-        };
-        this
+        }
     }
 }
 
@@ -48,20 +49,13 @@ impl<T> ArcSignal<T> {
         Self {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
-            inner: Arc::new(RwLock::new(SignalInner::new(value))),
-        }
-    }
-
-    pub fn downgrade(&self) -> WeakSignal<T> {
-        WeakSignal {
-            #[cfg(debug_assertions)]
-            defined_at: self.defined_at,
-            inner: Arc::downgrade(&self.inner),
+            value: Arc::new(RwLock::new(value)),
+            inner: Arc::new(RwLock::new(SubscriberSet::new())),
         }
     }
 }
 
-impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
+impl ReactiveNode for RwLock<SubscriberSet> {
     fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_dirty(&self) {
@@ -71,7 +65,7 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
     fn mark_check(&self) {}
 
     fn mark_subscribers_check(&self) {
-        for sub in self.inner.write().subscribers.take() {
+        for sub in self.write().take() {
             sub.mark_check();
         }
     }
@@ -82,24 +76,59 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcSignal<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> Source for ArcSignal<T> {
-    fn to_any_source(&self) -> AnySource {
-        AnySource(self.inner.data_ptr() as usize, Arc::new(self.clone()))
-    }
-
+impl Source for RwLock<SubscriberSet> {
     fn clear_subscribers(&self) {
-        let mut lock = self.inner.write();
-        lock.subscribers.take();
+        self.write().take();
     }
 
     fn add_subscriber(&self, subscriber: AnySubscriber) {
-        let mut lock = self.inner.write();
-        lock.subscribers.subscribe(subscriber)
+        self.write().subscribe(subscriber)
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        let mut lock = self.inner.write();
-        lock.subscribers.unsubscribe(subscriber)
+        self.write().unsubscribe(subscriber)
+    }
+}
+
+impl<T> ReactiveNode for ArcSignal<T> {
+    fn set_state(&self, _state: ReactiveNodeState) {}
+
+    fn mark_dirty(&self) {
+        self.mark_subscribers_check();
+    }
+
+    fn mark_check(&self) {}
+
+    fn mark_subscribers_check(&self) {
+        self.inner.mark_subscribers_check();
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        // if they're being checked, signals always count as "dirty"
+        true
+    }
+}
+
+impl<T> ToAnySource for ArcSignal<T> {
+    fn to_any_source(&self) -> AnySource {
+        AnySource(
+            self.inner.data_ptr() as usize,
+            Arc::downgrade(&self.inner) as Weak<dyn Source + Send + Sync>,
+        )
+    }
+}
+
+impl<T> Source for ArcSignal<T> {
+    fn clear_subscribers(&self) {
+        self.inner.clear_subscribers();
+    }
+
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        self.inner.add_subscriber(subscriber);
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        self.inner.remove_subscriber(subscriber);
     }
 }
 
@@ -128,12 +157,11 @@ impl<T> SignalWithUntracked for ArcSignal<T> {
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
     ) -> Option<U> {
-        let lock = self.inner.read();
-        Some(fun(&lock.value))
+        Some(fun(&self.value.read()))
     }
 }
 
-impl<T: Send + Sync + 'static> SignalUpdate for ArcSignal<T> {
+impl<T> SignalUpdate for ArcSignal<T> {
     type Value = T;
 
     #[cfg_attr(
@@ -142,8 +170,8 @@ impl<T: Send + Sync + 'static> SignalUpdate for ArcSignal<T> {
     )]
     fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
         {
-            let mut lock = self.inner.write();
-            fun(&mut lock.value);
+            let mut value = self.value.write();
+            fun(&mut value);
         }
         self.mark_dirty();
     }
@@ -157,8 +185,8 @@ impl<T: Send + Sync + 'static> SignalUpdate for ArcSignal<T> {
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
         let value = {
-            let mut lock = self.inner.write();
-            fun(&mut lock.value)
+            let mut value = self.value.write();
+            fun(&mut value)
         };
         self.mark_dirty();
         Some(value)
@@ -169,51 +197,5 @@ impl<T> SignalIsDisposed for ArcSignal<T> {
     #[inline(always)]
     fn is_disposed(&self) -> bool {
         false
-    }
-}
-
-struct SignalInner<T> {
-    value: T,
-    subscribers: SubscriberSet,
-}
-
-impl<T> SignalInner<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            value,
-            subscribers: Default::default(),
-        }
-    }
-}
-
-pub struct WeakSignal<T> {
-    #[cfg(debug_assertions)]
-    defined_at: &'static Location<'static>,
-    inner: Weak<RwLock<SignalInner<T>>>,
-}
-
-impl<T> Clone for WeakSignal<T> {
-    fn clone(&self) -> Self {
-        Self {
-            #[cfg(debug_assertions)]
-            defined_at: self.defined_at,
-            inner: Weak::clone(&self.inner),
-        }
-    }
-}
-
-impl<T> Debug for WeakSignal<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WeakSignal").finish()
-    }
-}
-
-impl<T> WeakSignal<T> {
-    pub fn upgrade(&self) -> Option<ArcSignal<T>> {
-        self.inner.upgrade().map(|inner| ArcSignal {
-            #[cfg(debug_assertions)]
-            defined_at: self.defined_at,
-            inner,
-        })
     }
 }

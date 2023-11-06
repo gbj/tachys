@@ -5,7 +5,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     mem,
-    sync::{Arc, Weak},
+    sync::Weak,
 };
 
 pub trait ReactiveNode {
@@ -33,11 +33,13 @@ pub enum ReactiveNodeState {
     Dirty,
 }
 
-/// Describes the behavior of any source of reactivity (like a signal, trigger, or memo.)
-pub trait Source: ReactiveNode {
+pub trait ToAnySource {
     /// Converts this type to its type-erased equivalent.
     fn to_any_source(&self) -> AnySource;
+}
 
+/// Describes the behavior of any source of reactivity (like a signal, trigger, or memo.)
+pub trait Source: ReactiveNode {
     /// Adds a subscriber to this source's list of dependencies.
     fn add_subscriber(&self, subscriber: AnySubscriber);
 
@@ -48,7 +50,7 @@ pub trait Source: ReactiveNode {
     fn clear_subscribers(&self);
 }
 
-pub trait Track: Source {
+pub trait Track: Source + ToAnySource {
     fn track(&self) {
         if let Some(subscriber) = Observer::get() {
             subscriber.add_source(self.to_any_source());
@@ -57,10 +59,10 @@ pub trait Track: Source {
     }
 }
 
-impl<T: Source> Track for T {}
+impl<T: Source + ToAnySource> Track for T {}
 
 #[derive(Clone)]
-pub struct AnySource(pub usize, pub Arc<dyn Source + Send + Sync>);
+pub struct AnySource(pub usize, pub Weak<dyn Source + Send + Sync>);
 
 impl Debug for AnySource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -82,43 +84,63 @@ impl PartialEq for AnySource {
 
 impl Eq for AnySource {}
 
-impl Source for AnySource {
+impl ToAnySource for AnySource {
     fn to_any_source(&self) -> AnySource {
         self.clone()
     }
+}
 
+impl Source for AnySource {
     fn add_subscriber(&self, subscriber: AnySubscriber) {
-        self.1.add_subscriber(subscriber)
+        if let Some(inner) = self.1.upgrade() {
+            inner.add_subscriber(subscriber)
+        }
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        self.1.remove_subscriber(subscriber)
+        if let Some(inner) = self.1.upgrade() {
+            inner.remove_subscriber(subscriber)
+        }
     }
 
     fn clear_subscribers(&self) {
-        self.1.clear_subscribers();
+        if let Some(inner) = self.1.upgrade() {
+            inner.clear_subscribers();
+        }
     }
 }
 
 impl ReactiveNode for AnySource {
     fn set_state(&self, state: ReactiveNodeState) {
-        self.1.set_state(state)
+        if let Some(inner) = self.1.upgrade() {
+            inner.set_state(state)
+        }
     }
 
     fn mark_dirty(&self) {
-        self.1.mark_dirty()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_dirty()
+        }
     }
 
     fn mark_subscribers_check(&self) {
-        self.1.mark_subscribers_check()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_subscribers_check()
+        }
     }
 
     fn update_if_necessary(&self) -> bool {
-        self.1.update_if_necessary()
+        if let Some(inner) = self.1.upgrade() {
+            inner.update_if_necessary()
+        } else {
+            false
+        }
     }
 
     fn mark_check(&self) {
-        self.1.mark_check()
+        if let Some(inner) = self.1.upgrade() {
+            inner.mark_check()
+        }
     }
 }
 
@@ -134,7 +156,7 @@ pub trait Subscriber: ReactiveNode {
     fn add_source(&self, source: AnySource);
 
     // Clears the set of sources for this subscriber.
-    //fn clear_sources(&self);
+    fn clear_sources(&self, subscriber: &AnySubscriber);
 }
 
 /// A type-erased subscriber.
@@ -154,11 +176,13 @@ impl Subscriber for AnySubscriber {
         }
     }
 
-    /* fn clear_sources(&self, subscriber: &AnySubscriber) {
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
         if let Some(inner) = self.1.upgrade() {
-            inner.clear_sources();
+            inner.clear_sources(subscriber);
+        } else {
+            panic!("boop");
         }
-    } */
+    }
 }
 
 impl ReactiveNode for AnySubscriber {

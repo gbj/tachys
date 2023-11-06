@@ -3,7 +3,7 @@
     create_rw_signal, create_signal, untrack, SignalGet, SignalSet,
 }; */
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 use tachy_reaccy::prelude::*;
 
 pub async fn tick() {
@@ -17,13 +17,15 @@ async fn effect_runs() {
     // simulate an arbitrary side effect
     let b = Arc::new(RwLock::new(String::new()));
 
-    Effect::new({
+    // we forget it so it continues running
+    // if it's dropped, it will stop listening
+    mem::forget(Effect::new({
         let b = b.clone();
         move |_| {
             let formatted = format!("Value is {}", a.get());
             *b.write() = formatted;
         }
-    });
+    }));
 
     tick().await;
     assert_eq!(b.read().as_str(), "Value is -1");
@@ -43,7 +45,7 @@ async fn dynamic_dependencies() {
 
     let combined_count = Arc::new(RwLock::new(0));
 
-    Effect::new({
+    mem::forget(Effect::new({
         let combined_count = Arc::clone(&combined_count);
         move |_| {
             *combined_count.write() += 1;
@@ -53,7 +55,7 @@ async fn dynamic_dependencies() {
                 println!("{}", first.get());
             }
         }
-    });
+    }));
 
     tick().await;
     assert_eq!(*combined_count.read(), 1);

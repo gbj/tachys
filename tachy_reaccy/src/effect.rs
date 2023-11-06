@@ -57,21 +57,16 @@ where
 
         spawn({
             let value = Arc::clone(&value);
-            let inner = Arc::clone(&inner);
-            let this = Effect { value, inner };
+            let subscriber = inner.to_any_subscriber();
+
             async move {
                 while rx.next().await.is_some() {
-                    let any_subscriber = this.to_any_subscriber();
-                    let old_value = {
-                        let mut inner = this.inner.write();
-                        inner.sources.clear_sources(&any_subscriber);
-                        mem::take(&mut *this.value.write())
-                    };
-                    let new_value = owner.with(|| {
-                        this.to_any_subscriber()
-                            .with_observer(|| fun(old_value))
-                    });
-                    *this.value.write() = Some(new_value);
+                    subscriber.clear_sources(&subscriber);
+
+                    let old_value = mem::take(&mut *value.write());
+                    let new_value = owner
+                        .with(|| subscriber.with_observer(|| fun(old_value)));
+                    *value.write() = Some(new_value);
                 }
             }
         });
@@ -131,9 +126,7 @@ impl Subscriber for RwLock<EffectInner> {
         self.write().sources.insert(source);
     }
 
-    /*  fn clear_sources(&self) {
-        todo!()
-        /* let subscriber = self.to_any_subscriber();
-        self.write().sources.clear_sources(&subscriber); */
-    } */
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
+        self.write().sources.clear_sources(subscriber);
+    }
 }

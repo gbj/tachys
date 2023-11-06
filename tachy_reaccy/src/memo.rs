@@ -3,12 +3,16 @@ use crate::{
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SourceSet, Subscriber, SubscriberSet,
+        SourceSet, Subscriber, SubscriberSet, ToAnySource, ToAnySubscriber,
     },
     Observer,
 };
 use parking_lot::RwLock;
-use std::{fmt::Debug, panic::Location, sync::Arc};
+use std::{
+    fmt::Debug,
+    panic::Location,
+    sync::{Arc, Weak},
+};
 
 pub struct Memo<T: Send + Sync + 'static> {
     inner: Stored<ArcMemo<T>>,
@@ -142,13 +146,13 @@ struct MemoInner<T> {
     compare_with: fn(Option<&T>, Option<&T>) -> bool,
     owner: Owner,
     state: ReactiveNodeState,
-    sources: SourceSet,
+    sources: Arc<RwLock<SourceSet>>,
     subscribers: SubscriberSet,
 }
 
-impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
+impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
     fn set_state(&self, state: ReactiveNodeState) {
-        self.inner.write().state = state;
+        self.write().state = state;
     }
 
     fn mark_dirty(&self) {
@@ -158,16 +162,16 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
 
     fn mark_check(&self) {
         {
-            let mut lock = self.inner.write();
+            let mut lock = self.write();
             lock.state = ReactiveNodeState::Check;
         }
-        for sub in (&self.inner.read().subscribers).into_iter() {
+        for sub in (&self.read().subscribers).into_iter() {
             sub.mark_check();
         }
     }
 
     fn mark_subscribers_check(&self) {
-        let lock = self.inner.read();
+        let lock = self.read();
         for sub in (&lock.subscribers).into_iter() {
             sub.mark_check();
         }
@@ -175,22 +179,24 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
 
     fn update_if_necessary(&self) -> bool {
         let (state, sources) = {
-            let inner = self.inner.read();
+            let inner = self.read();
             (inner.state, inner.sources.clone())
         };
 
         let needs_update = match state {
             ReactiveNodeState::Clean => false,
             ReactiveNodeState::Dirty => true,
-            ReactiveNodeState::Check => sources.into_iter().any(|source| {
-                source.update_if_necessary()
-                    || self.inner.read().state == ReactiveNodeState::Dirty
-            }),
+            ReactiveNodeState::Check => {
+                (&*sources.read()).into_iter().any(|source| {
+                    source.update_if_necessary()
+                        || self.read().state == ReactiveNodeState::Dirty
+                })
+            }
         };
 
         if needs_update {
             let (fun, value, compare_with, owner) = {
-                let mut lock = self.inner.write();
+                let mut lock = self.write();
                 (
                     lock.fun.clone(),
                     lock.value.take(),
@@ -198,16 +204,17 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
                     lock.owner.clone(),
                 )
             };
-            self.clear_sources();
-            let new_value = owner.with(|| {
-                self.to_any_subscriber()
-                    .with_observer(|| fun(value.as_ref()))
-            });
+
+            // TODO clear sources
+            let any_subscriber = self.read().sources.to_any_subscriber();
+            any_subscriber.clear_sources(&any_subscriber);
+            let new_value = owner
+                .with(|| any_subscriber.with_observer(|| fun(value.as_ref())));
 
             let changed = !compare_with(Some(&new_value), value.as_ref());
             if changed {
                 let subs = {
-                    let mut lock = self.inner.write();
+                    let mut lock = self.write();
                     lock.value = Some(new_value);
                     lock.state = ReactiveNodeState::Clean;
                     lock.subscribers.clone()
@@ -224,43 +231,139 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
 
             changed
         } else {
-            let mut lock = self.inner.write();
+            let mut lock = self.write();
             lock.state = ReactiveNodeState::Clean;
             false
         }
     }
 }
 
-impl<T: Send + Sync + 'static> Source for ArcMemo<T> {
-    fn to_any_source(&self) -> AnySource {
-        AnySource(self.inner.data_ptr() as usize, Arc::new(self.clone()))
+impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        self.inner.set_state(state);
     }
 
+    fn mark_dirty(&self) {
+        self.inner.mark_dirty();
+    }
+
+    fn mark_check(&self) {
+        self.inner.mark_check();
+    }
+
+    fn mark_subscribers_check(&self) {
+        self.inner.mark_subscribers_check();
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        self.inner.update_if_necessary()
+    }
+}
+
+impl ToAnySubscriber for Arc<RwLock<SourceSet>> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        AnySubscriber(
+            self.data_ptr() as usize,
+            Arc::downgrade(self) as Weak<dyn Subscriber + Send + Sync>,
+        )
+    }
+}
+
+impl ReactiveNode for RwLock<SourceSet> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        todo!()
+    }
+
+    fn mark_dirty(&self) {
+        todo!()
+    }
+
+    fn mark_check(&self) {
+        todo!()
+    }
+
+    fn mark_subscribers_check(&self) {
+        todo!()
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        todo!()
+    }
+}
+
+impl Subscriber for RwLock<SourceSet> {
+    fn add_source(&self, source: AnySource) {
+        self.write().insert(source);
+    }
+
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
+        self.write().clear_sources(subscriber);
+    }
+}
+
+impl<T: Send + Sync + 'static> ToAnySource for ArcMemo<T> {
+    fn to_any_source(&self) -> AnySource {
+        AnySource(
+            self.inner.data_ptr() as usize,
+            Arc::downgrade(&self.inner) as Weak<dyn Source + Send + Sync>,
+        )
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for RwLock<MemoInner<T>> {
     fn add_subscriber(&self, subscriber: AnySubscriber) {
-        self.inner.write().subscribers.subscribe(subscriber);
+        self.write().subscribers.subscribe(subscriber);
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        self.inner.write().subscribers.unsubscribe(subscriber);
+        self.write().subscribers.unsubscribe(subscriber);
     }
 
     fn clear_subscribers(&self) {
-        self.inner.write().subscribers.take();
+        self.write().subscribers.take();
+    }
+}
+
+impl<T: Send + Sync + 'static> Subscriber for RwLock<MemoInner<T>> {
+    fn add_source(&self, source: AnySource) {
+        self.read().sources.add_source(source);
+    }
+
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
+        self.read().sources.clear_sources(subscriber);
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for ArcMemo<T> {
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        self.inner.add_subscriber(subscriber);
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        self.inner.remove_subscriber(subscriber);
+    }
+
+    fn clear_subscribers(&self) {
+        self.inner.clear_subscribers();
+    }
+}
+
+impl<T: Send + Sync + 'static> ToAnySubscriber for ArcMemo<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        AnySubscriber(
+            self.inner.data_ptr() as usize,
+            Arc::downgrade(&self.inner) as Weak<dyn Subscriber + Send + Sync>,
+        )
     }
 }
 
 impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
-    fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(self.inner.data_ptr() as usize, Arc::new(self.clone()))
-    }
-
     fn add_source(&self, source: AnySource) {
-        self.inner.write().sources.insert(source);
+        self.inner.read().sources.write().insert(source);
     }
 
-    fn clear_sources(&self) {
-        let subscriber = self.to_any_subscriber();
-        self.inner.write().sources.clear_sources(&subscriber);
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
+        self.inner.read().sources.write().clear_sources(subscriber);
     }
 }
 
@@ -275,7 +378,7 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
             compare_with,
             owner: Owner::new(),
             state: ReactiveNodeState::Dirty,
-            sources: SourceSet::new(),
+            sources: Default::default(),
             subscribers: SubscriberSet::new(),
         }
     }
@@ -316,6 +419,18 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
     }
 }
 
+impl<T: Send + Sync + 'static> ToAnySource for Memo<T> {
+    fn to_any_source(&self) -> AnySource {
+        self.inner.get().unwrap().to_any_source()
+    }
+}
+
+impl<T: Send + Sync + 'static> ToAnySubscriber for Memo<T> {
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        self.inner.get().unwrap().to_any_subscriber()
+    }
+}
+
 impl<T: Send + Sync + 'static> ReactiveNode for Memo<T> {
     fn set_state(&self, state: ReactiveNodeState) {
         if let Some(inner) = self.inner.get() {
@@ -350,13 +465,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for Memo<T> {
 }
 
 impl<T: Send + Sync + 'static> Source for Memo<T> {
-    fn to_any_source(&self) -> AnySource {
-        self.inner
-            .get()
-            .map(|inner| inner.to_any_source())
-            .expect("boooooo")
-    }
-
     fn add_subscriber(&self, subscriber: AnySubscriber) {
         if let Some(inner) = self.inner.get() {
             inner.add_subscriber(subscriber)
@@ -377,22 +485,15 @@ impl<T: Send + Sync + 'static> Source for Memo<T> {
 }
 
 impl<T: Send + Sync + 'static> Subscriber for Memo<T> {
-    fn to_any_subscriber(&self) -> AnySubscriber {
-        self.inner
-            .get()
-            .map(|inner| inner.to_any_subscriber())
-            .expect("boooooo")
-    }
-
     fn add_source(&self, source: AnySource) {
         if let Some(inner) = self.inner.get() {
             inner.add_source(source)
         }
     }
 
-    fn clear_sources(&self) {
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
         if let Some(inner) = self.inner.get() {
-            inner.clear_sources()
+            inner.clear_sources(subscriber)
         }
     }
 }

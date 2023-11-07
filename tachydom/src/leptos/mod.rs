@@ -67,9 +67,11 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
+    const MIN_LENGTH: usize = V::MIN_LENGTH;
+
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         let value = self();
-        value.to_html(buf, position)
+        value.to_html_with_buf(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(

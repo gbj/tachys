@@ -1,5 +1,5 @@
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 use tachy_reaccy::prelude::*;
 
 pub async fn tick() {
@@ -166,13 +166,15 @@ async fn dynamic_dependencies() {
 
     let combined_count = Arc::new(RwLock::new(0));
 
-    Effect::new({
+    // we forget it so it continues running
+    // if it's dropped, it will stop listening
+    mem::forget(Effect::new({
         let combined_count = Arc::clone(&combined_count);
         move |_| {
             _ = name.get();
             *combined_count.write() += 1;
         }
-    });
+    }));
     tick().await;
 
     assert_eq!(*combined_count.read(), 1);

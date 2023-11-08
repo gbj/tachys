@@ -179,8 +179,6 @@ impl Subscriber for AnySubscriber {
     fn clear_sources(&self, subscriber: &AnySubscriber) {
         if let Some(inner) = self.1.upgrade() {
             inner.clear_sources(subscriber);
-        } else {
-            panic!("boop");
         }
     }
 }

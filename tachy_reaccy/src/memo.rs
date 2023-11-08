@@ -106,13 +106,35 @@ impl<T: Send + Sync + 'static> ArcMemo<T> {
     where
         T: PartialEq,
     {
+        let inner =
+            Arc::new(RwLock::new(MemoInner::new(Arc::new(fun), |lhs, rhs| {
+                lhs.as_ref() == rhs.as_ref()
+            })));
+
+        // I'll admit this is kind of stupid.
+        //
+        // AnySubscriber is a Weak ref to something that implements Subscriber
+        // During the "do I need to update?" check, the memo needs to re-run, which
+        // means it needs to push itself onto the observer stack so that any
+        // signals are registered with it.
+        //
+        // If a Weak<RwLock<MemoInner<_>>> is going to be a Weak<dyn Subscriber>,
+        // then RwLock<MemoInner<_>> needs to be Subscriber; but it needs to be able to
+        // create an AnySubscriber to run update_if_necessary, so it effectively needs
+        // access to a Weak reference to... itself.
+        //
+        // Here we do exactly that. Having constructed MemoInner with an empty any_subscriber
+        // field, and then Arc-ing it, we immediately mutate it to hold an AnySubscriber that
+        // points to itself.
+        inner.write().any_subscriber = Some(AnySubscriber(
+            inner.data_ptr() as usize,
+            Arc::downgrade(&inner) as Weak<dyn Subscriber + Send + Sync>,
+        ));
+
         Self {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
-            inner: Arc::new(RwLock::new(MemoInner::new(
-                Arc::new(fun),
-                |lhs, rhs| lhs.as_ref() == rhs.as_ref(),
-            ))),
+            inner,
         }
     }
 
@@ -146,8 +168,11 @@ struct MemoInner<T> {
     compare_with: fn(Option<&T>, Option<&T>) -> bool,
     owner: Owner,
     state: ReactiveNodeState,
-    sources: Arc<RwLock<SourceSet>>,
+    sources: SourceSet,
     subscribers: SubscriberSet,
+    // needs to be inserted after Arc-ing the MemoInner
+    // because it is a Weak reference back to that whole structure
+    any_subscriber: Option<AnySubscriber>,
 }
 
 impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
@@ -186,12 +211,10 @@ impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
         let needs_update = match state {
             ReactiveNodeState::Clean => false,
             ReactiveNodeState::Dirty => true,
-            ReactiveNodeState::Check => {
-                (&*sources.read()).into_iter().any(|source| {
-                    source.update_if_necessary()
-                        || self.read().state == ReactiveNodeState::Dirty
-                })
-            }
+            ReactiveNodeState::Check => (&sources).into_iter().any(|source| {
+                source.update_if_necessary()
+                    || self.read().state == ReactiveNodeState::Dirty
+            }),
         };
 
         if needs_update {
@@ -206,7 +229,8 @@ impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
             };
 
             // TODO clear sources
-            let any_subscriber = self.read().sources.to_any_subscriber();
+            let any_subscriber =
+                { &self.read().any_subscriber.clone().unwrap() };
             any_subscriber.clear_sources(&any_subscriber);
             let new_value = owner
                 .with(|| any_subscriber.with_observer(|| fun(value.as_ref())));
@@ -326,11 +350,11 @@ impl<T: Send + Sync + 'static> Source for RwLock<MemoInner<T>> {
 
 impl<T: Send + Sync + 'static> Subscriber for RwLock<MemoInner<T>> {
     fn add_source(&self, source: AnySource) {
-        self.read().sources.add_source(source);
+        self.write().sources.insert(source);
     }
 
     fn clear_sources(&self, subscriber: &AnySubscriber) {
-        self.read().sources.clear_sources(subscriber);
+        self.write().sources.clear_sources(subscriber);
     }
 }
 
@@ -359,11 +383,11 @@ impl<T: Send + Sync + 'static> ToAnySubscriber for ArcMemo<T> {
 
 impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
     fn add_source(&self, source: AnySource) {
-        self.inner.read().sources.write().insert(source);
+        self.inner.write().sources.insert(source);
     }
 
     fn clear_sources(&self, subscriber: &AnySubscriber) {
-        self.inner.read().sources.write().clear_sources(subscriber);
+        self.inner.write().sources.clear_sources(subscriber);
     }
 }
 
@@ -380,6 +404,7 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
             state: ReactiveNodeState::Dirty,
             sources: Default::default(),
             subscribers: SubscriberSet::new(),
+            any_subscriber: None,
         }
     }
 }

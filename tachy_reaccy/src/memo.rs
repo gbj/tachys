@@ -106,31 +106,18 @@ impl<T: Send + Sync + 'static> ArcMemo<T> {
     where
         T: PartialEq,
     {
-        let inner =
-            Arc::new(RwLock::new(MemoInner::new(Arc::new(fun), |lhs, rhs| {
-                lhs.as_ref() == rhs.as_ref()
-            })));
+        let inner = Arc::new_cyclic(|weak| {
+            let subscriber = AnySubscriber(
+                weak.as_ptr() as usize,
+                Weak::clone(weak) as Weak<dyn Subscriber + Send + Sync>,
+            );
 
-        // I'll admit this is kind of stupid.
-        //
-        // AnySubscriber is a Weak ref to something that implements Subscriber
-        // During the "do I need to update?" check, the memo needs to re-run, which
-        // means it needs to push itself onto the observer stack so that any
-        // signals are registered with it.
-        //
-        // If a Weak<RwLock<MemoInner<_>>> is going to be a Weak<dyn Subscriber>,
-        // then RwLock<MemoInner<_>> needs to be Subscriber; but it needs to be able to
-        // create an AnySubscriber to run update_if_necessary, so it effectively needs
-        // access to a Weak reference to... itself.
-        //
-        // Here we do exactly that. Having constructed MemoInner with an empty any_subscriber
-        // field, and then Arc-ing it, we immediately mutate it to hold an AnySubscriber that
-        // points to itself.
-        inner.write().any_subscriber = Some(AnySubscriber(
-            inner.data_ptr() as usize,
-            Arc::downgrade(&inner) as Weak<dyn Subscriber + Send + Sync>,
-        ));
-
+            RwLock::new(MemoInner::new(
+                Arc::new(fun),
+                |lhs, rhs| lhs.as_ref() == rhs.as_ref(),
+                subscriber,
+            ))
+        });
         Self {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
@@ -170,9 +157,7 @@ struct MemoInner<T> {
     state: ReactiveNodeState,
     sources: SourceSet,
     subscribers: SubscriberSet,
-    // needs to be inserted after Arc-ing the MemoInner
-    // because it is a Weak reference back to that whole structure
-    any_subscriber: Option<AnySubscriber>,
+    any_subscriber: AnySubscriber,
 }
 
 impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
@@ -229,8 +214,7 @@ impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
             };
 
             // TODO clear sources
-            let any_subscriber =
-                { &self.read().any_subscriber.clone().unwrap() };
+            let any_subscriber = { self.read().any_subscriber.clone() };
             any_subscriber.clear_sources(&any_subscriber);
             let new_value = owner
                 .with(|| any_subscriber.with_observer(|| fun(value.as_ref())));
@@ -281,47 +265,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
 
     fn update_if_necessary(&self) -> bool {
         self.inner.update_if_necessary()
-    }
-}
-
-impl ToAnySubscriber for Arc<RwLock<SourceSet>> {
-    fn to_any_subscriber(&self) -> AnySubscriber {
-        AnySubscriber(
-            self.data_ptr() as usize,
-            Arc::downgrade(self) as Weak<dyn Subscriber + Send + Sync>,
-        )
-    }
-}
-
-impl ReactiveNode for RwLock<SourceSet> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        todo!()
-    }
-
-    fn mark_dirty(&self) {
-        todo!()
-    }
-
-    fn mark_check(&self) {
-        todo!()
-    }
-
-    fn mark_subscribers_check(&self) {
-        todo!()
-    }
-
-    fn update_if_necessary(&self) -> bool {
-        todo!()
-    }
-}
-
-impl Subscriber for RwLock<SourceSet> {
-    fn add_source(&self, source: AnySource) {
-        self.write().insert(source);
-    }
-
-    fn clear_sources(&self, subscriber: &AnySubscriber) {
-        self.write().clear_sources(subscriber);
     }
 }
 
@@ -395,6 +338,7 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
     pub fn new(
         fun: Arc<dyn Fn(Option<&T>) -> T + Send + Sync>,
         compare_with: fn(Option<&T>, Option<&T>) -> bool,
+        any_subscriber: AnySubscriber,
     ) -> Self {
         Self {
             value: None,
@@ -404,7 +348,7 @@ impl<T: Send + Sync + 'static> MemoInner<T> {
             state: ReactiveNodeState::Dirty,
             sources: Default::default(),
             subscribers: SubscriberSet::new(),
-            any_subscriber: None,
+            any_subscriber,
         }
     }
 }

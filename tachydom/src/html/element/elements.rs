@@ -144,7 +144,7 @@ macro_rules! html_self_closing_elements {
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
-                    const SELF_CLOSING: bool = false;
+                    const SELF_CLOSING: bool = true;
                 }
 
                 impl CreateElement<Dom> for [<$tag:camel>] {

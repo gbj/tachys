@@ -19,6 +19,7 @@ web-sys = { version = "0.3", features = ["console"], optional = true }
 tokio = { version = "1", features = ["rt", "macros"], optional = true }
 tracing = { version = "0.1.40", optional = true }
 cfg-if = "1"
+smallvec = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1,12 +1,6 @@
 use crate::{Observer, OBSERVER};
-use rustc_hash::FxHashSet;
-use std::{
-    collections::hash_set::{IntoIter, Iter},
-    fmt::Debug,
-    hash::Hash,
-    mem,
-    sync::Weak,
-};
+use smallvec::{IntoIter, SmallVec};
+use std::{fmt::Debug, hash::Hash, mem, slice, sync::Weak};
 
 pub trait ReactiveNode {
     /// Sets the state of this source.
@@ -253,7 +247,7 @@ impl PartialEq for AnySubscriber {
 impl Eq for AnySubscriber {}
 
 #[derive(Default, Clone)]
-pub struct SourceSet(FxHashSet<AnySource>);
+pub struct SourceSet(SmallVec<[AnySource; 4]>);
 
 impl SourceSet {
     pub fn new() -> Self {
@@ -261,14 +255,16 @@ impl SourceSet {
     }
 
     pub fn insert(&mut self, source: AnySource) {
-        self.0.insert(source);
+        self.0.push(source);
     }
 
     pub fn remove(&mut self, source: &AnySource) {
-        self.0.remove(source);
+        if let Some(pos) = self.0.iter().position(|s| s == source) {
+            self.0.remove(pos);
+        }
     }
 
-    pub fn take(&mut self) -> FxHashSet<AnySource> {
+    pub fn take(&mut self) -> SmallVec<[AnySource; 4]> {
         mem::take(&mut self.0)
     }
 
@@ -285,7 +281,7 @@ impl SourceSet {
 
 impl IntoIterator for SourceSet {
     type Item = AnySource;
-    type IntoIter = IntoIter<AnySource>;
+    type IntoIter = IntoIter<[AnySource; 4]>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -294,7 +290,7 @@ impl IntoIterator for SourceSet {
 
 impl<'a> IntoIterator for &'a SourceSet {
     type Item = &'a AnySource;
-    type IntoIter = Iter<'a, AnySource>;
+    type IntoIter = slice::Iter<'a, AnySource>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -302,7 +298,7 @@ impl<'a> IntoIterator for &'a SourceSet {
 }
 
 #[derive(Default, Clone)]
-pub struct SubscriberSet(FxHashSet<AnySubscriber>);
+pub struct SubscriberSet(SmallVec<[AnySubscriber; 4]>);
 
 impl SubscriberSet {
     pub fn new() -> Self {
@@ -310,14 +306,16 @@ impl SubscriberSet {
     }
 
     pub fn subscribe(&mut self, subscriber: AnySubscriber) {
-        self.0.insert(subscriber);
+        self.0.push(subscriber);
     }
 
     pub fn unsubscribe(&mut self, subscriber: &AnySubscriber) {
-        self.0.remove(subscriber);
+        if let Some(pos) = self.0.iter().position(|s| s == subscriber) {
+            self.0.remove(pos);
+        }
     }
 
-    pub fn take(&mut self) -> FxHashSet<AnySubscriber> {
+    pub fn take(&mut self) -> SmallVec<[AnySubscriber; 4]> {
         mem::take(&mut self.0)
     }
 
@@ -328,7 +326,7 @@ impl SubscriberSet {
 
 impl IntoIterator for SubscriberSet {
     type Item = AnySubscriber;
-    type IntoIter = IntoIter<AnySubscriber>;
+    type IntoIter = IntoIter<[AnySubscriber; 4]>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -337,7 +335,7 @@ impl IntoIterator for SubscriberSet {
 
 impl<'a> IntoIterator for &'a SubscriberSet {
     type Item = &'a AnySubscriber;
-    type IntoIter = Iter<'a, AnySubscriber>;
+    type IntoIter = slice::Iter<'a, AnySubscriber>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()

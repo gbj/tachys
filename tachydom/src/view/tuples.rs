@@ -2,7 +2,7 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, Renderer,
     ToTemplate,
 };
-use crate::hydration::Cursor;
+use crate::{hydration::Cursor, view::StreamBuilder};
 use const_str_slice_concat::{
     const_concat, const_concat_with_separator, str_from_buffer,
 };
@@ -154,6 +154,21 @@ macro_rules! impl_view_for_tuples {
 					[<$first:lower>].to_html_with_buf(buf, position);
 					position.set(Position::NextChild);
 					$([<$ty:lower>].to_html_with_buf(buf, position));*
+				}
+			}
+
+			fn to_html_async_buffered(
+				self,
+				buf: &StreamBuilder,
+				position: &PositionState,
+			) where
+				Self: Sized,
+			{
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
+					[<$first:lower>].to_html_async_buffered(buf, position);
+					position.set(Position::NextChild);
+					$([<$ty:lower>].to_html_async_buffered(buf, position));*
 				}
 			}
 

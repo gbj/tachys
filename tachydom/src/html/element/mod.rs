@@ -2,6 +2,7 @@ use crate::{
     html::attribute::Attribute,
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
+    ssr::StreamBuilder,
     view::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
@@ -253,6 +254,65 @@ where
         }
     }
 
+    fn to_html_async_buffered(
+        self,
+        buffer: &StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        let mut buf = String::with_capacity(Self::MIN_LENGTH);
+        // opening tag
+        buf.push('<');
+        buf.push_str(E::TAG);
+
+        // attributes
+
+        // `class` and `style` are created first, and pushed later
+        // this is because they can be filled by a mixture of values that include
+        // either the whole value (`class="..."` or `style="..."`) and individual
+        // classes and styles (`class:foo=true` or `style:height="40px"`), so they
+        // need to be filled during the whole attribute-creation process and then
+        // added
+
+        // String doesn't allocate until the first push, so this is cheap if there
+        // is no class or style on an element
+        let mut class = String::new();
+        let mut style = String::new();
+
+        // inject regular attributes, and fill class and style
+        self.attributes.to_html(&mut buf, &mut class, &mut style);
+
+        if !class.is_empty() {
+            buf.push(' ');
+            buf.push_str("class=\"");
+            buf.push_str(class.trim_start().trim_end());
+            buf.push('"');
+        }
+        if !style.is_empty() {
+            buf.push(' ');
+            buf.push_str("style=\"");
+            buf.push_str(style.trim_start().trim_end());
+            buf.push('"');
+        }
+
+        buf.push('>');
+        buffer.push_sync(&buf);
+
+        if !E::SELF_CLOSING {
+            // children
+            position.set(Position::FirstChild);
+            self.children.to_html_async_buffered(buffer, position);
+
+            // closing tag
+            let mut buf = String::with_capacity(3 + E::TAG.len());
+            buf.push_str("</");
+            buf.push_str(E::TAG);
+            buf.push('>');
+            buffer.push_sync(&buf);
+        }
+    }
+
     fn hydrate<const FROM_SERVER: bool>(
         self,
         cursor: &Cursor<Rndr>,
@@ -393,7 +453,7 @@ mod tests {
             element::{em, ElementChild, Main},
         },
         renderer::mock_dom::MockDom,
-        view::{static_types::Static, Render, RenderHtml},
+        view::{Render, RenderHtml},
     };
 
     #[test]
@@ -421,8 +481,11 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "nightly")]
     #[test]
     fn html_render_allocates_appropriate_buffer() {
+        use crate::view::static_types::Static;
+
         let el: HtmlElement<Main, _, _, MockDom> = main().child(p().child((
             Static::<"Hello, ">,
             em().child(Static::<"beautiful">),

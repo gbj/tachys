@@ -10,6 +10,7 @@ pub mod html;
 pub mod hydration;
 pub mod renderer;
 pub mod spawner;
+pub mod ssr;
 pub mod view;
 
 #[cfg(all(feature = "leptos", not(feature = "reaccy")))]

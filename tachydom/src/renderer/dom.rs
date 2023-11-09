@@ -416,4 +416,9 @@ impl SpawningRenderer for Dom {
     type Spawn = crate::spawner::wasm::Wasm;
 }
 
+#[cfg(all(feature = "tokio", not(feature = "web")))]
+impl SpawningRenderer for Dom {
+    type Spawn = crate::spawner::tokio::Tokio;
+}
+
 /* Event Delegation */

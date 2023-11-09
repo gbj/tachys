@@ -1,6 +1,6 @@
-use crate::{hydration::Cursor, renderer::Renderer};
-use futures::Stream;
-use std::{cell::Cell, collections::VecDeque, future::Future, rc::Rc};
+use crate::{hydration::Cursor, renderer::Renderer, ssr::StreamBuilder};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub mod any_view;
 pub mod either;
@@ -67,6 +67,19 @@ where
         buf
     }
 
+    /// Renders a view to an in-order stream of HTML.
+    fn to_html_stream_in_order(self) -> StreamBuilder
+    where
+        Self: Sized,
+    {
+        let builder = StreamBuilder::default();
+        self.to_html_async_buffered(
+            &builder,
+            &PositionState::new(Position::FirstChild),
+        );
+        builder
+    }
+
     /// Renders a view to an HTML string, asynchronously.
     /* fn to_html_stream(self) -> impl Stream<Item = String>
     where
@@ -93,16 +106,15 @@ where
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
 
     /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
-    /* fn to_html_async_buffered(
+    fn to_html_async_buffered(
         self,
-        chunks: &mut VecDeque<StreamChunk>,
-        curr: &mut String,
+        buf: &StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,
     {
-        self.to_html_with_buf(curr, position);
-    } */
+        buf.with_buf(|buf| self.to_html_with_buf(buf, position));
+    }
 
     /// Makes a set of DOM nodes rendered from HTML interactive.
     ///
@@ -219,19 +231,19 @@ pub trait ToTemplate {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct PositionState(Rc<Cell<Position>>);
+pub struct PositionState(Arc<RwLock<Position>>);
 
 impl PositionState {
     pub fn new(position: Position) -> Self {
-        Self(Rc::new(Cell::new(position)))
+        Self(Arc::new(RwLock::new(position)))
     }
 
     pub fn set(&self, position: Position) {
-        self.0.set(position);
+        *self.0.write() = position;
     }
 
     pub fn get(&self) -> Position {
-        self.0.get()
+        *self.0.read()
     }
 }
 

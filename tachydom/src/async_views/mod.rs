@@ -2,6 +2,7 @@ use crate::{
     hydration::Cursor,
     renderer::{Renderer, SpawningRenderer},
     spawner::Spawner,
+    ssr::StreamBuilder,
     view::{
         either::{Either, EitherState},
         Mountable, PositionState, Render, RenderHtml,
@@ -9,7 +10,7 @@ use crate::{
 };
 use futures::{pin_mut, FutureExt};
 use parking_lot::RwLock;
-use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{fmt::Debug, future::Future, mem, pin::Pin, sync::Arc};
 
 pub trait FutureViewExt: Sized {
     fn suspend(self) -> Suspend<false, (), Self>
@@ -117,9 +118,9 @@ where
 impl<const TRANSITION: bool, Fal, Fut, Rndr> RenderHtml<Rndr>
     for Suspend<TRANSITION, Fal, Fut>
 where
-    Fal: RenderHtml<Rndr> + 'static,
-    Fut: Future + 'static,
-    Fut::Output: RenderHtml<Rndr>,
+    Fal: RenderHtml<Rndr> + Send + Sync + 'static,
+    Fut: Future + Send + Sync + 'static,
+    Fut::Output: RenderHtml<Rndr> + Send + Sync,
     Rndr: SpawningRenderer + 'static,
     Rndr::Node: Clone,
     Rndr::Element: Clone,
@@ -128,6 +129,27 @@ where
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         todo!()
+    }
+
+    fn to_html_async_buffered(
+        self,
+        buf: &StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        buf.push_async(
+            false, // TODO
+            {
+                let position = position.clone();
+                async move {
+                    let value = self.fut.await;
+                    let builder = StreamBuilder::new();
+                    value.to_html_async_buffered(&builder, &position);
+                    builder.take_chunks()
+                }
+            },
+        );
     }
 
     fn hydrate<const FROM_SERVER: bool>(

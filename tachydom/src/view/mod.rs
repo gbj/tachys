@@ -72,9 +72,9 @@ where
     where
         Self: Sized,
     {
-        let builder = StreamBuilder::default();
+        let mut builder = StreamBuilder::default();
         self.to_html_async_buffered(
-            &builder,
+            &mut builder,
             &PositionState::new(Position::FirstChild),
         );
         builder.finish()
@@ -108,7 +108,7 @@ where
     /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
     fn to_html_async_buffered(
         self,
-        buf: &StreamBuilder,
+        buf: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,

@@ -11,8 +11,8 @@ use std::{
     task::{Context, Poll},
 };
 
-#[derive(Clone, Debug, Default)]
-pub struct StreamBuilder(Arc<RwLock<StreamBuilderInner>>);
+#[derive(Debug, Default)]
+pub struct StreamBuilder(StreamBuilderInner);
 
 type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + Sync>>;
 
@@ -21,52 +21,49 @@ impl StreamBuilder {
         Default::default()
     }
 
-    pub fn push_sync(&self, string: &str) {
-        self.0.write().sync_buf.push_str(string);
+    pub fn push_sync(&mut self, string: &str) {
+        self.0.sync_buf.push_str(string);
     }
 
     pub fn push_async(
-        &self,
+        &mut self,
         should_block: bool,
         fut: impl Future<Output = VecDeque<StreamChunk>> + Send + Sync + 'static,
     ) {
         // flush sync chunk
-        let mut lock = self.0.write();
-        let sync = mem::take(&mut lock.sync_buf);
+        let sync = mem::take(&mut self.0.sync_buf);
         if !sync.is_empty() {
-            lock.chunks.push_back(StreamChunk::Sync(sync));
+            self.0.chunks.push_back(StreamChunk::Sync(sync));
         }
-        lock.chunks.push_back(StreamChunk::Async {
+        self.0.chunks.push_back(StreamChunk::Async {
             chunks: Box::pin(fut) as PinnedFuture<VecDeque<StreamChunk>>,
             should_block,
         });
     }
 
-    pub fn with_buf(&self, fun: impl FnOnce(&mut String)) {
-        fun(&mut self.0.write().sync_buf)
+    pub fn with_buf(&mut self, fun: impl FnOnce(&mut String)) {
+        fun(&mut self.0.sync_buf)
     }
 
-    pub fn take_chunks(&self) -> VecDeque<StreamChunk> {
-        let mut lock = self.0.write();
-        let sync = mem::take(&mut lock.sync_buf);
+    pub fn take_chunks(&mut self) -> VecDeque<StreamChunk> {
+        let sync = mem::take(&mut self.0.sync_buf);
         if !sync.is_empty() {
-            lock.chunks.push_back(StreamChunk::Sync(sync));
+            self.0.chunks.push_back(StreamChunk::Sync(sync));
         }
-        mem::take(&mut lock.chunks)
+        mem::take(&mut self.0.chunks)
     }
 
-    pub fn finish(self) -> Self {
-        let mut lock = self.0.write();
-        let sync_buf_remaining = mem::take(&mut lock.sync_buf);
+    pub fn finish(mut self) -> Self {
+        let sync_buf_remaining = mem::take(&mut self.0.sync_buf);
         if sync_buf_remaining.is_empty() {
-            drop(lock);
             return self;
-        } else if let Some(StreamChunk::Sync(buf)) = lock.chunks.back_mut() {
+        } else if let Some(StreamChunk::Sync(buf)) = self.0.chunks.back_mut() {
             buf.push_str(&sync_buf_remaining);
         } else {
-            lock.chunks.push_back(StreamChunk::Sync(sync_buf_remaining));
+            self.0
+                .chunks
+                .push_back(StreamChunk::Sync(sync_buf_remaining));
         }
-        drop(lock);
         self
     }
 }
@@ -115,29 +112,29 @@ impl Stream for StreamBuilder {
     type Item = String;
 
     fn poll_next(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        let pending = self.0.write().pending.take();
+        let mut this = self.as_mut();
+        let pending = this.0.pending.take();
         if let Some(mut pending) = pending {
             match pending.as_mut().poll(cx) {
                 Poll::Pending => {
-                    self.0.write().pending = Some(pending);
+                    this.0.pending = Some(pending);
                     Poll::Pending
                 }
                 Poll::Ready(mut chunks) => {
-                    let mut lock = self.0.write();
-                    chunks.append(&mut lock.chunks);
-                    lock.chunks = chunks;
-                    drop(lock);
+                    for chunk in chunks.into_iter().rev() {
+                        this.0.chunks.push_front(chunk);
+                    }
                     self.poll_next(cx)
                 }
             }
         } else {
-            let next_chunk = self.0.write().chunks.pop_front();
+            let next_chunk = this.0.chunks.pop_front();
             match next_chunk {
                 None => {
-                    let sync_buf = mem::take(&mut self.0.write().sync_buf);
+                    let sync_buf = mem::take(&mut this.0.sync_buf);
                     if sync_buf.is_empty() {
                         Poll::Ready(None)
                     } else {
@@ -145,16 +142,14 @@ impl Stream for StreamBuilder {
                     }
                 }
                 Some(StreamChunk::Sync(mut value)) => {
-                    let mut lock = self.0.write();
-
                     loop {
-                        match lock.chunks.pop_front() {
+                        match this.0.chunks.pop_front() {
                             None => break,
                             Some(StreamChunk::Async {
                                 chunks,
                                 should_block,
                             }) => {
-                                lock.chunks.push_front(StreamChunk::Async {
+                                this.0.chunks.push_front(StreamChunk::Async {
                                     chunks,
                                     should_block,
                                 });
@@ -166,7 +161,7 @@ impl Stream for StreamBuilder {
                         }
                     }
 
-                    let sync_buf = mem::take(&mut lock.sync_buf);
+                    let sync_buf = mem::take(&mut this.0.sync_buf);
                     value.push_str(&sync_buf);
                     Poll::Ready(Some(value))
                 }
@@ -174,7 +169,7 @@ impl Stream for StreamBuilder {
                     mut chunks,
                     should_block,
                 }) => {
-                    self.0.write().pending = Some(chunks);
+                    this.0.pending = Some(chunks);
                     self.poll_next(cx)
                 }
             }

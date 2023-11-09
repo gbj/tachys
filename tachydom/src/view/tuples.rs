@@ -86,7 +86,7 @@ where
 
     fn to_html_async_buffered(
         self,
-        buf: &StreamBuilder,
+        buf: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,
@@ -169,7 +169,7 @@ macro_rules! impl_view_for_tuples {
 
 			fn to_html_async_buffered(
 				self,
-				buf: &StreamBuilder,
+				buf: &mut StreamBuilder,
 				position: &PositionState,
 			) where
 				Self: Sized,

@@ -133,7 +133,7 @@ where
 
     fn to_html_async_buffered(
         self,
-        buf: &StreamBuilder,
+        buf: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,
@@ -144,8 +144,8 @@ where
                 let position = position.clone();
                 async move {
                     let value = self.fut.await;
-                    let builder = StreamBuilder::new();
-                    value.to_html_async_buffered(&builder, &position);
+                    let mut builder = StreamBuilder::new();
+                    value.to_html_async_buffered(&mut builder, &position);
                     builder.take_chunks()
                 }
             },

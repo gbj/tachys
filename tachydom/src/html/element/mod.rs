@@ -256,7 +256,7 @@ where
 
     fn to_html_async_buffered(
         self,
-        buffer: &StreamBuilder,
+        buffer: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,

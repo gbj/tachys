@@ -106,7 +106,7 @@ where
     /// let el: HtmlElement<_, _, _, MockDom> =
     ///     p().attr(id("foo")).attr(class("bar"));
     /// let el = el.build();
-    /// assert_eq!(el.el.to_debug_html(), "<p id=\"foo\" class=\"bar\"></p>");
+    /// assert_eq!(el.el.to_debug_html(), "<p class=\"bar\" id=\"foo\"></p>");
     /// ```
     #[inline(always)]
     pub fn attr<NewAttr>(
@@ -463,7 +463,7 @@ mod tests {
         let el = el.build();
         assert_eq!(
             el.el.to_debug_html(),
-            "<main><p id=\"test\" lang=\"en\">Hello, world!</p></main>"
+            "<main><p lang=\"en\" id=\"test\">Hello, world!</p></main>"
         );
     }
 

@@ -84,6 +84,16 @@ where
         self.0.to_html_with_buf(buf, position);
     }
 
+    fn to_html_async_buffered(
+        self,
+        buf: &StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        self.0.to_html_async_buffered(buf, position);
+    }
+
     fn hydrate<const FROM_SERVER: bool>(
         self,
         cursor: &Cursor<R>,

@@ -54,6 +54,21 @@ impl StreamBuilder {
         }
         mem::take(&mut lock.chunks)
     }
+
+    pub fn finish(self) -> Self {
+        let mut lock = self.0.write();
+        let sync_buf_remaining = mem::take(&mut lock.sync_buf);
+        if sync_buf_remaining.is_empty() {
+            drop(lock);
+            return self;
+        } else if let Some(StreamChunk::Sync(buf)) = lock.chunks.back_mut() {
+            buf.push_str(&sync_buf_remaining);
+        } else {
+            lock.chunks.push_back(StreamChunk::Sync(sync_buf_remaining));
+        }
+        drop(lock);
+        self
+    }
 }
 
 #[derive(Default)]
@@ -110,11 +125,10 @@ impl Stream for StreamBuilder {
                     self.0.write().pending = Some(pending);
                     Poll::Pending
                 }
-                Poll::Ready(chunks) => {
+                Poll::Ready(mut chunks) => {
                     let mut lock = self.0.write();
-                    for chunk in chunks {
-                        lock.chunks.push_front(chunk);
-                    }
+                    chunks.append(&mut lock.chunks);
+                    lock.chunks = chunks;
                     drop(lock);
                     self.poll_next(cx)
                 }
@@ -130,7 +144,32 @@ impl Stream for StreamBuilder {
                         Poll::Ready(Some(sync_buf))
                     }
                 }
-                Some(StreamChunk::Sync(value)) => Poll::Ready(Some(value)),
+                Some(StreamChunk::Sync(mut value)) => {
+                    let mut lock = self.0.write();
+
+                    loop {
+                        match lock.chunks.pop_front() {
+                            None => break,
+                            Some(StreamChunk::Async {
+                                chunks,
+                                should_block,
+                            }) => {
+                                lock.chunks.push_front(StreamChunk::Async {
+                                    chunks,
+                                    should_block,
+                                });
+                                break;
+                            }
+                            Some(StreamChunk::Sync(next)) => {
+                                value.push_str(&next);
+                            }
+                        }
+                    }
+
+                    let sync_buf = mem::take(&mut lock.sync_buf);
+                    value.push_str(&sync_buf);
+                    Poll::Ready(Some(value))
+                }
                 Some(StreamChunk::Async {
                     mut chunks,
                     should_block,
@@ -173,18 +212,9 @@ mod tests {
 
     #[tokio::test]
     async fn single_async_block_in_stream() {
-        /* let el: HtmlElement<Main, _, _, Dom> = main().child((
-            p().child(("Hello, ", em().child("beautiful"), " world!")),
-            async {
-                sleep(Duration::from_millis(250)).await;
-                p().child("Suspended")
-            }
-            .suspend(),
-        )); */
         let el = async {
             sleep(Duration::from_millis(250)).await;
             "Suspended"
-            //p().child("Suspended")
         }
         .suspend();
         let mut stream =
@@ -192,79 +222,71 @@ mod tests {
                 el,
             );
 
-        /*         let html = stream.next().await.unwrap();
-        assert_eq!(
-            html,
-            "<main><p>Hello, <em>beautiful</em> world!</p></main>"
-        ); */
-
         let html = stream.next().await.unwrap();
         assert_eq!(html, "Suspended");
     }
-}
 
-/* #[async_recursion]
-async fn handle_blocking_chunks(
-    tx: UnboundedSender<String>,
-    mut queued_chunks: VecDeque<StreamChunk>,
-) -> VecDeque<StreamChunk> {
-    let mut buffer = String::new();
-    while let Some(chunk) = queued_chunks.pop_front() {
-        match chunk {
-            StreamChunk::Sync(sync) => buffer.push_str(&sync),
-            StreamChunk::Async {
-                chunks,
-                should_block,
-            } => {
-                if should_block {
-                    // add static HTML before the Suspense and stream it down
-                    tx.unbounded_send(std::mem::take(&mut buffer))
-                        .expect("failed to send async HTML chunk");
-
-                    // send the inner stream
-                    let suspended = chunks.await;
-                    handle_blocking_chunks(tx.clone(), suspended).await;
-                } else {
-                    // TODO: should probably first check if there are any *other* blocking chunks
-                    queued_chunks.push_front(StreamChunk::Async {
-                        chunks,
-                        should_block: false,
-                    });
-                    break;
-                }
+    #[tokio::test]
+    async fn async_with_siblings_in_stream() {
+        let el = (
+            "Before Suspense",
+            async {
+                sleep(Duration::from_millis(250)).await;
+                "Suspended"
             }
-        }
+            .suspend(),
+        );
+        let mut stream =
+            <(&str, Suspend<false, _, _>) as RenderHtml<Dom>>::to_html_stream_in_order(
+                el,
+            );
+
+        assert_eq!(stream.next().await.unwrap(), "Before Suspense");
+        assert_eq!(stream.next().await.unwrap(), "<!>Suspended");
+        assert!(stream.next().await.is_none());
     }
 
-    // send final sync chunk
-    tx.unbounded_send(std::mem::take(&mut buffer))
-        .expect("failed to send final HTML chunk");
-
-    queued_chunks
-}
-
-#[async_recursion]
-pub(crate) async fn handle_chunks(
-    tx: UnboundedSender<String>,
-    chunks: VecDeque<StreamChunk>,
-) {
-    let mut buffer = String::new();
-    for chunk in chunks {
-        match chunk {
-            StreamChunk::Sync(sync) => buffer.push_str(&sync),
-            StreamChunk::Async { chunks, .. } => {
-                // add static HTML before the Suspense and stream it down
-                tx.unbounded_send(std::mem::take(&mut buffer))
-                    .expect("failed to send async HTML chunk");
-
-                // send the inner stream
-                let suspended = chunks.await;
-
-                handle_chunks(tx.clone(), suspended).await;
+    #[tokio::test]
+    async fn async_inside_element_in_stream() {
+        let el: HtmlElement<_, _, _, Dom> = p().child((
+            "Before Suspense",
+            async {
+                sleep(Duration::from_millis(250)).await;
+                "Suspended"
             }
-        }
+            .suspend(),
+        ));
+        let mut stream = el.to_html_stream_in_order();
+
+        assert_eq!(stream.next().await.unwrap(), "<p>Before Suspense");
+        assert_eq!(stream.next().await.unwrap(), "<!>Suspended</p>");
+        assert!(stream.next().await.is_none());
     }
-    // send final sync chunk
-    tx.unbounded_send(std::mem::take(&mut buffer))
-        .expect("failed to send final HTML chunk");
-} */
+
+    #[tokio::test]
+    async fn nested_async_blocks() {
+        let el: HtmlElement<_, _, _, Dom> = main().child((
+            "Before Suspense",
+            async {
+                sleep(Duration::from_millis(250)).await;
+                p().child((
+                    "Before inner Suspense",
+                    async {
+                        sleep(Duration::from_millis(250)).await;
+                        "Inner Suspense"
+                    }
+                    .suspend(),
+                ))
+            }
+            .suspend(),
+        ));
+        let mut stream = el.to_html_stream_in_order();
+
+        assert_eq!(stream.next().await.unwrap(), "<main>Before Suspense");
+        assert_eq!(stream.next().await.unwrap(), "<p>Before inner Suspense");
+        assert_eq!(
+            stream.next().await.unwrap(),
+            "<!>Inner Suspense</p></main>"
+        );
+    }
+}

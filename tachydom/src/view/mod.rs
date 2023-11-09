@@ -77,7 +77,7 @@ where
             &builder,
             &PositionState::new(Position::FirstChild),
         );
-        builder
+        builder.finish()
     }
 
     /// Renders a view to an HTML string, asynchronously.

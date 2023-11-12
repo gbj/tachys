@@ -254,7 +254,7 @@ where
         }
     }
 
-    fn to_html_async_buffered(
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
         self,
         buffer: &mut StreamBuilder,
         position: &PositionState,
@@ -302,7 +302,8 @@ where
         if !E::SELF_CLOSING {
             // children
             position.set(Position::FirstChild);
-            self.children.to_html_async_buffered(buffer, position);
+            self.children
+                .to_html_async_buffered::<OUT_OF_ORDER>(buffer, position);
 
             // closing tag
             let mut buf = String::with_capacity(3 + E::TAG.len());

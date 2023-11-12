@@ -73,7 +73,20 @@ where
         Self: Sized,
     {
         let mut builder = StreamBuilder::default();
-        self.to_html_async_buffered(
+        self.to_html_async_buffered::<false>(
+            &mut builder,
+            &PositionState::new(Position::FirstChild),
+        );
+        builder.finish()
+    }
+
+    /// Renders a view to an out-of-order stream of HTML.
+    fn to_html_stream_out_of_order(self) -> StreamBuilder
+    where
+        Self: Sized,
+    {
+        let mut builder = StreamBuilder::new(Some(vec![0]));
+        self.to_html_async_buffered::<true>(
             &mut builder,
             &PositionState::new(Position::FirstChild),
         );
@@ -106,7 +119,7 @@ where
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
 
     /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
-    fn to_html_async_buffered(
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,

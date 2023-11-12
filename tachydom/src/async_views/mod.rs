@@ -131,25 +131,55 @@ where
         todo!()
     }
 
-    fn to_html_async_buffered(
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,
     {
-        buf.push_async(
-            false, // TODO
-            {
-                let position = position.clone();
-                async move {
-                    let value = self.fut.await;
-                    let mut builder = StreamBuilder::new();
-                    value.to_html_async_buffered(&mut builder, &position);
-                    builder.take_chunks()
+        buf.next_id();
+
+        let mut fut = Box::pin(self.fut);
+        match fut.as_mut().now_or_never() {
+            Some(resolved) => {
+                let mut builder = StreamBuilder::new(buf.clone_id());
+                resolved.to_html_async_buffered::<OUT_OF_ORDER>(
+                    &mut builder,
+                    position,
+                );
+                let builder = builder.finish();
+                buf.append(builder);
+            }
+            None => {
+                let id = buf.clone_id();
+
+                // out-of-order streams immediately push fallback,
+                // wrapped by suspense markers
+                if OUT_OF_ORDER {
+                    buf.push_fallback(self.fallback, position);
+                    buf.push_async_out_of_order(
+                        false, /* TODO should_block */ fut, position,
+                    );
+                } else {
+                    buf.push_async(
+                        false, // TODO should_block
+                        {
+                            let position = position.clone();
+                            async move {
+                                let value = fut.await;
+                                let mut builder = StreamBuilder::new(id);
+                                value.to_html_async_buffered::<OUT_OF_ORDER>(
+                                    &mut builder,
+                                    &position,
+                                );
+                                builder.finish().take_chunks()
+                            }
+                        },
+                    );
                 }
-            },
-        );
+            }
+        };
     }
 
     fn hydrate<const FROM_SERVER: bool>(

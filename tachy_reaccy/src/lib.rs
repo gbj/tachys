@@ -1,12 +1,12 @@
 #![feature(return_position_impl_trait_in_trait)]
 
 mod arena;
+pub mod async_signal;
 pub mod context;
 pub mod effect;
 pub mod memo;
 mod notify;
 pub mod render_effect;
-//pub mod resource;
 pub mod selector;
 #[cfg(feature = "serde")]
 mod serde;

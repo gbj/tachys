@@ -1,6 +1,7 @@
 pub use crate::source::Track;
 use std::panic::Location;
 
+#[macro_export]
 macro_rules! unwrap_signal {
     ($signal:ident) => {
         || {
@@ -8,7 +9,7 @@ macro_rules! unwrap_signal {
             {
                 panic!(
                     "{}",
-                    panic_getting_disposed_signal(
+                    $crate::signal_traits::panic_getting_disposed_signal(
                         $signal.defined_at(),
                         Location::caller()
                     )
@@ -139,7 +140,7 @@ pub trait DefinedAt {
     fn defined_at(&self) -> Option<&'static Location<'static>>;
 }
 
-fn panic_getting_disposed_signal(
+pub(crate) fn panic_getting_disposed_signal(
     defined_at: Option<&'static Location<'static>>,
     location: &'static Location<'static>,
 ) -> String {

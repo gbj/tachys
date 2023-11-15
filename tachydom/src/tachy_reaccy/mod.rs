@@ -6,6 +6,7 @@ use crate::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
+use tachy_reaccy::async_signal::ScopedFuture;
 use tachy_reaccy::{
     render_effect::RenderEffect,
     /* resource::ScopedFuture, */ signal::Signal,
@@ -129,7 +130,7 @@ where
 }
 
 // Extends to track suspense
-/* impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
+impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
     pub fn track(self) -> Suspend<TRANSITION, Fal, ScopedFuture<Fut>> {
         let Suspend { fallback, fut } = self;
         Suspend {
@@ -137,7 +138,7 @@ where
             fut: ScopedFuture::new(fut),
         }
     }
-} */
+}
 
 /*
 #[cfg(test)]

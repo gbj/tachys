@@ -1,7 +1,6 @@
 use super::{AsyncState, ScopedFuture};
 use crate::{
     arena::{Owner, Stored},
-    effect::Effect,
     notify::NotificationSender,
     prelude::{DefinedAt, SignalWithUntracked},
     source::{
@@ -9,11 +8,13 @@ use crate::{
         SourceSet, Subscriber, SubscriberSet, ToAnySource, ToAnySubscriber,
         Track,
     },
-    spawn::spawn,
+    spawn::{spawn, spawn_local},
+    unwrap_signal,
 };
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::{
+    fmt::Debug,
     future::{Future, IntoFuture},
     mem,
     panic::Location,
@@ -24,14 +25,6 @@ use std::{
 pub struct ArcAsyncDerived<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    // function that generates a new future when needed
-    fun: Arc<
-        RwLock<
-            dyn FnMut() -> Pin<Box<dyn Future<Output = T> + Send + Sync>>
-                + Send
-                + Sync,
-        >,
-    >,
     // the current state of this signal
     value: Arc<RwLock<AsyncState<T>>>,
     // holds wakers generated when you .await this
@@ -44,11 +37,19 @@ impl<T> Clone for ArcAsyncDerived<T> {
         Self {
             #[cfg(debug_assertions)]
             defined_at: self.defined_at,
-            fun: Arc::clone(&self.fun),
             value: Arc::clone(&self.value),
             wakers: Arc::clone(&self.wakers),
             inner: Arc::clone(&self.inner),
         }
+    }
+}
+
+impl<T> Debug for ArcAsyncDerived<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_struct("ArcAsyncDerived");
+        #[cfg(debug_assertions)]
+        f.field("defined_at", &self.defined_at);
+        f.finish_non_exhaustive()
     }
 }
 
@@ -63,23 +64,16 @@ struct ArcAsyncDerivedInner {
     notifier: NotificationSender,
 }
 
-impl<T> ArcAsyncDerived<T> {
-    #[track_caller]
-    pub fn new<Fut>(
-        mut fun: impl FnMut() -> Fut + Send + Sync + 'static,
-    ) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
+// This implemented creating a derived async signal.
+// It needs to be implemented as a macro because it needs to be flexible over
+// whether `fun` returns a `Future` that is `Send + Sync`. Doing it as a function would,
+// as far as I can tell, require repeating most of the function body.
+macro_rules! spawn_derived {
+    ($spawner:ident, $fun:ident) => {{
         let (mut notifier, mut rx) = NotificationSender::channel();
         // begin loading eagerly but asynchronously
         notifier.notify();
 
-        let fun = Arc::new(RwLock::new(move || {
-            let fut = fun();
-            Box::pin(fut) as Pin<Box<dyn Future<Output = T> + Send + Sync>>
-        }));
         let inner = Arc::new(RwLock::new(ArcAsyncDerivedInner {
             owner: Owner::new(),
             notifier,
@@ -92,33 +86,25 @@ impl<T> ArcAsyncDerived<T> {
         let this = ArcAsyncDerived {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
-            fun,
             value,
             wakers,
             inner: Arc::clone(&inner),
         };
         let any_subscriber = this.to_any_subscriber();
 
-        spawn({
-            let fun = Arc::downgrade(&this.fun);
+        $spawner({
             let value = Arc::downgrade(&this.value);
             let inner = Arc::downgrade(&this.inner);
             let wakers = Arc::downgrade(&this.wakers);
             async move {
                 while rx.next().await.is_some() {
-                    match (
-                        fun.upgrade(),
-                        value.upgrade(),
-                        inner.upgrade(),
-                        wakers.upgrade(),
-                    ) {
-                        (Some(fun), Some(value), Some(inner), Some(wakers)) => {
+                    match (value.upgrade(), inner.upgrade(), wakers.upgrade()) {
+                        (Some(value), Some(inner), Some(wakers)) => {
                             // generate new Future
                             let owner = inner.read().owner.clone();
                             let fut = owner.with(|| {
-                                any_subscriber.with_observer(|| {
-                                    ScopedFuture::new((fun.write())())
-                                })
+                                any_subscriber
+                                    .with_observer(|| ScopedFuture::new($fun()))
                             });
 
                             // update state from Complete to Reloading
@@ -153,7 +139,7 @@ impl<T> ArcAsyncDerived<T> {
         });
 
         this
-    }
+    }};
 }
 
 impl<T> DefinedAt for ArcAsyncDerived<T> {
@@ -167,6 +153,28 @@ impl<T> DefinedAt for ArcAsyncDerived<T> {
         {
             None
         }
+    }
+}
+
+impl<T> ArcAsyncDerived<T> {
+    #[track_caller]
+    pub fn new<Fut>(
+        mut fun: impl FnMut() -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = T> + Send + Sync + 'static,
+    {
+        spawn_derived!(spawn, fun)
+    }
+
+    #[track_caller]
+    pub fn new_unsync<Fut>(mut fun: impl FnMut() -> Fut + 'static) -> Self
+    where
+        T: 'static,
+        Fut: Future<Output = T> + 'static,
+    {
+        spawn_derived!(spawn_local, fun)
     }
 }
 
@@ -330,13 +338,90 @@ impl<T: Clone + 'static> Future for AsyncDerivedFuture<T> {
     }
 }
 
+pub struct AsyncDerived<T: Send + Sync + 'static> {
+    inner: Stored<ArcAsyncDerived<T>>,
+}
+
+impl<T: Send + Sync + 'static> AsyncDerived<T> {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    pub fn new<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = T> + Send + Sync + 'static,
+    {
+        Self {
+            inner: Stored::new(ArcAsyncDerived::new(fun)),
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Copy for AsyncDerived<T> {}
+
+impl<T: Send + Sync + 'static> Clone for AsyncDerived<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Send + Sync + 'static> Debug for AsyncDerived<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsyncDerived")
+            .field("type", &std::any::type_name::<T>())
+            .field("store", &self.inner)
+            .finish()
+    }
+}
+
+impl<T: Send + Sync + 'static> DefinedAt for AsyncDerived<T> {
+    #[inline(always)]
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        #[cfg(debug_assertions)]
+        {
+            self.inner.get().and_then(|inner| inner.defined_at())
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> SignalWithUntracked for AsyncDerived<T> {
+    type Value = AsyncState<T>;
+
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        self.inner
+            .get()
+            .and_then(|inner| inner.try_with_untracked(fun))
+    }
+}
+
+impl<T: Send + Sync + Clone + 'static> IntoFuture for AsyncDerived<T> {
+    type Output = T;
+    type IntoFuture = AsyncDerivedFuture<T>;
+
+    #[track_caller]
+    fn into_future(self) -> Self::IntoFuture {
+        let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));
+        this.into_future()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        async_signal::{ArcAsyncDerived, AsyncState},
-        prelude::{
-            ArcSignal, Signal, SignalGet, SignalGetUntracked, SignalSet,
-        },
+        async_signal::{AsyncDerived, AsyncState},
+        prelude::{Signal, SignalGet, SignalGetUntracked, SignalSet},
     };
     use std::time::Duration;
     use tokio::time::sleep;
@@ -346,7 +431,7 @@ mod tests {
         let a = Signal::new(1);
         let b = Signal::new(2);
 
-        let c = ArcAsyncDerived::new(move || {
+        let c = AsyncDerived::new(move || {
             let a = a.get();
             async move {
                 sleep(Duration::from_millis(50)).await;
@@ -388,7 +473,7 @@ mod tests {
         let a = Signal::new(1);
         let b = Signal::new(2);
 
-        let c = ArcAsyncDerived::new(move || {
+        let c = AsyncDerived::new(move || {
             let a = a.get();
             async move {
                 sleep(Duration::from_millis(50)).await;
@@ -400,13 +485,13 @@ mod tests {
         assert_eq!(b.get(), 2);
 
         // after it's done loading, state is Complete
-        assert_eq!(c.clone().await, 3);
+        assert_eq!(c.await, 3);
 
         a.set(2);
 
         // after it's done loading, state is Complete
         sleep(Duration::from_millis(75)).await;
-        assert_eq!(c.clone().await, 4);
+        assert_eq!(c.await, 4);
 
         b.set(3);
         sleep(Duration::from_millis(75)).await;

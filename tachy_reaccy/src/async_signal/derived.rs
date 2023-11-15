@@ -118,11 +118,16 @@ macro_rules! spawn_derived {
                                 }
                             }
 
+                            // notify reactive subscribers that we're now loading
+                            for sub in (&inner.read().subscribers).into_iter() {
+                                sub.mark_check();
+                            }
+
                             // generate and assign new value
                             let new_value = fut.await;
                             *value.write() = AsyncState::Complete(new_value);
 
-                            // notify reactive subscribers
+                            // notify reactive subscribers that we're not loading any more
                             for sub in (&inner.read().subscribers).into_iter() {
                                 sub.mark_check();
                             }

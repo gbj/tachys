@@ -251,7 +251,14 @@ where
     const MIN_LENGTH: usize = 0;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        todo!()
+        let mut children = self.into_iter();
+        if let Some(first) = children.next() {
+            first.to_html_with_buf(buf, position);
+        }
+        position.set(Position::NextChild);
+        for child in children {
+            child.to_html_with_buf(buf, position);
+        }
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -259,7 +266,15 @@ where
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
+        // TODO does this make sense for hydration from template?
+        VecState {
+            states: self
+                .into_iter()
+                .map(|child| child.hydrate::<FROM_SERVER>(cursor, position))
+                .collect(),
+            parent: None,
+            marker: None,
+        }
     }
 }
 

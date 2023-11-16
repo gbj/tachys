@@ -66,10 +66,10 @@ where
     const CLASS: &'static str = C::TEMPLATE;
 
     fn to_template(
-        buf: &mut String,
+        _buf: &mut String,
         class: &mut String,
-        style: &mut String,
-        position: &mut Position,
+        _style: &mut String,
+        _position: &mut Position,
     ) {
         C::to_template(class);
     }
@@ -83,6 +83,7 @@ pub trait IntoClass<R: DomRenderer> {
 
     fn to_html(self, class: &mut String);
 
+    #[allow(unused)] // it's used with `nightly` feature
     fn to_template(class: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
@@ -226,7 +227,7 @@ where
         R::set_attribute(el, "class", V);
     }
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {}
 }
 
 /* #[cfg(test)]

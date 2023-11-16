@@ -234,6 +234,7 @@ impl Debug for StreamChunk {
     }
 }
 
+// TODO handle should_block
 impl Stream for StreamBuilder {
     type Item = String;
 
@@ -299,8 +300,7 @@ impl Stream for StreamBuilder {
                                 break;
                             }
                             Some(StreamChunk::OutOfOrder {
-                                chunks,
-                                should_block,
+                                chunks, ..
                             }) => {
                                 this.pending_ooo.push_back(chunks);
                                 break;
@@ -315,17 +315,11 @@ impl Stream for StreamBuilder {
                     value.push_str(&sync_buf);
                     Poll::Ready(Some(value))
                 }
-                Some(StreamChunk::Async {
-                    chunks,
-                    should_block,
-                }) => {
+                Some(StreamChunk::Async { chunks, .. }) => {
                     this.pending = Some(chunks);
                     self.poll_next(cx)
                 }
-                Some(StreamChunk::OutOfOrder {
-                    chunks,
-                    should_block,
-                }) => {
+                Some(StreamChunk::OutOfOrder { chunks, .. }) => {
                     this.pending_ooo.push_back(chunks);
                     self.poll_next(cx)
                 }

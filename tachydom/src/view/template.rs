@@ -1,10 +1,6 @@
 use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
-use crate::{
-    dom::{document, log},
-    hydration::Cursor,
-    renderer::dom::Dom,
-};
-use once_cell::unsync::{Lazy, OnceCell};
+use crate::{dom::document, hydration::Cursor, renderer::dom::Dom};
+use once_cell::unsync::Lazy;
 use rustc_hash::FxHashMap;
 use std::{any::TypeId, cell::RefCell};
 use wasm_bindgen::JsCast;

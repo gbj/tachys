@@ -44,7 +44,10 @@ where
         })
     }
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {
+        // TODO: consider whether dropping and rebuilding RenderEffects
+        // makes sense in some context?
+    }
 }
 
 impl<F, R> IntoClass<R> for (&'static str, F)

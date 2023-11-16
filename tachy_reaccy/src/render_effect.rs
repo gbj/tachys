@@ -24,7 +24,7 @@ impl<T> RenderEffect<T>
 where
     T: 'static,
 {
-    pub fn new(fun: impl Fn(Option<T>) -> T + 'static) -> Self {
+    pub fn new(mut fun: impl FnMut(Option<T>) -> T + 'static) -> Self {
         let (observer, mut rx) = NotificationSender::channel();
         let value = Arc::new(RwLock::new(None));
         let inner = Arc::new(RwLock::new(EffectInner {

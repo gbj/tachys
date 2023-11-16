@@ -8,9 +8,9 @@ use crate::{
         Mountable, PositionState, Render, RenderHtml,
     },
 };
-use futures::{pin_mut, FutureExt};
+use futures::FutureExt;
 use parking_lot::RwLock;
-use std::{fmt::Debug, future::Future, mem, pin::Pin, sync::Arc};
+use std::{fmt::Debug, future::Future, sync::Arc};
 
 pub trait FutureViewExt: Sized {
     fn suspend(self) -> Suspend<false, (), Self>
@@ -128,7 +128,7 @@ where
     const MIN_LENGTH: usize = Fal::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        todo!()
+        self.fallback.to_html_with_buf(buf, position);
     }
 
     fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
@@ -187,7 +187,38 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
+        // poll the future once immediately
+        // if it's already available, start in the ready state
+        // otherwise, start with the fallback
+        let mut fut = Box::pin(self.fut);
+        let initial = match fut.as_mut().now_or_never() {
+            Some(resolved) => Either::Right(resolved),
+            None => Either::Left(self.fallback),
+        };
+
+        // store whether this was pending at first
+        // by the time we need to know, we will have consumed `initial`
+        let initially_pending = matches!(initial, Either::Left(_));
+
+        // now we can build the initial state
+        let state = Arc::new(RwLock::new(
+            initial.hydrate::<FROM_SERVER>(cursor, position),
+        ));
+
+        // if the initial state was pending, spawn a future to wait for it
+        // spawning immediately means that our now_or_never poll result isn't lost
+        // if it wasn't pending at first, we don't need to poll the Future again
+        if initially_pending {
+            Rndr::Spawn::spawn_local({
+                let state = Arc::clone(&state);
+                async move {
+                    let value = fut.as_mut().await;
+                    Either::Right(value).rebuild(&mut *state.write());
+                }
+            });
+        }
+
+        state
     }
 }
 

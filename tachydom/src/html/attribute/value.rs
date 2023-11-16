@@ -50,9 +50,7 @@ where
         buf.push('"');
     }
 
-    fn to_template(key: &str, buf: &mut String) {
-        // TODO
-    }
+    fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -104,8 +102,8 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
-        key: &str,
-        el: &R::Element,
+        _key: &str,
+        _el: &R::Element,
     ) -> Self::State {
     }
 
@@ -113,7 +111,7 @@ where
         <&str as AttributeValue<R>>::build(V, el, key);
     }
 
-    fn rebuild(self, key: &str, state: &mut Self::State) {}
+    fn rebuild(self, _key: &str, _state: &mut Self::State) {}
 }
 
 impl<'a, R> AttributeValue<R> for &'a String
@@ -127,9 +125,7 @@ where
         <&str as AttributeValue<R>>::to_html(self.as_str(), key, buf);
     }
 
-    fn to_template(key: &str, buf: &mut String) {
-        // TODO
-    }
+    fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -145,14 +141,14 @@ where
     }
 
     fn build(self, el: &R::Element, key: &str) -> Self::State {
-        R::set_attribute(el, key, &self);
+        R::set_attribute(el, key, self);
         (el.clone(), self)
     }
 
     fn rebuild(self, key: &str, state: &mut Self::State) {
         let (el, prev_value) = state;
         if self != *prev_value {
-            R::set_attribute(el, key, &self);
+            R::set_attribute(el, key, self);
         }
         *prev_value = self;
     }
@@ -166,12 +162,10 @@ where
     type State = (R::Element, String);
 
     fn to_html(self, key: &str, buf: &mut String) {
-        <&str as AttributeValue<R>>::to_html(&self.as_str(), key, buf);
+        <&str as AttributeValue<R>>::to_html(self.as_str(), key, buf);
     }
 
-    fn to_template(key: &str, buf: &mut String) {
-        // TODO
-    }
+    fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -214,9 +208,7 @@ where
         }
     }
 
-    fn to_template(key: &str, buf: &mut String) {
-        // TODO
-    }
+    fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -265,9 +257,7 @@ where
         }
     }
 
-    fn to_template(key: &str, buf: &mut String) {
-        // TODO
-    }
+    fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -291,7 +281,15 @@ where
     }
 
     fn rebuild(self, key: &str, state: &mut Self::State) {
-        todo!()
+        let (el, prev) = state;
+        match (self, prev.as_mut()) {
+            (None, None) => {}
+            (None, Some(_)) => R::remove_attribute(el, key),
+            (Some(value), None) => {
+                *prev = Some(value.build(el, key));
+            }
+            (Some(new), Some(old)) => new.rebuild(key, old),
+        }
     }
 }
 

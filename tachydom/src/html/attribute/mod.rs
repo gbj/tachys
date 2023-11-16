@@ -62,8 +62,8 @@ where
 {
     fn to_template(
         buf: &mut String,
-        class: &mut String,
-        style: &mut String,
+        _class: &mut String,
+        _style: &mut String,
         _position: &mut Position,
     ) {
         V::to_template(K::KEY, buf);

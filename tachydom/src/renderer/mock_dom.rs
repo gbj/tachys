@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! A stupidly-simple mock DOM implementation that can be used for testing.
 //!
 //! Do not use this for anything real.

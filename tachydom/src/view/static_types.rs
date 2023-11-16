@@ -136,8 +136,8 @@ impl<const V: &'static str> ToTemplate for Static<V> {
 
     fn to_template(
         buf: &mut String,
-        class: &mut String,
-        style: &mut String,
+        _class: &mut String,
+        _style: &mut String,
         position: &mut Position,
     ) {
         if matches!(*position, Position::NextChild | Position::LastChild) {

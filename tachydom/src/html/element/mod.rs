@@ -14,7 +14,7 @@ use next_tuple::TupleBuilder;
 use std::marker::PhantomData;
 
 mod elements;
-use super::attribute::{global::AddAttribute, id, Attr, AttributeValue, Id};
+use super::attribute::global::AddAttribute;
 pub use elements::*;
 
 pub struct HtmlElement<E, At, Ch, Rndr>
@@ -402,6 +402,7 @@ where
         ">",
     ]));
 
+    #[allow(unused)] // the variables `class` and `style` might be used, but only with `nightly` feature
     fn to_template(
         buf: &mut String,
         class: &mut String,

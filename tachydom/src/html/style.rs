@@ -65,12 +65,12 @@ where
     R: DomRenderer,
 {
     fn to_template(
-        buf: &mut String,
-        class: &mut String,
-        style: &mut String,
-        position: &mut Position,
+        _buf: &mut String,
+        _class: &mut String,
+        _style: &mut String,
+        _position: &mut Position,
     ) {
-        todo!()
+        // TODO: should there be some templating for static styles?
     }
 }
 

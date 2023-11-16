@@ -52,8 +52,8 @@ impl ToTemplate for () {
 
     fn to_template(
         _buf: &mut String,
-        class: &mut String,
-        style: &mut String,
+        _class: &mut String,
+        _style: &mut String,
         _position: &mut Position,
     ) {
     }

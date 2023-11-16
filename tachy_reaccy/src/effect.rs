@@ -40,7 +40,9 @@ impl<T> Effect<T>
 where
     T: Send + Sync + 'static,
 {
-    pub fn new(fun: impl Fn(Option<T>) -> T + Send + Sync + 'static) -> Self {
+    pub fn new(
+        mut fun: impl FnMut(Option<T>) -> T + Send + Sync + 'static,
+    ) -> Self {
         let (mut observer, mut rx) = NotificationSender::channel();
 
         // spawn the effect asynchronously

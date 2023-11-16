@@ -1,4 +1,6 @@
-use super::{CastFrom, DomRenderer, Renderer, SpawningRenderer};
+#[cfg(any(feature = "tokio", feature = "web"))]
+use super::SpawningRenderer;
+use super::{CastFrom, DomRenderer, Renderer};
 use crate::{
     dom::{document, window},
     ok_or_debug, or_debug,

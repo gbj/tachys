@@ -1,5 +1,9 @@
-use super::{Mountable, Render};
-use crate::renderer::Renderer;
+use super::{Mountable, PositionState, Render, RenderHtml};
+use crate::{
+    hydration::Cursor,
+    renderer::{CastFrom, Renderer},
+    ssr::StreamBuilder,
+};
 
 pub enum Either<A, B> {
     Left(A),
@@ -99,5 +103,68 @@ where
             Either::Left(left) => left.insert_before_this(parent, child),
             Either::Right(right) => right.insert_before_this(parent, child),
         }
+    }
+}
+
+impl<A, B, Rndr> RenderHtml<Rndr> for Either<A, B>
+where
+    A: RenderHtml<Rndr>,
+    B: RenderHtml<Rndr>,
+    Rndr: Renderer,
+    Rndr::Node: Clone,
+    Rndr::Element: Clone,
+{
+    const MIN_LENGTH: usize = smaller_usize(A::MIN_LENGTH, B::MIN_LENGTH);
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        match self {
+            Either::Left(left) => left.to_html_with_buf(buf, position),
+            Either::Right(right) => right.to_html_with_buf(buf, position),
+        }
+        buf.push_str("<!>");
+    }
+
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        match self {
+            Either::Left(left) => {
+                left.to_html_async_buffered::<OUT_OF_ORDER>(buf, position)
+            }
+            Either::Right(right) => {
+                right.to_html_async_buffered::<OUT_OF_ORDER>(buf, position)
+            }
+        }
+        buf.push_sync("<!>");
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<Rndr>,
+        position: &PositionState,
+    ) -> Self::State {
+        let state = match self {
+            Either::Left(left) => {
+                Either::Left(left.hydrate::<FROM_SERVER>(cursor, position))
+            }
+            Either::Right(right) => {
+                Either::Right(right.hydrate::<FROM_SERVER>(cursor, position))
+            }
+        };
+        let marker = cursor.current().to_owned();
+        let marker = Rndr::Placeholder::cast_from(marker).unwrap();
+        EitherState { state, marker }
+    }
+}
+
+const fn smaller_usize(a: usize, b: usize) -> usize {
+    if a < b {
+        a
+    } else {
+        b
     }
 }

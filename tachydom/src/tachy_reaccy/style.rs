@@ -37,16 +37,42 @@ where
                 *prev = value;
                 state
             } else {
+                // only set the style in template mode
+                // in server mode, it's already been set
+                if !FROM_SERVER {
+                    R::set_css_property(&style, name, &value);
+                }
                 (style.clone(), value)
             }
         })
     }
 
     fn build(self, el: &R::Element) -> Self::State {
-        todo!()
+        let (name, f) = self;
+        let style = R::style(el);
+        RenderEffect::new(move |prev| {
+            let value = f().into();
+            if let Some(mut state) = prev {
+                let (style, prev): &mut (
+                    R::CssStyleDeclaration,
+                    Cow<'static, str>,
+                ) = &mut state;
+                if &value != prev {
+                    R::set_css_property(style, name, &value);
+                }
+                *prev = value;
+                state
+            } else {
+                // always set the style initially without checking
+                R::set_css_property(&style, name, &value);
+                (style.clone(), value)
+            }
+        })
     }
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, _state: &mut Self::State) {
+        // TODO should this drop and rebuild the effect?
+    }
 }
 
 impl<F, C, R> IntoStyle<R> for F

@@ -71,8 +71,8 @@ impl<'a> ToTemplate for &'a str {
 
     fn to_template(
         buf: &mut String,
-        class: &mut String,
-        style: &mut String,
+        _class: &mut String,
+        _style: &mut String,
         position: &mut Position,
     ) {
         buf.push(' ');
@@ -109,7 +109,7 @@ where
     const MIN_LENGTH: usize = 0;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        <&str as RenderHtml<R>>::to_html_with_buf(&self.as_str(), buf, position)
+        <&str as RenderHtml<R>>::to_html_with_buf(self.as_str(), buf, position)
     }
 
     fn hydrate<const FROM_SERVER: bool>(

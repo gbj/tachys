@@ -116,6 +116,48 @@ where
     fn rebuild(self, key: &str, state: &mut Self::State) {}
 }
 
+impl<'a, R> AttributeValue<R> for &'a String
+where
+    R: Renderer,
+    R::Element: Clone,
+{
+    type State = (R::Element, &'a String);
+
+    fn to_html(self, key: &str, buf: &mut String) {
+        <&str as AttributeValue<R>>::to_html(self.as_str(), key, buf);
+    }
+
+    fn to_template(key: &str, buf: &mut String) {
+        // TODO
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        key: &str,
+        el: &R::Element,
+    ) -> Self::State {
+        let (el, _) = <&str as AttributeValue<R>>::hydrate::<FROM_SERVER>(
+            self.as_str(),
+            key,
+            el,
+        );
+        (el, self)
+    }
+
+    fn build(self, el: &R::Element, key: &str) -> Self::State {
+        R::set_attribute(el, key, &self);
+        (el.clone(), self)
+    }
+
+    fn rebuild(self, key: &str, state: &mut Self::State) {
+        let (el, prev_value) = state;
+        if self != *prev_value {
+            R::set_attribute(el, key, &self);
+        }
+        *prev_value = self;
+    }
+}
+
 impl<R> AttributeValue<R> for String
 where
     R: Renderer,

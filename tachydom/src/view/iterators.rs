@@ -2,6 +2,7 @@ use super::{Mountable, Position, PositionState, Render, RenderHtml};
 use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
+    ssr::StreamBuilder,
 };
 use itertools::Itertools;
 
@@ -57,6 +58,20 @@ where
         }
         // placeholder
         buf.push_str("<!>");
+    }
+
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        if let Some(value) = self {
+            value.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+        }
+        // placeholder
+        buf.push_sync("<!>");
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -258,6 +273,23 @@ where
         position.set(Position::NextChild);
         for child in children {
             child.to_html_with_buf(buf, position);
+        }
+    }
+
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        let mut children = self.into_iter();
+        if let Some(first) = children.next() {
+            first.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+        }
+        position.set(Position::NextChild);
+        for child in children {
+            child.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
         }
     }
 

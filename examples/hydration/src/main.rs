@@ -3,8 +3,11 @@
 async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
-    use tachydom::view::{Position, PositionState, Render, RenderHtml};
-    use tachydom::renderer::dom::Dom;
+    use futures::StreamExt;
+    use tachydom::{
+        renderer::dom::Dom,
+        view::{Position, PositionState, Render, RenderHtml},
+    };
 
     HttpServer::new(move || {
         App::new()
@@ -17,18 +20,21 @@ async fn main() -> std::io::Result<()> {
                 web::get().to(|| async {
                     HttpResponse::Ok()
                         .content_type(http::header::ContentType::html())
-                        .body({
-                            let mut buf = String::from(
-                                r#"<!DOCTYPE html>
-                                    <html>
-                                        <head>
-                                        <script>import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
-                                        </head><body>"#,
-                            );
-                            hydration_ex::app::my_app()
-                                .to_html(&mut buf, &PositionState::new(Position::FirstChild));
-                            buf.push_str("<script>__LEPTOS_PENDING_RESOURCES = [];__LEPTOS_RESOLVED_RESOURCES = new Map();__LEPTOS_RESOURCE_RESOLVERS = new Map();</script></body></html>");
-                            buf
+                        .streaming({
+                            let stream = hydration_ex::app::my_app()
+                                .to_html_stream_out_of_order();
+
+                            futures::stream::once(async move {
+                                String::from(
+                                    r#"<!DOCTYPE html>
+                                        <html>
+                                            <head>
+                                            <script>import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
+                                            </head><body>"#,
+                                )
+                            }).chain(stream).chain(futures::stream::once(async move {
+                                String::from("</body></html>")
+                            })).map(|html| Ok(web::Bytes::from(html)) as Result<web::Bytes>)
                         })
                 }),
             )

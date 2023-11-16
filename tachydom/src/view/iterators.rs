@@ -3,6 +3,7 @@ use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
 };
+use itertools::Itertools;
 
 impl<T, R> Render<R> for Option<T>
 where
@@ -129,20 +130,114 @@ where
     }
 }
 
-/*
 impl<T, R> Render<R> for Vec<T>
 where
     T: Render<R>,
     R: Renderer,
+    R::Element: Clone,
+    R::Node: Clone,
 {
-    type State = Vec<T::State>;
+    type State = VecState<T, R>;
 
     fn build(self) -> Self::State {
-        todo!()
+        VecState {
+            states: self.into_iter().map(T::build).collect(),
+            parent: None,
+            marker: None,
+        }
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        todo!()
+        let VecState {
+            states,
+            parent,
+            marker,
+        } = state;
+        let old = states;
+        // this is an unkeyed diff
+        if old.is_empty() {
+            let mut new = self.build().states;
+            if let Some(parent) = parent {
+                for item in new.iter_mut() {
+                    item.mount(parent, (*marker).as_ref());
+                }
+            }
+            *old = new;
+        } else if self.is_empty() {
+            // TODO fast path for clearing
+            for item in old.iter_mut() {
+                item.unmount();
+            }
+            old.clear();
+        } else {
+            let mut adds = vec![];
+            for item in self.into_iter().zip_longest(old.iter_mut()) {
+                match item {
+                    itertools::EitherOrBoth::Both(new, old) => {
+                        T::rebuild(new, old)
+                    }
+                    itertools::EitherOrBoth::Left(new) => {
+                        let mut new_state = new.build();
+                        if let Some(parent) = parent {
+                            new_state.mount(parent, (*marker).as_ref());
+                        }
+                        adds.push(new_state);
+                    }
+                    itertools::EitherOrBoth::Right(old) => old.unmount(),
+                }
+            }
+            old.append(&mut adds);
+        }
+    }
+}
+
+pub struct VecState<T, R>
+where
+    T: Render<R>,
+    R: Renderer,
+{
+    states: Vec<T::State>,
+    parent: Option<R::Element>,
+    marker: Option<R::Node>,
+}
+
+impl<T, R> Mountable<R> for VecState<T, R>
+where
+    T: Render<R>,
+    R: Renderer,
+    R::Element: Clone,
+    R::Node: Clone,
+{
+    fn unmount(&mut self) {
+        for state in self.states.iter_mut() {
+            state.unmount();
+        }
+        self.parent = None;
+        self.marker = None;
+    }
+
+    fn mount(
+        &mut self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
+        for state in self.states.iter_mut() {
+            state.mount(parent, marker);
+        }
+        self.parent = Some(parent.clone());
+        self.marker = marker.cloned();
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        if let Some(first) = self.states.get(0) {
+            first.insert_before_this(parent, child)
+        } else {
+            false
+        }
     }
 }
 
@@ -151,11 +246,12 @@ where
     T: RenderHtml<R>,
     R: Renderer,
     R::Node: Clone,
+    R::Element: Clone,
 {
-    fn to_html(self, buf: &mut String, position: &PositionState) {
-        for item in self {
-            item.to_html(buf, position);
-        }
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        todo!()
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -167,19 +263,7 @@ where
     }
 }
 
-impl<T, R> Mountable<R> for Vec<T>
-where
-    T: Mountable<R>,
-    R: Renderer,
-{
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn as_mountable(&self) -> Option<Node> {
-        todo!()
-    }
-}
+/*
 
 pub trait IterView<R: Renderer> {
     type Iterator: Iterator<Item = Self::View>;

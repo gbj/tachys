@@ -94,6 +94,7 @@ impl StreamBuilder {
     {
         self.write_chunk_marker(true);
         fallback.to_html_with_buf(&mut self.sync_buf, position);
+        self.sync_buf.push_str("<!>"); // for Either marker
         self.write_chunk_marker(false);
     }
 
@@ -168,7 +169,7 @@ impl StreamBuilder {
                 }
                 view.to_html_async_buffered::<true>(&mut subbuilder, &position);
 
-                subbuilder.sync_buf.push_str("</template>");
+                subbuilder.sync_buf.push_str("<!></template>");
 
                 // TODO nonce
                 subbuilder.sync_buf.push_str("<script");
@@ -181,12 +182,12 @@ impl StreamBuilder {
                      {if(walker.currentNode.textContent == `s-${id}o`){ \
                      open=walker.currentNode; } else \
                      if(walker.currentNode.textContent == `s-${id}c`) { close \
-                     = walker.currentNode; let range = new Range(); \
-                     range.setStartAfter(open); range.setEndBefore(close); \
-                     range.deleteContents(); let tpl = \
+                     = walker.currentNode;}}let range = new Range(); \
+                     range.setStartBefore(open); range.setEndBefore(close); \
+                     console.log(range);range.deleteContents(); let tpl = \
                      document.getElementById(`${id}f`); \
                      close.parentNode.insertBefore(tpl.content.\
-                     cloneNode(true), close);})()",
+                     cloneNode(true), close);close.remove();})()",
                 );
                 subbuilder.sync_buf.push_str("</script>");
 
@@ -478,7 +479,7 @@ mod tests {
              {if(walker.currentNode.textContent == `s-${id}o`){ \
              open=walker.currentNode; } else \
              if(walker.currentNode.textContent == `s-${id}c`) { close = \
-             walker.currentNode; let range = new Range(); \
+             walker.currentNode;}}let range = new Range(); \
              range.setStartAfter(open); range.setEndBefore(close); \
              range.deleteContents(); let tpl = \
              document.getElementById(`${id}f`); \

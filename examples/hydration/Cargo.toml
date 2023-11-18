@@ -13,13 +13,25 @@ console_error_panic_hook = "0.1"
 http = { version = "0.2", optional = true }
 tachydom = { path = "../../tachydom", features = ["nightly", "reaccy"] }
 tachy_maccy = { path = "../../tachy_maccy", features = ["nightly"] }
-tachy_reaccy = { path = "../../tachy_reaccy", features = ["web"] }
+tachy_reaccy = { path = "../../tachy_reaccy", features = [
+	"web",
+	"hydration",
+	"serde",
+] }
 wasm-bindgen = "=0.2.88"
 futures = "0.3.29"
+tokio = { version = "1", features = ["rt"], optional = true }
+wee_alloc = { version = "0.4.5" }
 
 [features]
-hydrate = []
-ssr = ["dep:actix-files", "dep:actix-web"]
+hydrate = ["tachydom/web"]
+ssr = [
+	"dep:actix-files",
+	"dep:actix-web",
+	"dep:tokio",
+	"tachy_reaccy/tokio",
+	"tachydom/tokio",
+]
 
 # Defines a size-optimized profile for the WASM bundle in release mode
 [profile.wasm-release]

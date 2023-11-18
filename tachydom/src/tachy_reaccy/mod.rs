@@ -1,5 +1,6 @@
 use crate::{
     async_views::Suspend,
+    html::attribute::AttributeValue,
     hydration::Cursor,
     renderer::Renderer,
     view::{
@@ -138,6 +139,80 @@ impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
             fut: ScopedFuture::new(fut),
         }
     }
+}
+
+// Dynamic attributes
+impl<F, V, R> AttributeValue<R> for F
+where
+    F: Fn() -> V + 'static,
+    V: AttributeValue<R>,
+    V::State: 'static,
+    R: Renderer,
+    R::Element: Clone + 'static,
+{
+    type State = RenderEffect<V::State>;
+
+    fn to_html(self, key: &str, buf: &mut String) {
+        let value = self();
+        value.to_html(key, buf);
+    }
+
+    fn to_template(_key: &str, _buf: &mut String) {}
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        key: &str,
+        el: &<R as Renderer>::Element,
+    ) -> Self::State {
+        let key = key.to_owned();
+        let el = el.to_owned();
+        RenderEffect::new(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&key, &mut state);
+                state
+            } else {
+                value.hydrate::<FROM_SERVER>(&key, &el)
+            }
+        })
+    }
+
+    fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
+        let key = key.to_owned();
+        let el = el.to_owned();
+        RenderEffect::new(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&key, &mut state);
+                state
+            } else {
+                value.build(&el, &key)
+            }
+        })
+    }
+
+    fn rebuild(self, key: &str, state: &mut Self::State) {}
+
+    /*     fn build(self) -> Self::State {
+        RenderEffect::new(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&mut state);
+                state
+            } else {
+                value.build()
+            }
+        })
+    }
+
+    #[track_caller]
+    fn rebuild(self, state: &mut Self::State) {
+        /* crate::log(&format!(
+            "[REBUILDING EFFECT] Is this a mistake? {}",
+            std::panic::Location::caller(),
+        )); */
+        let old_effect = std::mem::replace(state, self.build());
+    } */
 }
 
 /*

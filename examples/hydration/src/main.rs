@@ -4,6 +4,7 @@ async fn main() -> std::io::Result<()> {
     use actix_files::Files;
     use actix_web::*;
     use futures::StreamExt;
+    use tachy_reaccy::{Owner, Root};
     use tachydom::{
         renderer::dom::Dom,
         view::{Position, PositionState, Render, RenderHtml},
@@ -18,24 +19,33 @@ async fn main() -> std::io::Result<()> {
             .route(
                 "/",
                 web::get().to(|| async {
-                    HttpResponse::Ok()
-                        .content_type(http::header::ContentType::html())
-                        .streaming({
-                            let stream = hydration_ex::app::my_app()
-                                .to_html_stream_out_of_order();
+                    Root::global_ssr(move || {
+                        HttpResponse::Ok()
+                            .content_type(http::header::ContentType::html())
+                            .streaming({
+                                let app = hydration_ex::app::my_app();
+                                let app_stream = app
+                                    .to_html_stream_out_of_order();
+                                let shared_context = Owner::shared_context().unwrap();
+                                // TODO nonce
+                                let shared_context = shared_context.pending_data().unwrap().map(|chunk| format!("<script>{chunk}</script>"));
+                                let stream = futures::stream::select(app_stream, shared_context);
 
-                            futures::stream::once(async move {
-                                String::from(
-                                    r#"<!DOCTYPE html>
-                                        <html>
-                                            <head>
-                                            <script>import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
-                                            </head><body>"#,
-                                )
-                            }).chain(stream).chain(futures::stream::once(async move {
-                                String::from("</body></html>")
-                            })).map(|html| Ok(web::Bytes::from(html)) as Result<web::Bytes>)
-                        })
+                                futures::stream::once(async move {
+                                    String::from(
+                                        r#"<!DOCTYPE html>
+                                            <html>
+                                                <head>
+                                                <script type="module">import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
+                                                </head><body>"#,
+                                    )
+                                })
+                                .chain(stream)
+                                .chain(futures::stream::once(async move {
+                                    String::from("</body></html>")
+                                })).map(|html| Ok(web::Bytes::from(html)) as Result<web::Bytes>)
+                            })
+                    })
                 }),
             )
         // serve the favicon from /favicon.ico

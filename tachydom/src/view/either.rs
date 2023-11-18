@@ -155,6 +155,7 @@ where
                 Either::Right(right.hydrate::<FROM_SERVER>(cursor, position))
             }
         };
+        cursor.sibling();
         let marker = cursor.current().to_owned();
         let marker = Rndr::Placeholder::cast_from(marker).unwrap();
         EitherState { state, marker }

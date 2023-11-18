@@ -1,8 +1,10 @@
 mod derived;
+mod resource;
 use crate::{arena::Owner, source::AnySubscriber, Observer};
 pub use derived::*;
 use futures::Future;
 use pin_project_lite::pin_project;
+pub use resource::*;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -31,8 +33,8 @@ impl<T> AsyncState<T> {
 
 pin_project! {
     pub struct ScopedFuture<Fut> {
-        owner: Owner,
-        observer: AnySubscriber,
+        owner: Option<Owner>,
+        observer: Option<AnySubscriber>,
         #[pin]
         fut: Fut,
     }
@@ -40,8 +42,8 @@ pin_project! {
 
 impl<Fut> ScopedFuture<Fut> {
     pub fn new(fut: Fut) -> Self {
-        let owner = Owner::get().unwrap();
-        let observer = Observer::get().unwrap();
+        let owner = Owner::get();
+        let observer = Observer::get();
         Self {
             owner,
             observer,
@@ -55,7 +57,13 @@ impl<Fut: Future> Future for ScopedFuture<Fut> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        this.owner
-            .with(|| this.observer.with_observer(|| this.fut.poll(cx)))
+        match (this.owner, this.observer) {
+            (None, None) => this.fut.poll(cx),
+            (None, Some(obs)) => obs.with_observer(|| this.fut.poll(cx)),
+            (Some(owner), None) => owner.with(|| this.fut.poll(cx)),
+            (Some(owner), Some(observer)) => {
+                owner.with(|| observer.with_observer(|| this.fut.poll(cx)))
+            }
+        }
     }
 }

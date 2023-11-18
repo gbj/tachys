@@ -69,10 +69,13 @@ struct ArcAsyncDerivedInner {
 // whether `fun` returns a `Future` that is `Send + Sync`. Doing it as a function would,
 // as far as I can tell, require repeating most of the function body.
 macro_rules! spawn_derived {
-    ($spawner:ident, $fun:ident) => {{
+    ($spawner:ident, $initial:ident, $fun:ident) => {{
         let (mut notifier, mut rx) = NotificationSender::channel();
-        // begin loading eagerly but asynchronously
-        notifier.notify();
+
+        // begin loading eagerly but asynchronously, if not already loaded
+        if matches!($initial, AsyncState::Loading) {
+            notifier.notify();
+        }
 
         let inner = Arc::new(RwLock::new(ArcAsyncDerivedInner {
             owner: Owner::new(),
@@ -161,25 +164,55 @@ impl<T> DefinedAt for ArcAsyncDerived<T> {
     }
 }
 
-impl<T> ArcAsyncDerived<T> {
+impl<T: 'static> ArcAsyncDerived<T> {
     #[track_caller]
-    pub fn new<Fut>(
+    pub fn new<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = T> + Send + Sync + 'static,
+    {
+        Self::new_with_initial(AsyncState::Loading, fun)
+    }
+
+    #[track_caller]
+    pub fn new_with_initial<Fut>(
+        initial_value: AsyncState<T>,
         mut fun: impl FnMut() -> Fut + Send + Sync + 'static,
     ) -> Self
     where
         T: Send + Sync + 'static,
         Fut: Future<Output = T> + Send + Sync + 'static,
     {
-        spawn_derived!(spawn, fun)
+        spawn_derived!(spawn, initial_value, fun)
     }
 
     #[track_caller]
-    pub fn new_unsync<Fut>(mut fun: impl FnMut() -> Fut + 'static) -> Self
+    pub fn new_unsync<Fut>(fun: impl FnMut() -> Fut + 'static) -> Self
     where
         T: 'static,
         Fut: Future<Output = T> + 'static,
     {
-        spawn_derived!(spawn_local, fun)
+        Self::new_unsync_with_initial(AsyncState::Loading, fun)
+    }
+
+    #[track_caller]
+    pub fn new_unsync_with_initial<Fut>(
+        initial_value: AsyncState<T>,
+        mut fun: impl FnMut() -> Fut + 'static,
+    ) -> Self
+    where
+        T: 'static,
+        Fut: Future<Output = T> + 'static,
+    {
+        spawn_derived!(spawn_local, initial_value, fun)
+    }
+
+    pub fn ready(&self) -> AsyncDerivedReadyFuture<T> {
+        AsyncDerivedReadyFuture {
+            source: self.to_any_source(),
+            value: Arc::clone(&self.value),
+            wakers: Arc::clone(&self.wakers),
+        }
     }
 }
 
@@ -307,7 +340,32 @@ impl Subscriber for RwLock<ArcAsyncDerivedInner> {
     }
 }
 
-/// A [`Future`] that is ready when an [`ArcAsyncDerived`] is finished loading or reloading.
+/// A [`Future`] that is ready when an [`ArcAsyncDerived`] is finished loading or reloading,
+/// but does not contain its value.
+pub struct AsyncDerivedReadyFuture<T> {
+    source: AnySource,
+    value: Arc<RwLock<AsyncState<T>>>,
+    wakers: Arc<RwLock<Vec<Waker>>>,
+}
+
+impl<T: 'static> Future for AsyncDerivedReadyFuture<T> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let waker = cx.waker();
+        self.source.track();
+        match &*self.value.read() {
+            AsyncState::Loading | AsyncState::Reloading(_) => {
+                self.wakers.write().push(waker.clone());
+                Poll::Pending
+            }
+            AsyncState::Complete(_) => Poll::Ready(()),
+        }
+    }
+}
+
+/// A [`Future`] that is ready when an [`ArcAsyncDerived`] is finished loading or reloading,
+/// and contains its value.
 pub struct AsyncDerivedFuture<T> {
     source: AnySource,
     value: Arc<RwLock<AsyncState<T>>>,

@@ -128,7 +128,8 @@ where
     const MIN_LENGTH: usize = Fal::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        self.fallback.to_html_with_buf(buf, position);
+        Either::<Fal, Fut::Output>::Left(self.fallback)
+            .to_html_with_buf(buf, position);
     }
 
     fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
@@ -144,10 +145,12 @@ where
         match fut.as_mut().now_or_never() {
             Some(resolved) => {
                 let mut builder = StreamBuilder::new(buf.clone_id());
-                resolved.to_html_async_buffered::<OUT_OF_ORDER>(
-                    &mut builder,
-                    position,
-                );
+                Either::<Fal, Fut::Output>::Right(resolved)
+                    .to_html_async_buffered::<OUT_OF_ORDER>(
+                        &mut builder,
+                        position,
+                    );
+                buf.push_sync("<!>");
                 let builder = builder.finish();
                 buf.append(builder);
             }
@@ -169,7 +172,8 @@ where
                             async move {
                                 let value = fut.await;
                                 let mut builder = StreamBuilder::new(id);
-                                value.to_html_async_buffered::<OUT_OF_ORDER>(
+                                Either::<Fal, Fut::Output>::Right(value)
+                                    .to_html_async_buffered::<OUT_OF_ORDER>(
                                     &mut builder,
                                     &position,
                                 );

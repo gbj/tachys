@@ -1,3 +1,6 @@
+use crate::shared_context::{
+    HydrateSharedContext, SharedContext, SsrSharedContext,
+};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rustc_hash::FxHashMap;
@@ -21,18 +24,47 @@ thread_local! {
     static OWNER: RefCell<Option<Owner>> = Default::default();
 }
 
-pub fn global_root<T>(fun: impl FnOnce() -> T) -> T {
-    let Root(owner, value) = Root::new(fun);
-    mem::forget(owner);
-    value
-}
-
 #[derive(Debug, Clone)]
 pub struct Root<T>(Owner, T);
 
 impl<T> Root<T> {
+    pub fn global(fun: impl FnOnce() -> T) -> T {
+        let Root(owner, value) = Root::new(fun);
+        mem::forget(owner);
+        value
+    }
+
+    #[cfg(feature = "web")]
+    pub fn global_hydrate(fun: impl FnOnce() -> T) -> T {
+        let Root(owner, value) = Root::new_with_shared_context(
+            fun,
+            Some(Arc::new(HydrateSharedContext::new())),
+        );
+        mem::forget(owner);
+        value
+    }
+
+    pub fn global_ssr(fun: impl FnOnce() -> T) -> T {
+        let Root(owner, value) = Root::new_with_shared_context(
+            fun,
+            Some(Arc::new(SsrSharedContext::new())),
+        );
+        mem::forget(owner);
+        value
+    }
+
     pub fn new(fun: impl FnOnce() -> T) -> Self {
-        let owner = Owner::default();
+        Self::new_with_shared_context(fun, None)
+    }
+
+    pub fn new_with_shared_context(
+        fun: impl FnOnce() -> T,
+        shared_context: Option<Arc<dyn SharedContext + Send + Sync>>,
+    ) -> Self {
+        let owner = Owner {
+            shared_context,
+            ..Default::default()
+        };
         let prev = OWNER.with(|o| {
             std::mem::replace(&mut *o.borrow_mut(), Some(owner.clone()))
         });
@@ -52,13 +84,19 @@ impl<T> Root<T> {
 #[derive(Debug, Clone, Default)]
 pub struct Owner {
     pub(crate) inner: Arc<RwLock<OwnerInner>>,
+    pub(crate) shared_context: Option<Arc<dyn SharedContext + Send + Sync>>,
 }
 
 impl Owner {
     pub fn new() -> Self {
-        let parent = {
+        let (parent, shared_context) = {
             OWNER
-                .with(|o| o.borrow().as_ref().map(|o| Arc::downgrade(&o.inner)))
+                .with(|o| {
+                    o.borrow().as_ref().map(|o| {
+                        (Arc::downgrade(&o.inner), o.shared_context.clone())
+                    })
+                })
+                .unzip()
         };
         Self {
             inner: Arc::new(RwLock::new(OwnerInner {
@@ -66,6 +104,7 @@ impl Owner {
                 nodes: Default::default(),
                 contexts: Default::default(),
             })),
+            shared_context: shared_context.flatten(),
         }
     }
 
@@ -80,6 +119,20 @@ impl Owner {
             *o.borrow_mut() = prev;
         });
         val
+    }
+
+    #[inline(always)]
+    pub fn shared_context() -> Option<Arc<dyn SharedContext + Send + Sync>> {
+        #[cfg(feature = "hydration")]
+        {
+            OWNER.with(|o| {
+                o.borrow().as_ref().and_then(|o| o.shared_context.clone())
+            })
+        }
+        #[cfg(not(feature = "hydration"))]
+        {
+            None
+        }
     }
 
     fn register(&self, node: NodeId) {

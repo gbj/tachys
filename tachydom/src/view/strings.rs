@@ -5,6 +5,12 @@ use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
 };
+use std::{rc::Rc, sync::Arc};
+
+pub struct StrState<'a, R: Renderer> {
+    pub node: R::Text,
+    str: &'a str,
+}
 
 impl<'a, R: Renderer> Render<R> for &'a str {
     type State = StrState<'a, R>;
@@ -83,6 +89,36 @@ impl<'a> ToTemplate for &'a str {
     }
 }
 
+impl<'a, R> Mountable<R> for StrState<'a, R>
+where
+    R: Renderer,
+{
+    fn unmount(&mut self) {
+        self.node.unmount()
+    }
+
+    fn mount(
+        &mut self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
+        R::insert_node(parent, self.node.as_ref(), marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        child.mount(parent, Some(self.node.as_ref()));
+        true
+    }
+}
+pub struct StringState<R: Renderer> {
+    node: R::Text,
+    str: String,
+}
+
 impl<R: Renderer> Render<R> for String {
     type State = StringState<R>;
 
@@ -136,16 +172,6 @@ impl ToTemplate for String {
     }
 }
 
-pub struct StringState<R: Renderer> {
-    node: R::Text,
-    str: String,
-}
-
-pub struct StrState<'a, R: Renderer> {
-    pub node: R::Text,
-    str: &'a str,
-}
-
 impl<R: Renderer> Mountable<R> for StringState<R> {
     fn unmount(&mut self) {
         self.node.unmount()
@@ -169,10 +195,148 @@ impl<R: Renderer> Mountable<R> for StringState<R> {
     }
 }
 
-impl<'a, R> Mountable<R> for StrState<'a, R>
+pub struct RcStrState<R: Renderer> {
+    node: R::Text,
+    str: Rc<str>,
+}
+
+impl<R: Renderer> Render<R> for Rc<str> {
+    type State = RcStrState<R>;
+
+    fn build(self) -> Self::State {
+        let node = R::create_text_node(&self);
+        RcStrState { node, str: self }
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        let RcStrState { node, str } = state;
+        if !Rc::ptr_eq(&self, str) {
+            R::set_text(node, &self);
+            *str = self;
+        }
+    }
+}
+
+impl<R> RenderHtml<R> for Rc<str>
 where
     R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
 {
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        <&str as RenderHtml<R>>::to_html_with_buf(&self, buf, position)
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<R>,
+        position: &PositionState,
+    ) -> Self::State {
+        let this: &str = self.as_ref();
+        let StrState { node, .. } =
+            this.hydrate::<FROM_SERVER>(cursor, position);
+        RcStrState { node, str: self }
+    }
+}
+
+impl ToTemplate for Rc<str> {
+    const TEMPLATE: &'static str = <&str as ToTemplate>::TEMPLATE;
+
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        <&str as ToTemplate>::to_template(buf, class, style, position)
+    }
+}
+
+impl<R: Renderer> Mountable<R> for RcStrState<R> {
+    fn unmount(&mut self) {
+        self.node.unmount()
+    }
+
+    fn mount(
+        &mut self,
+        parent: &<R as Renderer>::Element,
+        marker: Option<&<R as Renderer>::Node>,
+    ) {
+        R::insert_node(parent, self.node.as_ref(), marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<R as Renderer>::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        child.mount(parent, Some(self.node.as_ref()));
+        true
+    }
+}
+
+pub struct ArcStrState<R: Renderer> {
+    node: R::Text,
+    str: Arc<str>,
+}
+
+impl<R: Renderer> Render<R> for Arc<str> {
+    type State = ArcStrState<R>;
+
+    fn build(self) -> Self::State {
+        let node = R::create_text_node(&self);
+        ArcStrState { node, str: self }
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        let ArcStrState { node, str } = state;
+        if !Arc::ptr_eq(&self, str) {
+            R::set_text(node, &self);
+            *str = self;
+        }
+    }
+}
+
+impl<R> RenderHtml<R> for Arc<str>
+where
+    R: Renderer,
+    R::Node: Clone,
+    R::Element: Clone,
+{
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        <&str as RenderHtml<R>>::to_html_with_buf(&self, buf, position)
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<R>,
+        position: &PositionState,
+    ) -> Self::State {
+        let this: &str = self.as_ref();
+        let StrState { node, .. } =
+            this.hydrate::<FROM_SERVER>(cursor, position);
+        ArcStrState { node, str: self }
+    }
+}
+
+impl ToTemplate for Arc<str> {
+    const TEMPLATE: &'static str = <&str as ToTemplate>::TEMPLATE;
+
+    fn to_template(
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        position: &mut Position,
+    ) {
+        <&str as ToTemplate>::to_template(buf, class, style, position)
+    }
+}
+
+impl<R: Renderer> Mountable<R> for ArcStrState<R> {
     fn unmount(&mut self) {
         self.node.unmount()
     }

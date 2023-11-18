@@ -6,6 +6,7 @@ pub mod any_view;
 pub mod either;
 pub mod iterators;
 pub mod keyed;
+mod primitives;
 #[cfg(feature = "nightly")]
 pub mod static_types;
 pub mod strings;

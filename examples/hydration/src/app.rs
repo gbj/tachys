@@ -1,5 +1,10 @@
+use std::{future::IntoFuture, rc::Rc, sync::Arc};
 use tachy_maccy::view;
-use tachy_reaccy::{async_signal::AsyncState, prelude::*};
+use tachy_reaccy::{
+    async_signal::AsyncState,
+    prelude::*,
+    serialization::{Miniserde, SerdeJson, SerdeLite, Str},
+};
 use tachydom::{
     async_views::FutureViewExt,
     dom::log,
@@ -19,11 +24,32 @@ pub fn my_app() -> impl RenderHtml<Dom> {
     let count = Signal::new(0);
     let value = Resource::new(|| async {
         timer().await;
-        42
+        "str".to_string()
+    });
+    let value2 = Resource::serde(|| async {
+        timer().await;
+        "serde_json".to_string()
+    });
+    let value3 = Resource::miniserde(|| async {
+        timer().await;
+        "miniserde".to_string()
+    });
+    let value4 = Resource::serde_lite(|| async {
+        timer().await;
+        "serde_lite".to_string()
+    });
+    let value5 = Resource::rkyv(|| async {
+        timer().await;
+        "serde_lite".to_string()
     });
 
-    view! {
-        <button
+    let a: &str = "hello world";
+    let b: Rc<str> = Rc::from(a);
+    let c: Arc<str> = Arc::from(a);
+    let d = String::from(a);
+
+    /* view! {
+        /* <button
             on:click=move |_| {
                 log("clicked");
                 count.update(|n| *n += 1)
@@ -40,6 +66,19 @@ pub fn my_app() -> impl RenderHtml<Dom> {
                     .with_fallback("Loading...")
                     .track()
             }}
-        </button>
-    }
+        </button> */
+        //{a} {b} {c} {d}
+    } */
+    (
+        async { value.await }.suspend().with_fallback("FromStr..."),
+        async { value2.await }
+            .suspend()
+            .with_fallback("serde_json..."),
+        async { value3.await }
+            .suspend()
+            .with_fallback("miniserde..."),
+        async { value4.await }
+            .suspend()
+            .with_fallback("serde_lite..."),
+    )
 }

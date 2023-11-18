@@ -17,6 +17,9 @@ tachy_reaccy = { path = "../../tachy_reaccy", features = [
 	"web",
 	"hydration",
 	"serde",
+	"serde-lite",
+	"miniserde",
+	"rkyv",
 ] }
 wasm-bindgen = "=0.2.88"
 futures = "0.3.29"

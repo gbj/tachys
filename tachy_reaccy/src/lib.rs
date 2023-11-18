@@ -8,6 +8,7 @@ pub mod render_effect;
 pub mod selector;
 #[cfg(feature = "serde")]
 mod serde;
+pub mod serialization;
 pub mod shared_context;
 pub mod signal;
 pub mod signal_traits;

@@ -1,4 +1,4 @@
-use super::{Serializable, SerializedDataId, SharedContext};
+use super::{SerializedDataId, SharedContext};
 use crate::{PinnedFuture, PinnedStream};
 use core::fmt::Debug;
 use js_sys::Array;
@@ -34,8 +34,6 @@ impl SharedContext for HydrateSharedContext {
         let id = self.id.fetch_add(1, Ordering::Relaxed);
         SerializedDataId(id)
     }
-
-    fn write(&self, _value: &dyn Serializable) {}
 
     fn write_async(&self, _fut: PinnedFuture<String>) {}
 

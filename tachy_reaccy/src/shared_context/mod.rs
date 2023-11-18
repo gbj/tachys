@@ -1,13 +1,11 @@
 #[cfg(feature = "web")]
 mod hydrate;
 mod islands;
-mod serialization;
 mod ssr;
 use crate::{PinnedFuture, PinnedStream};
 pub use hydrate::*;
 pub use islands::*;
 use serde::{Deserialize, Serialize};
-pub use serialization::*;
 pub use ssr::*;
 use std::fmt::Debug;
 
@@ -18,12 +16,6 @@ pub trait SharedContext: Debug {
     /// of serializing and deserializing data from the server to the browser as part of an HTTP
     /// response.
     fn next_id(&self) -> SerializedDataId;
-
-    /// Synchronously writes a serializable value into a collection of server data
-    /// to be serialized from the server to the client.
-    ///
-    /// In browser implementations, this should be a no-op.
-    fn write(&self, value: &dyn Serializable);
 
     /// The given [`Future`] should resolve with some data that can be serialized
     /// from the server to the client. This will be polled as part of the process of

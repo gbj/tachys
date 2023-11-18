@@ -1,4 +1,4 @@
-use super::{Serializable, SerializedDataId, SharedContext};
+use super::{SerializedDataId, SharedContext};
 use crate::{PinnedFuture, PinnedStream};
 use futures::{
     stream::{self, FuturesUnordered},
@@ -38,18 +38,6 @@ impl SharedContext for SsrSharedContext {
     fn next_id(&self) -> SerializedDataId {
         let id = self.id.fetch_add(1, Ordering::Relaxed);
         SerializedDataId(id)
-    }
-
-    fn write(&self, value: &dyn Serializable) {
-        let id = self.next_id();
-        let ser = value.ser();
-        match ser {
-            Ok(ser) => self.sync_buf.write().push(ResolvedData(id, ser)),
-            Err(e) => {
-                #[cfg(feature = "tracing")]
-                tracing::warn!("Failed while serializing server data: {e:?}")
-            }
-        }
     }
 
     fn write_async(&self, fut: PinnedFuture<String>) {

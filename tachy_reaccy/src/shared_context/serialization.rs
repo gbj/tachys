@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::{error::Error, rc::Rc};
 use thiserror::Error;
 
 /// Describes errors that can occur while serializing and deserializing data,
@@ -8,10 +8,10 @@ use thiserror::Error;
 pub enum SerializationError {
     /// Errors that occur during serialization.
     #[error("error serializing Resource: {0}")]
-    Serialize(Arc<dyn Error + Send + Sync>),
+    Serialize(Rc<dyn Error>),
     /// Errors that occur during deserialization.
     #[error("error deserializing Resource: {0}")]
-    Deserialize(Arc<dyn Error + Send + Sync>),
+    Deserialize(Rc<dyn Error>),
 }
 
 /// Describes an object that can be serialized to or from a supported format
@@ -34,21 +34,86 @@ pub trait Serializable {
         Self: Sized;
 }
 
-#[cfg(feature = "serde")]
-use serde::{de::DeserializeOwned, Serialize};
+cfg_if::cfg_if! {
+    if #[cfg(feature = "rkyv")] {
+        use rkyv::{Archive, CheckBytes, Deserialize, Serialize, ser::serializers::AllocSerializer, de::deserializers::SharedDeserializeMap, validation::validators::DefaultValidator};
+        use base64::Engine as _;
+        use base64::engine::general_purpose::STANDARD_NO_PAD;
 
-#[cfg(feature = "serde")]
-impl<T> Serializable for T
-where
-    T: DeserializeOwned + Serialize,
-{
-    fn ser(&self) -> Result<String, SerializationError> {
-        serde_json::to_string(&self)
-            .map_err(|e| SerializationError::Serialize(Arc::new(e)))
+        impl<T> Serializable for T
+        where
+        T: Serialize<AllocSerializer<1024>>,
+        T: Archive,
+        T::Archived: for<'b> CheckBytes<DefaultValidator<'b>> + Deserialize<T, SharedDeserializeMap>,
+        {
+            fn ser(&self) -> Result<String, SerializationError> {
+                let bytes = rkyv::to_bytes::<T, 1024>(self).map_err(|e| SerializationError::Serialize(Rc::new(e)))?;
+                Ok(STANDARD_NO_PAD.encode(bytes))
+            }
+
+            fn de(serialized: &str) -> Result<Self, SerializationError> {
+                let bytes = STANDARD_NO_PAD.decode(serialized.as_bytes()).map_err(|e| SerializationError::Deserialize(Rc::new(e)))?;
+                rkyv::from_bytes::<T>(&bytes).map_err(|e| SerializationError::Deserialize(Rc::new(e)))
+            }
+        }
     }
+    // prefer miniserde if it's chosen
+    else if #[cfg(feature = "miniserde")] {
+        use miniserde::{json, Deserialize, Serialize};
 
-    fn de(json: &str) -> Result<Self, SerializationError> {
-        serde_json::from_str(json)
-            .map_err(|e| SerializationError::Deserialize(Arc::new(e)))
+        impl<T> Serializable for T
+        where
+            T: Serialize + Deserialize,
+        {
+            fn ser(&self) -> Result<String, SerializationError> {
+                Ok(json::to_string(&self))
+            }
+
+            fn de(json: &str) -> Result<Self, SerializationError> {
+                json::from_str(json).map_err(|e| SerializationError::Deserialize(Rc::new(e)))
+            }
+        }
+
+    }
+    // use serde-lite if enabled
+    else if #[cfg(feature = "serde-lite")] {
+        use serde_lite::{Deserialize, Serialize};
+
+        impl<T> Serializable for T
+        where
+            T: Serialize + Deserialize,
+        {
+            fn ser(&self) -> Result<String, SerializationError> {
+                let intermediate = self
+                    .serialize()
+                    .map_err(|e| SerializationError::Serialize(Rc::new(e)))?;
+                serde_json::to_string(&intermediate).map_err(|e| SerializationError::Serialize(Rc::new(e)))
+            }
+
+            fn de(json: &str) -> Result<Self, SerializationError> {
+                let intermediate =
+                    serde_json::from_str(json).map_err(|e| SerializationError::Deserialize(Rc::new(e)))?;
+                Self::deserialize(&intermediate).map_err(|e| SerializationError::Deserialize(Rc::new(e)))
+            }
+        }
+
+    }
+    // otherwise, or if serde is chosen, default to serde
+    else {
+        use serde::{de::DeserializeOwned, Serialize};
+
+        impl<T> Serializable for T
+        where
+            T: DeserializeOwned + Serialize,
+        {
+            fn ser(&self) -> Result<String, SerializationError> {
+                serde_json::to_string(&self).map_err(|e| SerializationError::Serialize(Rc::new(e)))
+            }
+
+            fn de(json: &str) -> Result<Self, SerializationError> {
+                serde_json::from_str(json).map_err(|e| SerializationError::Deserialize(Rc::new(e)))
+            }
+
+        }
     }
 }

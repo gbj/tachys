@@ -134,7 +134,11 @@ fn node_to_tokens(
     view_marker: Option<&str>,
 ) -> Option<TokenStream> {
     match node {
-        Node::Comment(_) | Node::Doctype(_) => None,
+        Node::Comment(_) => None,
+        Node::Doctype(node) => {
+            let value = node.value.to_string_best();
+            Some(quote! { ::tachydom::html::doctype(#value) })
+        }
         Node::Fragment(fragment) => fragment_to_tokens(
             &fragment.children,
             parent_type,

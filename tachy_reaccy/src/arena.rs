@@ -25,7 +25,7 @@ thread_local! {
 }
 
 #[derive(Debug, Clone)]
-pub struct Root<T>(Owner, T);
+pub struct Root<T>(pub Owner, pub T);
 
 impl<T> Root<T> {
     pub fn global(fun: impl FnOnce() -> T) -> T {
@@ -44,13 +44,11 @@ impl<T> Root<T> {
         value
     }
 
-    pub fn global_ssr(fun: impl FnOnce() -> T) -> T {
-        let Root(owner, value) = Root::new_with_shared_context(
+    pub fn global_ssr(fun: impl FnOnce() -> T) -> Root<T> {
+        Root::new_with_shared_context(
             fun,
             Some(Arc::new(SsrSharedContext::new())),
-        );
-        mem::forget(owner);
-        value
+        )
     }
 
     pub fn new(fun: impl FnOnce() -> T) -> Self {
@@ -153,10 +151,12 @@ pub(crate) struct OwnerInner {
 
 impl Drop for OwnerInner {
     fn drop(&mut self) {
+        println!("dropping OwnerInner");
         let mut map = MAP.write();
         for node in std::mem::take(&mut self.nodes) {
             map.remove(node);
         }
+        println!("MAP len is now {}", map.len());
     }
 }
 

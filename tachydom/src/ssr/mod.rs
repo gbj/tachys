@@ -94,7 +94,6 @@ impl StreamBuilder {
     {
         self.write_chunk_marker(true);
         fallback.to_html_with_buf(&mut self.sync_buf, position);
-        self.sync_buf.push_str("<!>"); // for Either marker
         self.write_chunk_marker(false);
     }
 
@@ -143,7 +142,9 @@ impl StreamBuilder {
         Rndr::Element: Clone,
     {
         let id = self.clone_id();
-        let position = position.clone();
+        // don't be updated by additional iterations
+        // i.e., restart in the same position we were at when we suspended
+        let position = position.deep_clone();
 
         self.chunks.push_back(StreamChunk::OutOfOrder {
             should_block,

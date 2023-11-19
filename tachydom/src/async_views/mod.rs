@@ -150,7 +150,6 @@ where
                         &mut builder,
                         position,
                     );
-                buf.push_sync("<!>");
                 let builder = builder.finish();
                 buf.append(builder);
             }

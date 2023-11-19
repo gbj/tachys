@@ -259,6 +259,11 @@ impl PositionState {
     pub fn get(&self) -> Position {
         *self.0.read()
     }
+
+    pub fn deep_clone(&self) -> Self {
+        let current = self.get();
+        Self(Arc::new(RwLock::new(current)))
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]

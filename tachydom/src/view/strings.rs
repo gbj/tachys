@@ -56,13 +56,15 @@ where
             cursor.sibling();
         }
 
+        // separating placeholder marker comes before text node
+        if matches!(position.get(), Position::NextChild | Position::LastChild) {
+            cursor.sibling();
+        }
+
         let node = cursor.current();
         let node = R::Text::cast_from(node)
             .expect("couldn't cast text node from node");
 
-        if matches!(position.get(), Position::NextChild | Position::LastChild) {
-            cursor.sibling();
-        }
         if !FROM_SERVER {
             R::set_text(&node, self);
         }

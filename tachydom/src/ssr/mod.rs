@@ -187,7 +187,7 @@ impl StreamBuilder {
                      if(walker.currentNode.textContent == `s-${id}c`) { close \
                      = walker.currentNode;}}let range = new Range(); \
                      range.setStartBefore(open); range.setEndBefore(close); \
-                     console.log(range);range.deleteContents(); let tpl = \
+                     range.deleteContents(); let tpl = \
                      document.getElementById(`${id}f`); \
                      close.parentNode.insertBefore(tpl.content.\
                      cloneNode(true), close);close.remove();})()",

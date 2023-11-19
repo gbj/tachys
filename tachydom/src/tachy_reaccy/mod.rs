@@ -1,18 +1,14 @@
 use crate::{
     async_views::Suspend,
-    html::attribute::AttributeValue,
+    html::{attribute::AttributeValue, property::IntoProperty},
     hydration::Cursor,
-    renderer::Renderer,
+    renderer::{DomRenderer, Renderer},
+    ssr::StreamBuilder,
     view::{
         Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
     },
 };
-use tachy_reaccy::async_signal::ScopedFuture;
-use tachy_reaccy::{
-    render_effect::RenderEffect,
-    /* resource::ScopedFuture, */ signal::Signal,
-    signal_traits::SignalGet,
-};
+use tachy_reaccy::{async_signal::ScopedFuture, render_effect::RenderEffect};
 
 mod class;
 mod style;
@@ -80,6 +76,17 @@ where
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         let value = self();
         value.to_html_with_buf(buf, position)
+    }
+
+    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &PositionState,
+    ) where
+        Self: Sized,
+    {
+        let value = self();
+        value.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -213,6 +220,53 @@ where
         )); */
         let old_effect = std::mem::replace(state, self.build());
     } */
+}
+
+// Dynamic properties
+// These do update during hydration because properties don't exist in the DOM
+impl<F, V, R> IntoProperty<R> for F
+where
+    F: Fn() -> V + 'static,
+    V: IntoProperty<R>,
+    V::State: 'static,
+    R: DomRenderer,
+    R::Element: Clone + 'static,
+{
+    type State = RenderEffect<V::State>;
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        el: &<R as Renderer>::Element,
+        key: &str,
+    ) -> Self::State {
+        let key = key.to_owned();
+        let el = el.to_owned();
+        RenderEffect::new(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&mut state, &key);
+                state
+            } else {
+                value.hydrate::<FROM_SERVER>(&el, &key)
+            }
+        })
+    }
+
+    fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
+        let key = key.to_owned();
+        let el = el.to_owned();
+        RenderEffect::new(move |prev| {
+            let value = self();
+            if let Some(mut state) = prev {
+                value.rebuild(&mut state, &key);
+                state
+            } else {
+                value.build(&el, &key)
+            }
+        })
+    }
+
+    fn rebuild(self, _state: &mut Self::State, _key: &str) {}
 }
 
 /*

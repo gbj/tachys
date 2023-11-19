@@ -89,36 +89,59 @@ pub trait IntoProperty<R: DomRenderer> {
     fn rebuild(self, state: &mut Self::State, key: &str);
 }
 
-impl<T, R> IntoProperty<R> for T
-where
-    T: Into<JsValue>,
-    R: DomRenderer,
-    R::Element: Clone,
-{
-    type State = (R::Element, JsValue);
+macro_rules! prop_type {
+    ($prop_type:ty) => {
+        impl<R> IntoProperty<R> for $prop_type
+        where
+            R: DomRenderer,
+            R::Element: Clone,
+        {
+            type State = (R::Element, JsValue);
 
-    fn hydrate<const FROM_SERVER: bool>(
-        self,
-        el: &R::Element,
-        key: &str,
-    ) -> Self::State {
-        let value = self.into();
-        R::set_property(el, key, &value);
-        (el.clone(), value)
-    }
+            fn hydrate<const FROM_SERVER: bool>(
+                self,
+                el: &R::Element,
+                key: &str,
+            ) -> Self::State {
+                let value = self.into();
+                R::set_property(el, key, &value);
+                (el.clone(), value)
+            }
 
-    fn build(self, el: &R::Element, key: &str) -> Self::State {
-        let value = self.into();
-        R::set_property(el, key, &value);
-        (el.clone(), value)
-    }
+            fn build(self, el: &R::Element, key: &str) -> Self::State {
+                let value = self.into();
+                R::set_property(el, key, &value);
+                (el.clone(), value)
+            }
 
-    fn rebuild(self, state: &mut Self::State, key: &str) {
-        let (el, prev) = state;
-        let value = self.into();
-        if value != *prev {
-            R::set_property(el, key, &value);
+            fn rebuild(self, state: &mut Self::State, key: &str) {
+                let (el, prev) = state;
+                let value = self.into();
+                if value != *prev {
+                    R::set_property(el, key, &value);
+                }
+                *prev = value;
+            }
         }
-        *prev = value;
-    }
+    };
 }
+
+prop_type!(JsValue);
+prop_type!(String);
+prop_type!(&String);
+prop_type!(&str);
+prop_type!(usize);
+prop_type!(u8);
+prop_type!(u16);
+prop_type!(u32);
+prop_type!(u64);
+prop_type!(u128);
+prop_type!(isize);
+prop_type!(i8);
+prop_type!(i16);
+prop_type!(i32);
+prop_type!(i64);
+prop_type!(i128);
+prop_type!(f32);
+prop_type!(f64);
+prop_type!(bool);

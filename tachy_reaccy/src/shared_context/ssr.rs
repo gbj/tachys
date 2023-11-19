@@ -40,8 +40,7 @@ impl SharedContext for SsrSharedContext {
         SerializedDataId(id)
     }
 
-    fn write_async(&self, fut: PinnedFuture<String>) {
-        let id = self.next_id();
+    fn write_async(&self, id: SerializedDataId, fut: PinnedFuture<String>) {
         self.async_buf.write().push((id, fut))
     }
 
@@ -83,11 +82,11 @@ impl SharedContext for SsrSharedContext {
         Some(Box::pin(stream))
     }
 
-    fn read_data(&self, _id: SerializedDataId) -> Option<String> {
+    fn read_data(&self, _id: &SerializedDataId) -> Option<String> {
         None
     }
 
-    fn await_data(&self, _id: SerializedDataId) -> Option<String> {
+    fn await_data(&self, _id: &SerializedDataId) -> Option<String> {
         None
     }
 }

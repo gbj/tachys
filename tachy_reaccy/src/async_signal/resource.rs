@@ -9,6 +9,7 @@ use crate::{
     arena::Owner,
     prelude::SignalWithUntracked,
     serialization::{SerdeJson, SerializableData, Serializer, Str},
+    shared_context::SerializedDataId,
 };
 use core::{fmt::Debug, marker::PhantomData};
 use futures::Future;
@@ -123,7 +124,10 @@ where
         T: Send + Sync + 'static,
         Fut: Future<Output = T> + Send + Sync + 'static,
     {
-        let initial = Self::initial_value();
+        let id = Owner::shared_context()
+            .map(|sc| sc.next_id())
+            .unwrap_or_default();
+        let initial = Self::initial_value(&id);
 
         let data = ArcAsyncDerived::new_with_initial(initial, fun);
 
@@ -131,15 +135,18 @@ where
             let value = data.clone();
             let ready_fut = data.ready();
 
-            shared_context.write_async(Box::pin(async move {
-                ready_fut.await;
-                value
-                    .with_untracked(|data| match &data {
-                        AsyncState::Complete(val) => val.ser(),
-                        _ => unreachable!(),
-                    })
-                    .unwrap() // TODO handle
-            }));
+            shared_context.write_async(
+                id,
+                Box::pin(async move {
+                    ready_fut.await;
+                    value
+                        .with_untracked(|data| match &data {
+                            AsyncState::Complete(val) => val.ser(),
+                            _ => unreachable!(),
+                        })
+                        .unwrap() // TODO handle
+                }),
+            );
         }
 
         Resource {
@@ -149,17 +156,18 @@ where
     }
 
     #[inline(always)]
-    fn initial_value() -> AsyncState<T> {
+    fn initial_value(id: &SerializedDataId) -> AsyncState<T> {
         #[cfg(feature = "hydration")]
         {
             if let Some(shared_context) = Owner::shared_context() {
-                let id = shared_context.next_id();
                 let value = shared_context.read_data(id);
                 if let Some(value) = value {
                     match T::de(&value) {
                         Ok(value) => AsyncState::Complete(value),
                         Err(e) => {
-                            crate::log(&format!("couldn't deserialize: {e:?}"));
+                            crate::log(&format!(
+                                "couldn't deserialize from {value:?}: {e:?}"
+                            ));
                             AsyncState::Loading
                         }
                     }

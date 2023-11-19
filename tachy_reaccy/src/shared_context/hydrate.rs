@@ -35,13 +35,13 @@ impl SharedContext for HydrateSharedContext {
         SerializedDataId(id)
     }
 
-    fn write_async(&self, _fut: PinnedFuture<String>) {}
+    fn write_async(&self, _id: SerializedDataId, _fut: PinnedFuture<String>) {}
 
-    fn read_data(&self, id: SerializedDataId) -> Option<String> {
+    fn read_data(&self, id: &SerializedDataId) -> Option<String> {
         __RESOLVED_RESOURCES.get(id.0 as u32).as_string()
     }
 
-    fn await_data(&self, _id: SerializedDataId) -> Option<String> {
+    fn await_data(&self, _id: &SerializedDataId) -> Option<String> {
         todo!()
     }
 

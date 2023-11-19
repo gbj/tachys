@@ -22,7 +22,7 @@ pub trait SharedContext: Debug {
     /// building the HTTP response, *not* when it is first created.
     ///
     /// In browser implementations, this should be a no-op.
-    fn write_async(&self, fut: PinnedFuture<String>);
+    fn write_async(&self, id: SerializedDataId, fut: PinnedFuture<String>);
 
     /// Reads the current value of some data from the shared context, if it has been
     /// sent from the server. This returns the serialized data as a `String` that should
@@ -30,7 +30,7 @@ pub trait SharedContext: Debug {
     ///
     /// On the server and in client-side rendered implementations, this should
     /// always return [`None`].
-    fn read_data(&self, id: SerializedDataId) -> Option<String>;
+    fn read_data(&self, id: &SerializedDataId) -> Option<String>;
 
     /// Returns a [`Future`] that resolves with a `String` that should
     /// be deserialized using [`Serializable::de`] once the given piece of server
@@ -38,7 +38,7 @@ pub trait SharedContext: Debug {
     ///
     /// On the server and in client-side rendered implementations, this should
     /// return a [`Future`] that is immediately ready with [`None`].
-    fn await_data(&self, id: SerializedDataId) -> Option<String>;
+    fn await_data(&self, id: &SerializedDataId) -> Option<String>;
 
     /// Returns some [`Stream`] of HTML that contains JavaScript `<script>` tags defining
     /// all values being serialized from the server to the client, with their serialized values

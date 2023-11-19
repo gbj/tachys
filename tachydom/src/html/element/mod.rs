@@ -252,6 +252,7 @@ where
             buf.push_str(E::TAG);
             buf.push('>');
         }
+        position.set(Position::NextChild);
     }
 
     fn to_html_async_buffered<const OUT_OF_ORDER: bool>(

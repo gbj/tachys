@@ -1,4 +1,4 @@
-use super::{Mountable, PositionState, Render, RenderHtml};
+use super::{Mountable, Position, PositionState, Render, RenderHtml};
 use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
@@ -122,6 +122,7 @@ where
             Either::Right(right) => right.to_html_with_buf(buf, position),
         }
         buf.push_str("<!>");
+        position.set(Position::NextChild);
     }
 
     fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
@@ -140,6 +141,7 @@ where
             }
         }
         buf.push_sync("<!>");
+        position.set(Position::NextChild);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -158,6 +160,7 @@ where
         cursor.sibling();
         let marker = cursor.current().to_owned();
         let marker = Rndr::Placeholder::cast_from(marker).unwrap();
+        position.set(Position::NextChild);
         EitherState { state, marker }
     }
 }

@@ -108,10 +108,11 @@ where
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
         // add a comment node to separate from previous sibling, if any
-        if matches!(position.get(), Position::NextChild | Position::LastChild) {
+        if matches!(position.get(), Position::NextChildAfterText) {
             buf.push_str("<!>")
         }
-        buf.push_str(V)
+        buf.push_str(V);
+        position.set(Position::NextChildAfterText);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -124,7 +125,10 @@ where
         } else {
             cursor.sibling();
         }
-        position.set(Position::NextChild);
+        if matches!(position.get(), Position::NextChildAfterText) {
+            cursor.sibling();
+        }
+        position.set(Position::NextChildAfterText);
 
         // no view state is created when hydrating, because this is static
         None
@@ -140,10 +144,10 @@ impl<const V: &'static str> ToTemplate for Static<V> {
         _style: &mut String,
         position: &mut Position,
     ) {
-        if matches!(*position, Position::NextChild | Position::LastChild) {
+        if matches!(*position, Position::NextChildAfterText) {
             buf.push_str("<!>")
         }
         buf.push_str(V);
-        *position = Position::NextChild;
+        *position = Position::NextChildAfterText;
     }
 }

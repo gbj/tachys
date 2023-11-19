@@ -1,6 +1,6 @@
 use crate::{
     renderer::Renderer,
-    view::{PositionState, RenderHtml},
+    view::{Position, PositionState, RenderHtml},
 };
 use futures::Stream;
 use std::{
@@ -95,6 +95,7 @@ impl StreamBuilder {
         self.write_chunk_marker(true);
         fallback.to_html_with_buf(&mut self.sync_buf, position);
         self.write_chunk_marker(false);
+        position.set(Position::NextChild);
     }
 
     pub fn next_id(&mut self) {
@@ -145,6 +146,7 @@ impl StreamBuilder {
         // don't be updated by additional iterations
         // i.e., restart in the same position we were at when we suspended
         let position = position.deep_clone();
+        println!("\n deep cloning position at {position:?}");
 
         self.chunks.push_back(StreamChunk::OutOfOrder {
             should_block,

@@ -38,11 +38,16 @@ where
     const MIN_LENGTH: usize = 0;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+        println!(
+            "render HTML for &str {self:?} at position {:?}",
+            position.get()
+        );
         // add a comment node to separate from previous sibling, if any
-        if matches!(position.get(), Position::NextChild | Position::LastChild) {
+        if matches!(position.get(), Position::NextChildAfterText) {
             buf.push_str("<!>")
         }
         buf.push_str(self);
+        position.set(Position::NextChildAfterText);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -57,7 +62,7 @@ where
         }
 
         // separating placeholder marker comes before text node
-        if matches!(position.get(), Position::NextChild | Position::LastChild) {
+        if matches!(position.get(), Position::NextChildAfterText) {
             cursor.sibling();
         }
 
@@ -68,7 +73,7 @@ where
         if !FROM_SERVER {
             R::set_text(&node, self);
         }
-        position.set(Position::NextChild);
+        position.set(Position::NextChildAfterText);
 
         StrState { node, str: self }
     }
@@ -83,11 +88,11 @@ impl<'a> ToTemplate for &'a str {
         _style: &mut String,
         position: &mut Position,
     ) {
-        buf.push(' ');
-        if matches!(*position, Position::NextChild | Position::LastChild) {
+        if matches!(*position, Position::NextChildAfterText) {
             buf.push_str("<!>")
         }
-        *position = Position::NextChild;
+        buf.push(' ');
+        *position = Position::NextChildAfterText;
     }
 }
 

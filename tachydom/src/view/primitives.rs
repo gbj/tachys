@@ -70,10 +70,11 @@ macro_rules! render_primitive {
 
 				fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
 					// add a comment node to separate from previous sibling, if any
-					if matches!(position.get(), Position::NextChild | Position::LastChild) {
+					if matches!(position.get(), Position::NextChildAfterText) {
 						buf.push_str("<!>")
 					}
 					write!(buf, "{}", self);
+					position.set(Position::NextChildAfterText);
 				}
 
 				fn hydrate<const FROM_SERVER: bool>(
@@ -88,7 +89,7 @@ macro_rules! render_primitive {
 					}
 
 					// separating placeholder marker comes before text node
-					if matches!(position.get(), Position::NextChild | Position::LastChild) {
+					if matches!(position.get(), Position::NextChildAfterText) {
 						cursor.sibling();
 					}
 
@@ -99,7 +100,7 @@ macro_rules! render_primitive {
 					if !FROM_SERVER {
 						R::set_text(&node, &self.to_string());
 					}
-					position.set(Position::NextChild);
+					position.set(Position::NextChildAfterText);
 
 					[<$child_type:camel State>](node, self)
 				}
@@ -114,11 +115,11 @@ macro_rules! render_primitive {
 					_style: &mut String,
 					position: &mut Position,
 				) {
-					buf.push(' ');
-					if matches!(*position, Position::NextChild | Position::LastChild) {
+					if matches!(*position, Position::NextChildAfterText) {
 						buf.push_str("<!>")
 					}
-					*position = Position::NextChild;
+					buf.push(' ');
+					*position = Position::NextChildAfterText;
 				}
 			}
 		}

@@ -162,7 +162,6 @@ macro_rules! impl_view_for_tuples {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html_with_buf(buf, position);
-					position.set(Position::NextChild);
 					$([<$ty:lower>].to_html_with_buf(buf, position));*
 				}
 			}
@@ -177,7 +176,6 @@ macro_rules! impl_view_for_tuples {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
-					position.set(Position::NextChild);
 					$([<$ty:lower>].to_html_async_buffered::<OUT_OF_ORDER>(buf, position));*
 				}
 			}

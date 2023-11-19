@@ -1,4 +1,4 @@
-use super::{Mountable, PositionState, Render, RenderHtml};
+use super::{Mountable, Position, PositionState, Render, RenderHtml};
 use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
@@ -110,6 +110,7 @@ where
             value.to_html_with_buf(buf, position);
             // insert marker node
             buf.push_str("<!>");
+            position.set(Position::NextChild);
         };
         let build = |value: Box<dyn Any>| {
             let value = value
@@ -140,6 +141,7 @@ where
                 cursor.sibling();
                 let placeholder = R::Placeholder::cast_from(cursor.current())
                     .expect("should be a placeholder node");
+                position.set(Position::NextChild);
 
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
@@ -164,6 +166,7 @@ where
                 cursor.sibling();
                 let placeholder = R::Placeholder::cast_from(cursor.current())
                     .expect("should be a placeholder node");
+                position.set(Position::NextChild);
 
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
@@ -238,7 +241,7 @@ where
     const MIN_LENGTH: usize = 0;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        (self.to_html)(self.value, buf, position)
+        (self.to_html)(self.value, buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(

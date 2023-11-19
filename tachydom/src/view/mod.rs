@@ -271,6 +271,7 @@ pub enum Position {
     #[default]
     FirstChild,
     NextChild,
+    NextChildAfterText,
     OnlyChild,
     LastChild,
 }

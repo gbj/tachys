@@ -38,10 +38,6 @@ where
     const MIN_LENGTH: usize = 0;
 
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
-        println!(
-            "render HTML for &str {self:?} at position {:?}",
-            position.get()
-        );
         // add a comment node to separate from previous sibling, if any
         if matches!(position.get(), Position::NextChildAfterText) {
             buf.push_str("<!>")

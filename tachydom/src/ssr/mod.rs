@@ -161,7 +161,7 @@ impl StreamBuilder {
                     }
                 }
 
-                subbuilder.sync_buf.reserve(100); // TODO size
+                subbuilder.sync_buf.reserve(591 + id.len()); // TODO size
                 subbuilder.sync_buf.push_str("<template id=\"");
                 subbuilder.sync_buf.push_str(&id);
                 subbuilder.sync_buf.push('f');

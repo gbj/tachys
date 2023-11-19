@@ -83,7 +83,7 @@ macro_rules! spawn_derived {
             sources: SourceSet::new(),
             subscribers: SubscriberSet::new(),
         }));
-        let value = Arc::new(RwLock::new(AsyncState::Loading));
+        let value = Arc::new(RwLock::new($initial));
         let wakers = Arc::new(RwLock::new(Vec::new()));
 
         let this = ArcAsyncDerived {

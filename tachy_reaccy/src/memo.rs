@@ -151,6 +151,7 @@ impl<T> Debug for ArcMemo<T> {
 
 struct MemoInner<T> {
     value: Option<T>,
+    #[allow(clippy::type_complexity)]
     fun: Arc<dyn Fn(Option<&T>) -> T + Send + Sync>,
     compare_with: fn(Option<&T>, Option<&T>) -> bool,
     owner: Owner,
@@ -335,6 +336,7 @@ impl<T: Send + Sync + 'static> Subscriber for ArcMemo<T> {
 }
 
 impl<T: Send + Sync + 'static> MemoInner<T> {
+    #[allow(clippy::type_complexity)]
     pub fn new(
         fun: Arc<dyn Fn(Option<&T>) -> T + Send + Sync>,
         compare_with: fn(Option<&T>, Option<&T>) -> bool,

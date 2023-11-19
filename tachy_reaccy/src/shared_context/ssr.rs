@@ -61,7 +61,7 @@ impl SharedContext for SsrSharedContext {
         // pending async resources
         initial_chunk.push_str("__PENDING_RESOURCES=[");
         for (id, _) in &async_data {
-            write!(&mut initial_chunk, "{}", id.0);
+            write!(&mut initial_chunk, "{}", id.0).unwrap();
         }
         initial_chunk.push_str("];");
 
@@ -99,6 +99,6 @@ impl ResolvedData {
         let ResolvedData(id, ser) = self;
         // escapes < to prevent it being interpreted as another opening HTML tag
         let ser = ser.replace('<', "\\u003c");
-        write!(buf, "{}: {:?}", id.0, ser);
+        write!(buf, "{}: {:?}", id.0, ser).unwrap();
     }
 }

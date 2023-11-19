@@ -29,7 +29,6 @@ impl<T, Ser> Deref for SerializedResource<T, Ser> {
 }
 
 pub type Resource<T> = SerializedResource<T, Str>;
-pub type JsValueResource<T> = SerializedResource<T, Str>;
 pub type SerdeJsonResource<T> = SerializedResource<T, SerdeJson>;
 
 #[cfg(feature = "miniserde")]
@@ -49,7 +48,7 @@ where
     T::DeErr: Debug,
 {
     pub fn new<Fut>(
-        fun: impl FnMut() -> Fut + Send + Sync + 'static,
+        fun: impl Fn() -> Fut + Send + Sync + 'static,
     ) -> SerializedResource<T, Ser>
     where
         T: Send + Sync + 'static,
@@ -58,6 +57,7 @@ where
         let id = Owner::shared_context()
             .map(|sc| sc.next_id())
             .unwrap_or_default();
+
         let initial = Self::initial_value(&id);
 
         let data = ArcAsyncDerived::new_with_initial(initial, fun);

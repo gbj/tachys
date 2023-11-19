@@ -11,7 +11,7 @@ use crate::{
     spawn::{spawn, spawn_local},
     unwrap_signal,
 };
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use parking_lot::RwLock;
 use std::{
     fmt::Debug,
@@ -76,6 +76,7 @@ macro_rules! spawn_derived {
         if matches!($initial, AsyncState::Loading) {
             notifier.notify();
         }
+        let is_ready = matches!($initial, AsyncState::Complete(_));
 
         let inner = Arc::new(RwLock::new(ArcAsyncDerivedInner {
             owner: Owner::new(),
@@ -94,6 +95,19 @@ macro_rules! spawn_derived {
             inner: Arc::clone(&inner),
         };
         let any_subscriber = this.to_any_subscriber();
+
+        // if it's immediately available, poll once
+        // this means either
+        // a) it's synchronous, or
+        // b) it was hydrated, and we want to access any reactivity
+        if is_ready {
+            let owner = this.inner.read().owner.clone();
+            let fut = owner.with(|| {
+                any_subscriber
+                    .with_observer(|| ScopedFuture::new($fun()))
+            });
+            _ = fut.now_or_never();
+        }
 
         $spawner({
             let value = Arc::downgrade(&this.value);
@@ -166,7 +180,7 @@ impl<T> DefinedAt for ArcAsyncDerived<T> {
 
 impl<T: 'static> ArcAsyncDerived<T> {
     #[track_caller]
-    pub fn new<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
+    pub fn new<Fut>(fun: impl Fn() -> Fut + Send + Sync + 'static) -> Self
     where
         T: Send + Sync + 'static,
         Fut: Future<Output = T> + Send + Sync + 'static,
@@ -177,7 +191,7 @@ impl<T: 'static> ArcAsyncDerived<T> {
     #[track_caller]
     pub fn new_with_initial<Fut>(
         initial_value: AsyncState<T>,
-        mut fun: impl FnMut() -> Fut + Send + Sync + 'static,
+        fun: impl Fn() -> Fut + Send + Sync + 'static,
     ) -> Self
     where
         T: Send + Sync + 'static,
@@ -187,7 +201,7 @@ impl<T: 'static> ArcAsyncDerived<T> {
     }
 
     #[track_caller]
-    pub fn new_unsync<Fut>(fun: impl FnMut() -> Fut + 'static) -> Self
+    pub fn new_unsync<Fut>(fun: impl Fn() -> Fut + 'static) -> Self
     where
         T: 'static,
         Fut: Future<Output = T> + 'static,
@@ -198,7 +212,7 @@ impl<T: 'static> ArcAsyncDerived<T> {
     #[track_caller]
     pub fn new_unsync_with_initial<Fut>(
         initial_value: AsyncState<T>,
-        mut fun: impl FnMut() -> Fut + 'static,
+        fun: impl Fn() -> Fut + 'static,
     ) -> Self
     where
         T: 'static,
@@ -410,7 +424,7 @@ impl<T: Send + Sync + 'static> AsyncDerived<T> {
         feature = "tracing",
         tracing::instrument(level = "debug", skip_all,)
     )]
-    pub fn new<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
+    pub fn new<Fut>(fun: impl Fn() -> Fut + Send + Sync + 'static) -> Self
     where
         T: Send + Sync + 'static,
         Fut: Future<Output = T> + Send + Sync + 'static,

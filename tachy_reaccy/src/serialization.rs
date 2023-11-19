@@ -34,30 +34,6 @@ where
     }
 }
 
-/// A [`Serializer`] that serializes using [`serde_json`] and deserializes using `JSON.parse` and
-/// `From<JsValue>`, which can be implemented for types using
-/// [`ducktor`](https://docs.rs/ducktor/latest/ducktor/).
-pub struct JsValueSer;
-
-impl Serializer for JsValueSer {}
-
-impl<T> SerializableData<JsValueSer> for T
-where
-    T: From<JsValue> + Serialize,
-{
-    type SerErr = serde_json::Error;
-    type DeErr = JsValue;
-
-    fn ser(&self) -> Result<String, Self::SerErr> {
-        serde_json::to_string(&self)
-    }
-
-    fn de(data: &str) -> Result<Self, Self::DeErr> {
-        let value = js_sys::JSON::parse(data)?;
-        Ok(value.into())
-    }
-}
-
 /// A [`Serializer`] that serializes using [`serde_json`].
 pub struct SerdeJson;
 
@@ -224,4 +200,3 @@ mod rkyv {
 
 #[cfg(feature = "rkyv")]
 pub use rkyv::*;
-use wasm_bindgen::JsValue;

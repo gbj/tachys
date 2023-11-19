@@ -146,7 +146,6 @@ impl StreamBuilder {
         // don't be updated by additional iterations
         // i.e., restart in the same position we were at when we suspended
         let position = position.deep_clone();
-        println!("\n deep cloning position at {position:?}");
 
         self.chunks.push_back(StreamChunk::OutOfOrder {
             should_block,

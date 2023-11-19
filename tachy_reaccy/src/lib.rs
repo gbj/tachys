@@ -21,7 +21,7 @@ use std::{cell::RefCell, pin::Pin};
 
 pub mod prelude {
     pub use crate::{
-        async_signal::SerializedResource,
+        async_signal::{AsyncDerived, SerializedResource},
         context::{provide_context, use_context},
         effect::Effect,
         memo::{ArcMemo, Memo},

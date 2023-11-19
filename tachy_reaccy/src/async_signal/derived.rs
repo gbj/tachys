@@ -433,6 +433,40 @@ impl<T: Send + Sync + 'static> AsyncDerived<T> {
             inner: Stored::new(ArcAsyncDerived::new(fun)),
         }
     }
+
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    pub fn new_with_initial<Fut>(
+        initial_value: AsyncState<T>,
+        fun: impl Fn() -> Fut + Send + Sync + 'static,
+    ) -> Self
+    where
+        T: Send + Sync + 'static,
+        Fut: Future<Output = T> + Send + Sync + 'static,
+    {
+        Self {
+            inner: Stored::new(ArcAsyncDerived::new_with_initial(
+                initial_value,
+                fun,
+            )),
+        }
+    }
+
+    #[track_caller]
+    pub fn ready(&self) -> AsyncDerivedReadyFuture<T> {
+        let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));
+        this.ready()
+    }
+}
+
+impl<T: Send + Sync + 'static> ToAnySource for AsyncDerived<T> {
+    #[track_caller]
+    fn to_any_source(&self) -> AnySource {
+        let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));
+        this.to_any_source()
+    }
 }
 
 impl<T: Send + Sync + 'static> Copy for AsyncDerived<T> {}
@@ -480,6 +514,60 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for AsyncDerived<T> {
         self.inner
             .get()
             .and_then(|inner| inner.try_with_untracked(fun))
+    }
+}
+
+impl<T: Send + Sync + 'static> ReactiveNode for AsyncDerived<T> {
+    fn set_state(&self, state: ReactiveNodeState) {
+        if let Some(inner) = self.inner.get() {
+            inner.set_state(state);
+        }
+    }
+
+    fn mark_dirty(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_dirty();
+        }
+    }
+
+    fn mark_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_check();
+        }
+    }
+
+    fn mark_subscribers_check(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.mark_subscribers_check();
+        }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        if let Some(inner) = self.inner.get() {
+            inner.update_if_necessary()
+        } else {
+            false
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Source for AsyncDerived<T> {
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.add_subscriber(subscriber);
+        }
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.inner.get() {
+            inner.remove_subscriber(subscriber);
+        }
+    }
+
+    fn clear_subscribers(&self) {
+        if let Some(inner) = self.inner.get() {
+            inner.clear_subscribers();
+        }
     }
 }
 

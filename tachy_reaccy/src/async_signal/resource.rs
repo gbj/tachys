@@ -15,12 +15,12 @@ use core::{fmt::Debug, marker::PhantomData};
 use futures::Future;
 use std::{future::IntoFuture, ops::Deref};
 
-pub struct Resource<T, Ser = Str> {
+pub struct SerializedResource<T, Ser = Str> {
     ser: PhantomData<Ser>,
     data: ArcAsyncDerived<T>,
 }
 
-impl<T, Ser> Deref for Resource<T, Ser> {
+impl<T, Ser> Deref for SerializedResource<T, Ser> {
     type Target = ArcAsyncDerived<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -28,98 +28,29 @@ impl<T, Ser> Deref for Resource<T, Ser> {
     }
 }
 
-impl<T> Resource<T, Str>
-where
-    T: SerializableData<Str>,
-    T::SerErr: Debug,
-    T::DeErr: Debug,
-{
-    pub fn new<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
-        Self::new_with_serializer(fun)
-    }
-}
-
-impl<T> Resource<T, SerdeJson>
-where
-    T: SerializableData<SerdeJson>,
-    T::SerErr: Debug,
-    T::DeErr: Debug,
-{
-    pub fn serde<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
-        Self::new_with_serializer(fun)
-    }
-}
+pub type Resource<T> = SerializedResource<T, Str>;
+pub type JsValueResource<T> = SerializedResource<T, Str>;
+pub type SerdeJsonResource<T> = SerializedResource<T, SerdeJson>;
 
 #[cfg(feature = "miniserde")]
-impl<T> Resource<T, Miniserde>
-where
-    T: SerializableData<Miniserde>,
-    T::SerErr: Debug,
-    T::DeErr: Debug,
-{
-    pub fn miniserde<Fut>(
-        fun: impl FnMut() -> Fut + Send + Sync + 'static,
-    ) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
-        Self::new_with_serializer(fun)
-    }
-}
+pub type MiniserdeResource<T> = SerializedResource<T, Miniserde>;
 
 #[cfg(feature = "serde-lite")]
-impl<T> Resource<T, SerdeLite>
-where
-    T: SerializableData<SerdeLite>,
-    T::SerErr: Debug,
-    T::DeErr: Debug,
-{
-    pub fn serde_lite<Fut>(
-        fun: impl FnMut() -> Fut + Send + Sync + 'static,
-    ) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
-        Self::new_with_serializer(fun)
-    }
-}
+pub type SerdeLiteResource<T> = SerializedResource<T, SerdeLite>;
 
 #[cfg(feature = "rkyv")]
-impl<T> Resource<T, Rkyv>
-where
-    T: SerializableData<Rkyv>,
-    T::SerErr: Debug,
-    T::DeErr: Debug,
-{
-    pub fn rkyv<Fut>(fun: impl FnMut() -> Fut + Send + Sync + 'static) -> Self
-    where
-        T: Send + Sync + 'static,
-        Fut: Future<Output = T> + Send + Sync + 'static,
-    {
-        Self::new_with_serializer(fun)
-    }
-}
+pub type RkyvResource<T> = SerializedResource<T, Rkyv>;
 
-impl<T, Ser> Resource<T, Ser>
+impl<T, Ser> SerializedResource<T, Ser>
 where
     Ser: Serializer,
     T: SerializableData<Ser>,
     T::SerErr: Debug,
     T::DeErr: Debug,
 {
-    pub fn new_with_serializer<Fut>(
+    pub fn new<Fut>(
         fun: impl FnMut() -> Fut + Send + Sync + 'static,
-    ) -> Resource<T, Ser>
+    ) -> SerializedResource<T, Ser>
     where
         T: Send + Sync + 'static,
         Fut: Future<Output = T> + Send + Sync + 'static,
@@ -149,7 +80,7 @@ where
             );
         }
 
-        Resource {
+        SerializedResource {
             ser: PhantomData,
             data,
         }
@@ -163,30 +94,21 @@ where
                 let value = shared_context.read_data(id);
                 if let Some(value) = value {
                     match T::de(&value) {
-                        Ok(value) => AsyncState::Complete(value),
+                        Ok(value) => return AsyncState::Complete(value),
                         Err(e) => {
                             crate::log(&format!(
                                 "couldn't deserialize from {value:?}: {e:?}"
                             ));
-                            AsyncState::Loading
                         }
                     }
-                } else {
-                    AsyncState::Loading
                 }
-            } else {
-                AsyncState::Loading
             }
         }
-        // without hydration enabled, always starts Loading
-        #[cfg(not(feature = "hydration"))]
-        {
-            AsyncState::Loading
-        }
+        AsyncState::Loading
     }
 }
 
-impl<T, Ser> IntoFuture for Resource<T, Ser>
+impl<T, Ser> IntoFuture for SerializedResource<T, Ser>
 where
     T: Clone + 'static,
 {

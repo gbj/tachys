@@ -9,6 +9,7 @@ pub mod selector;
 #[cfg(feature = "serde")]
 mod serde;
 pub mod serialization;
+#[cfg(feature = "hydration")]
 pub mod shared_context;
 pub mod signal;
 pub mod signal_traits;

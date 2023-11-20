@@ -9,7 +9,6 @@ pub mod selector;
 #[cfg(feature = "serde")]
 mod serde;
 pub mod serialization;
-#[cfg(feature = "hydration")]
 pub mod shared_context;
 pub mod signal;
 pub mod signal_traits;
@@ -26,7 +25,7 @@ pub mod prelude {
         context::{provide_context, use_context},
         effect::Effect,
         memo::{ArcMemo, Memo},
-        signal::{ArcSignal, Signal},
+        signal::{ArcRwSignal, RwSignal},
         signal_traits::*,
         Root,
     };

@@ -1,5 +1,11 @@
-use crate::shared_context::{
-    HydrateSharedContext, SharedContext, SsrSharedContext,
+#[cfg(feature = "web")]
+use crate::shared_context::HydrateSharedContext;
+use crate::{
+    shared_context::{SharedContext, SsrSharedContext},
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
+        Subscriber,
+    },
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -212,5 +218,97 @@ where
         T: Clone,
     {
         MAP.read().contains_key(self.node)
+    }
+
+    pub fn dispose(&self) {
+        MAP.write().remove(self.node);
+    }
+}
+
+pub trait StoredData {
+    type Data;
+
+    fn get(&self) -> Option<Self::Data>;
+
+    fn dispose(&self);
+}
+
+impl<T> ReactiveNode for T
+where
+    T: StoredData,
+    T::Data: ReactiveNode,
+{
+    fn set_state(&self, state: ReactiveNodeState) {
+        if let Some(inner) = self.get() {
+            inner.set_state(state);
+        }
+    }
+
+    fn mark_dirty(&self) {
+        if let Some(inner) = self.get() {
+            inner.mark_dirty();
+        }
+    }
+
+    fn mark_check(&self) {
+        if let Some(inner) = self.get() {
+            inner.mark_check();
+        }
+    }
+
+    fn mark_subscribers_check(&self) {
+        if let Some(inner) = self.get() {
+            inner.mark_subscribers_check();
+        }
+    }
+
+    fn update_if_necessary(&self) -> bool {
+        if let Some(inner) = self.get() {
+            inner.update_if_necessary()
+        } else {
+            false
+        }
+    }
+}
+
+impl<T> Source for T
+where
+    T: StoredData,
+    T::Data: Source,
+{
+    fn add_subscriber(&self, subscriber: AnySubscriber) {
+        if let Some(inner) = self.get() {
+            inner.add_subscriber(subscriber);
+        }
+    }
+
+    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.get() {
+            inner.remove_subscriber(subscriber);
+        }
+    }
+
+    fn clear_subscribers(&self) {
+        if let Some(inner) = self.get() {
+            inner.clear_subscribers();
+        }
+    }
+}
+
+impl<T> Subscriber for T
+where
+    T: StoredData,
+    T::Data: Subscriber,
+{
+    fn add_source(&self, source: AnySource) {
+        if let Some(inner) = self.get() {
+            inner.add_source(source);
+        }
+    }
+
+    fn clear_sources(&self, subscriber: &AnySubscriber) {
+        if let Some(inner) = self.get() {
+            inner.clear_sources(subscriber);
+        }
     }
 }

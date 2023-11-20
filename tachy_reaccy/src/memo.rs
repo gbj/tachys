@@ -1,5 +1,5 @@
 use crate::{
-    arena::{Owner, Stored},
+    arena::{Owner, Stored, StoredData},
     signal_traits::*,
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
@@ -51,6 +51,18 @@ impl<T: Send + Sync + 'static> Debug for Memo<T> {
             .field("type", &std::any::type_name::<T>())
             .field("store", &self.inner)
             .finish()
+    }
+}
+
+impl<T: Send + Sync + 'static> StoredData for Memo<T> {
+    type Data = ArcMemo<T>;
+
+    fn get(&self) -> Option<Self::Data> {
+        self.inner.get()
+    }
+
+    fn dispose(&self) {
+        self.inner.dispose();
     }
 }
 
@@ -399,72 +411,5 @@ impl<T: Send + Sync + 'static> ToAnySource for Memo<T> {
 impl<T: Send + Sync + 'static> ToAnySubscriber for Memo<T> {
     fn to_any_subscriber(&self) -> AnySubscriber {
         self.inner.get().unwrap().to_any_subscriber()
-    }
-}
-
-impl<T: Send + Sync + 'static> ReactiveNode for Memo<T> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        if let Some(inner) = self.inner.get() {
-            inner.set_state(state);
-        }
-    }
-
-    fn mark_dirty(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_dirty();
-        }
-    }
-
-    fn mark_check(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_check();
-        }
-    }
-
-    fn mark_subscribers_check(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_subscribers_check();
-        }
-    }
-
-    fn update_if_necessary(&self) -> bool {
-        self.inner
-            .get()
-            .map(|inner| inner.update_if_necessary())
-            .unwrap_or(false)
-    }
-}
-
-impl<T: Send + Sync + 'static> Source for Memo<T> {
-    fn add_subscriber(&self, subscriber: AnySubscriber) {
-        if let Some(inner) = self.inner.get() {
-            inner.add_subscriber(subscriber)
-        }
-    }
-
-    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        if let Some(inner) = self.inner.get() {
-            inner.remove_subscriber(subscriber)
-        }
-    }
-
-    fn clear_subscribers(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.clear_subscribers()
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> Subscriber for Memo<T> {
-    fn add_source(&self, source: AnySource) {
-        if let Some(inner) = self.inner.get() {
-            inner.add_source(source)
-        }
-    }
-
-    fn clear_sources(&self, subscriber: &AnySubscriber) {
-        if let Some(inner) = self.inner.get() {
-            inner.clear_sources(subscriber)
-        }
     }
 }

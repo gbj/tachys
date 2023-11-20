@@ -12,7 +12,7 @@ pub async fn tick() {
 
 #[tokio::test]
 async fn effect_runs() {
-    let a = Signal::new(-1);
+    let a = RwSignal::new(-1);
 
     // simulate an arbitrary side effect
     let b = Arc::new(RwLock::new(String::new()));
@@ -39,9 +39,9 @@ async fn effect_runs() {
 
 #[tokio::test]
 async fn dynamic_dependencies() {
-    let first = Signal::new("Greg");
-    let last = Signal::new("Johnston");
-    let use_last = Signal::new(true);
+    let first = RwSignal::new("Greg");
+    let last = RwSignal::new("Johnston");
+    let use_last = RwSignal::new(true);
 
     let combined_count = Arc::new(RwLock::new(0));
 

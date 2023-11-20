@@ -1,5 +1,5 @@
 use crate::{
-    prelude::SignalWith, render_effect::RenderEffect, signal::ArcSignal,
+    prelude::SignalWith, render_effect::RenderEffect, signal::ArcRwSignal,
     signal_traits::SignalUpdate,
 };
 use parking_lot::RwLock;
@@ -13,7 +13,7 @@ pub struct Selector<T>
 where
     T: PartialEq + Eq + Clone + Hash + 'static,
 {
-    subs: Arc<RwLock<FxHashMap<T, ArcSignal<bool>>>>,
+    subs: Arc<RwLock<FxHashMap<T, ArcRwSignal<bool>>>>,
     v: Arc<RwLock<Option<T>>>,
     #[allow(clippy::type_complexity)]
     f: Arc<dyn Fn(&T, &T) -> bool>,
@@ -31,7 +31,7 @@ where
         source: impl Fn() -> T + Clone + 'static,
         f: impl Fn(&T, &T) -> bool + Clone + 'static,
     ) -> Self {
-        let subs: Arc<RwLock<FxHashMap<T, ArcSignal<bool>>>> =
+        let subs: Arc<RwLock<FxHashMap<T, ArcRwSignal<bool>>>> =
             Default::default();
         let v: Arc<RwLock<Option<T>>> = Default::default();
         let f = Arc::new(f) as Arc<dyn Fn(&T, &T) -> bool>;
@@ -65,7 +65,7 @@ where
         let read = {
             let mut subs = self.subs.write();
             subs.entry(key.clone())
-                .or_insert_with(|| ArcSignal::new(false))
+                .or_insert_with(|| ArcRwSignal::new(false))
                 .clone()
         };
         _ = read.try_with(|n| *n);

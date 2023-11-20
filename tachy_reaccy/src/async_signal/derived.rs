@@ -1,6 +1,6 @@
 use super::{AsyncState, ScopedFuture};
 use crate::{
-    arena::{Owner, Stored},
+    arena::{Owner, Stored, StoredData},
     notify::NotificationSender,
     prelude::{DefinedAt, SignalWithUntracked},
     source::{
@@ -419,6 +419,18 @@ pub struct AsyncDerived<T: Send + Sync + 'static> {
     inner: Stored<ArcAsyncDerived<T>>,
 }
 
+impl<T: Send + Sync + 'static> StoredData for AsyncDerived<T> {
+    type Data = ArcAsyncDerived<T>;
+
+    fn get(&self) -> Option<Self::Data> {
+        self.inner.get()
+    }
+
+    fn dispose(&self) {
+        self.inner.dispose();
+    }
+}
+
 impl<T: Send + Sync + 'static> AsyncDerived<T> {
     #[cfg_attr(
         feature = "tracing",
@@ -517,60 +529,6 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for AsyncDerived<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> ReactiveNode for AsyncDerived<T> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        if let Some(inner) = self.inner.get() {
-            inner.set_state(state);
-        }
-    }
-
-    fn mark_dirty(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_dirty();
-        }
-    }
-
-    fn mark_check(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_check();
-        }
-    }
-
-    fn mark_subscribers_check(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.mark_subscribers_check();
-        }
-    }
-
-    fn update_if_necessary(&self) -> bool {
-        if let Some(inner) = self.inner.get() {
-            inner.update_if_necessary()
-        } else {
-            false
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> Source for AsyncDerived<T> {
-    fn add_subscriber(&self, subscriber: AnySubscriber) {
-        if let Some(inner) = self.inner.get() {
-            inner.add_subscriber(subscriber);
-        }
-    }
-
-    fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        if let Some(inner) = self.inner.get() {
-            inner.remove_subscriber(subscriber);
-        }
-    }
-
-    fn clear_subscribers(&self) {
-        if let Some(inner) = self.inner.get() {
-            inner.clear_subscribers();
-        }
-    }
-}
-
 impl<T: Send + Sync + Clone + 'static> IntoFuture for AsyncDerived<T> {
     type Output = T;
     type IntoFuture = AsyncDerivedFuture<T>;
@@ -586,15 +544,15 @@ impl<T: Send + Sync + Clone + 'static> IntoFuture for AsyncDerived<T> {
 mod tests {
     use crate::{
         async_signal::{AsyncDerived, AsyncState},
-        prelude::{Signal, SignalGet, SignalGetUntracked, SignalSet},
+        prelude::{RwSignal, SignalGet, SignalGetUntracked, SignalSet},
     };
     use std::time::Duration;
     use tokio::time::sleep;
 
     #[tokio::test]
     async fn tracks_in_fn_and_async_block() {
-        let a = Signal::new(1);
-        let b = Signal::new(2);
+        let a = RwSignal::new(1);
+        let b = RwSignal::new(2);
 
         let c = AsyncDerived::new(move || {
             let a = a.get();
@@ -635,8 +593,8 @@ mod tests {
 
     #[tokio::test]
     async fn awaiting_directly_works() {
-        let a = Signal::new(1);
-        let b = Signal::new(2);
+        let a = RwSignal::new(1);
+        let b = RwSignal::new(2);
 
         let c = AsyncDerived::new(move || {
             let a = a.get();

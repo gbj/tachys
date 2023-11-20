@@ -8,9 +8,9 @@ pub async fn tick() {
 
 #[test]
 fn memo_calculates_value() {
-    let a = Signal::new(1);
-    let b = Signal::new(2);
-    let c = Signal::new(3);
+    let a = RwSignal::new(1);
+    let b = RwSignal::new(2);
+    let c = RwSignal::new(3);
 
     let d = Memo::new(move |_| a.get() + b.get() + c.get());
     assert_eq!(d.get(), 6);
@@ -20,9 +20,9 @@ fn memo_calculates_value() {
 fn memo_doesnt_repeat_calculation_per_get() {
     let calculations = Arc::new(RwLock::new(0));
 
-    let a = Signal::new(1);
-    let b = Signal::new(2);
-    let c = Signal::new(3);
+    let a = RwSignal::new(1);
+    let b = RwSignal::new(2);
+    let c = RwSignal::new(3);
 
     let d = Memo::new({
         let calculations = Arc::clone(&calculations);
@@ -44,8 +44,8 @@ fn memo_doesnt_repeat_calculation_per_get() {
 
 #[test]
 fn nested_memos() {
-    let a = Signal::new(0); // 1
-    let b = Signal::new(0); // 2
+    let a = RwSignal::new(0); // 1
+    let b = RwSignal::new(0); // 2
     let c = Memo::new(move |_| {
         println!("calculating C");
         a.get() + b.get()
@@ -79,9 +79,9 @@ fn nested_memos() {
 #[test]
 fn memo_runs_only_when_inputs_change() {
     let call_count = Arc::new(RwLock::new(0));
-    let a = Signal::new(0);
-    let b = Signal::new(0);
-    let c = Signal::new(0);
+    let a = RwSignal::new(0);
+    let b = RwSignal::new(0);
+    let c = RwSignal::new(0);
 
     // pretend that this is some kind of expensive computation and we need to access its its value often
     // we could do this with a derived signal, but that would re-run the computation
@@ -117,7 +117,7 @@ fn memo_runs_only_when_inputs_change() {
 
 #[test]
 fn diamond_problem() {
-    let name = Signal::new("Greg Johnston".to_string());
+    let name = RwSignal::new("Greg Johnston".to_string());
     let first = Memo::new(move |_| {
         println!("calculating first");
         name.get().split_whitespace().next().unwrap().to_string()
@@ -153,9 +153,9 @@ fn diamond_problem() {
 
 #[tokio::test]
 async fn dynamic_dependencies() {
-    let first = Signal::new("Greg");
-    let last = Signal::new("Johnston");
-    let use_last = Signal::new(true);
+    let first = RwSignal::new("Greg");
+    let last = RwSignal::new("Johnston");
+    let use_last = RwSignal::new(true);
     let name = Memo::new(move |_| {
         if use_last.get() {
             format!("{} {}", first.get(), last.get())

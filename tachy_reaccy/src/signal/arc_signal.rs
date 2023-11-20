@@ -12,14 +12,14 @@ use std::{
     sync::{Arc, Weak},
 };
 
-pub struct ArcSignal<T> {
+pub struct ArcRwSignal<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
     value: Arc<RwLock<T>>,
     inner: Arc<RwLock<SubscriberSet>>,
 }
 
-impl<T> Clone for ArcSignal<T> {
+impl<T> Clone for ArcRwSignal<T> {
     #[track_caller]
     fn clone(&self) -> Self {
         Self {
@@ -31,7 +31,7 @@ impl<T> Clone for ArcSignal<T> {
     }
 }
 
-impl<T> Debug for ArcSignal<T> {
+impl<T> Debug for ArcRwSignal<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ArcSignal")
             .field("type", &std::any::type_name::<T>())
@@ -40,7 +40,7 @@ impl<T> Debug for ArcSignal<T> {
     }
 }
 
-impl<T> ArcSignal<T> {
+impl<T> ArcRwSignal<T> {
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "trace", skip_all,)
@@ -90,7 +90,7 @@ impl Source for RwLock<SubscriberSet> {
     }
 }
 
-impl<T> ReactiveNode for ArcSignal<T> {
+impl<T> ReactiveNode for ArcRwSignal<T> {
     fn set_state(&self, _state: ReactiveNodeState) {}
 
     fn mark_dirty(&self) {
@@ -109,7 +109,7 @@ impl<T> ReactiveNode for ArcSignal<T> {
     }
 }
 
-impl<T> ToAnySource for ArcSignal<T> {
+impl<T> ToAnySource for ArcRwSignal<T> {
     fn to_any_source(&self) -> AnySource {
         AnySource(
             self.inner.data_ptr() as usize,
@@ -118,7 +118,7 @@ impl<T> ToAnySource for ArcSignal<T> {
     }
 }
 
-impl<T> Source for ArcSignal<T> {
+impl<T> Source for ArcRwSignal<T> {
     fn clear_subscribers(&self) {
         self.inner.clear_subscribers();
     }
@@ -132,7 +132,7 @@ impl<T> Source for ArcSignal<T> {
     }
 }
 
-impl<T> DefinedAt for ArcSignal<T> {
+impl<T> DefinedAt for ArcRwSignal<T> {
     #[inline(always)]
     fn defined_at(&self) -> Option<&'static Location<'static>> {
         #[cfg(debug_assertions)]
@@ -146,7 +146,7 @@ impl<T> DefinedAt for ArcSignal<T> {
     }
 }
 
-impl<T> SignalWithUntracked for ArcSignal<T> {
+impl<T> SignalWithUntracked for ArcRwSignal<T> {
     type Value = T;
 
     #[cfg_attr(
@@ -161,7 +161,7 @@ impl<T> SignalWithUntracked for ArcSignal<T> {
     }
 }
 
-impl<T> SignalUpdate for ArcSignal<T> {
+impl<T> SignalUpdate for ArcRwSignal<T> {
     type Value = T;
 
     #[cfg_attr(
@@ -193,7 +193,7 @@ impl<T> SignalUpdate for ArcSignal<T> {
     }
 }
 
-impl<T> SignalIsDisposed for ArcSignal<T> {
+impl<T> SignalIsDisposed for ArcRwSignal<T> {
     #[inline(always)]
     fn is_disposed(&self) -> bool {
         false

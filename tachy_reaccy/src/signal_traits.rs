@@ -128,10 +128,6 @@ pub trait SignalSet: SignalUpdate + SignalIsDisposed {
 
 impl<T> SignalSet for T where T: SignalUpdate + SignalIsDisposed {}
 
-pub trait SignalDispose {
-    fn dispose(self);
-}
-
 pub trait SignalIsDisposed {
     fn is_disposed(&self) -> bool;
 }

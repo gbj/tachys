@@ -3,6 +3,7 @@ mod hydrate;
 mod islands;
 mod ssr;
 use crate::{PinnedFuture, PinnedStream};
+#[cfg(feature = "web")]
 pub use hydrate::*;
 pub use islands::*;
 use serde::{Deserialize, Serialize};

@@ -151,12 +151,9 @@ pub(crate) struct OwnerInner {
 
 impl Drop for OwnerInner {
     fn drop(&mut self) {
-        println!("dropping OwnerInner");
-        let mut map = MAP.write();
         for node in std::mem::take(&mut self.nodes) {
-            map.remove(node);
+            _ = MAP.write().remove(node);
         }
-        println!("MAP len is now {}", map.len());
     }
 }
 

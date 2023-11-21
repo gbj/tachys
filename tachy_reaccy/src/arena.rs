@@ -1,6 +1,7 @@
 #[cfg(feature = "web")]
 use crate::shared_context::HydrateSharedContext;
 use crate::{
+    prelude::{DefinedAt, SignalUpdate, SignalWithUntracked},
     shared_context::{SharedContext, SsrSharedContext},
     source::{
         AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
@@ -17,6 +18,7 @@ use std::{
     fmt::Debug,
     marker::PhantomData,
     mem,
+    panic::Location,
     sync::{Arc, Weak},
 };
 
@@ -225,6 +227,7 @@ where
     }
 }
 
+#[doc(hidden)]
 pub trait StoredData {
     type Data;
 
@@ -310,5 +313,51 @@ where
         if let Some(inner) = self.get() {
             inner.clear_sources(subscriber);
         }
+    }
+}
+
+impl<T> DefinedAt for T
+where
+    T: StoredData,
+    T::Data: DefinedAt,
+{
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        self.get().and_then(|n| n.defined_at())
+    }
+}
+
+impl<T> SignalWithUntracked for T
+where
+    T: StoredData + DefinedAt,
+    T::Data: SignalWithUntracked,
+{
+    type Value = <<T as StoredData>::Data as SignalWithUntracked>::Value;
+
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        self.get().and_then(|n| n.try_with_untracked(fun))
+    }
+}
+
+impl<T> SignalUpdate for T
+where
+    T: StoredData,
+    T::Data: SignalUpdate,
+{
+    type Value = <<T as StoredData>::Data as SignalUpdate>::Value;
+
+    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
+        if let Some(inner) = self.get() {
+            inner.update(fun)
+        }
+    }
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        self.get().and_then(|inner| inner.try_update(fun))
     }
 }

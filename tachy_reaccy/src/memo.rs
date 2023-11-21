@@ -66,43 +66,6 @@ impl<T: Send + Sync + 'static> StoredData for Memo<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> DefinedAt for Memo<T> {
-    #[inline(always)]
-    fn defined_at(&self) -> Option<&'static Location<'static>> {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.get().and_then(|inner| inner.defined_at())
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            None
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalWithUntracked for Memo<T> {
-    type Value = T;
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn try_with_untracked<U>(
-        &self,
-        fun: impl FnOnce(&Self::Value) -> U,
-    ) -> Option<U> {
-        self.inner
-            .get()
-            .and_then(|inner| inner.try_with_untracked(fun))
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalIsDisposed for Memo<T> {
-    fn is_disposed(&self) -> bool {
-        self.inner.exists()
-    }
-}
-
 pub struct ArcMemo<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,

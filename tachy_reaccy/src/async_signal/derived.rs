@@ -498,37 +498,6 @@ impl<T: Send + Sync + 'static> Debug for AsyncDerived<T> {
     }
 }
 
-impl<T: Send + Sync + 'static> DefinedAt for AsyncDerived<T> {
-    #[inline(always)]
-    fn defined_at(&self) -> Option<&'static Location<'static>> {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.get().and_then(|inner| inner.defined_at())
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            None
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalWithUntracked for AsyncDerived<T> {
-    type Value = AsyncState<T>;
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn try_with_untracked<U>(
-        &self,
-        fun: impl FnOnce(&Self::Value) -> U,
-    ) -> Option<U> {
-        self.inner
-            .get()
-            .and_then(|inner| inner.try_with_untracked(fun))
-    }
-}
-
 impl<T: Send + Sync + Clone + 'static> IntoFuture for AsyncDerived<T> {
     type Output = T;
     type IntoFuture = AsyncDerivedFuture<T>;

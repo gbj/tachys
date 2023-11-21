@@ -11,7 +11,7 @@ macro_rules! unwrap_signal {
                     "{}",
                     $crate::signal_traits::panic_getting_disposed_signal(
                         $signal.defined_at(),
-                        Location::caller()
+                        std::panic::Location::caller()
                     )
                 );
             }

@@ -1,11 +1,32 @@
 mod arc_signal;
+mod read;
+mod write;
 use crate::{
     arena::{Stored, StoredData},
     signal_traits::*,
     source::{AnySource, ToAnySource},
+    unwrap_signal,
 };
 pub use arc_signal::ArcRwSignal;
-use std::{fmt::Debug, panic::Location};
+pub use read::*;
+use std::{fmt::Debug, sync::Arc};
+pub use write::*;
+
+pub fn signal<T>(initial_value: T) -> (ReadSignal<T>, WriteSignal<T>)
+where
+    T: Send + Sync + 'static,
+{
+    let signal = RwSignal::new(initial_value);
+    signal.split()
+}
+
+pub fn arc_signal<T>(initial_value: T) -> (ArcReadSignal<T>, ArcWriteSignal<T>)
+where
+    T: Send + Sync + 'static,
+{
+    let signal = ArcRwSignal::new(initial_value);
+    signal.split()
+}
 
 pub struct RwSignal<T: Send + Sync + 'static> {
     inner: Stored<ArcRwSignal<T>>,
@@ -19,6 +40,48 @@ impl<T: Send + Sync + 'static> RwSignal<T> {
     pub fn new(value: T) -> Self {
         Self {
             inner: Stored::new(ArcRwSignal::new(value)),
+        }
+    }
+
+    #[inline(always)]
+    pub fn read_only(&self) -> ReadSignal<T> {
+        ReadSignal {
+            inner: Stored::new(
+                self.get()
+                    .map(|inner| inner.read_only())
+                    .unwrap_or_else(unwrap_signal!(self)),
+            ),
+        }
+    }
+
+    #[inline(always)]
+    pub fn write_only(&self) -> WriteSignal<T> {
+        WriteSignal {
+            inner: Stored::new(
+                self.get()
+                    .map(|inner| inner.write_only())
+                    .unwrap_or_else(unwrap_signal!(self)),
+            ),
+        }
+    }
+
+    #[inline(always)]
+    pub fn split(&self) -> (ReadSignal<T>, WriteSignal<T>) {
+        (self.read_only(), self.write_only())
+    }
+
+    pub fn unite(read: ReadSignal<T>, write: WriteSignal<T>) -> Option<Self> {
+        match (read.inner.get(), write.inner.get()) {
+            (Some(read), Some(write)) => {
+                if Arc::ptr_eq(&read.0.value, &write.0.value) {
+                    Some(Self {
+                        inner: Stored::new(read.0.clone()),
+                    })
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 }
@@ -37,62 +100,6 @@ impl<T: Send + Sync + 'static> Debug for RwSignal<T> {
             .field("type", &std::any::type_name::<T>())
             .field("store", &self.inner)
             .finish()
-    }
-}
-
-impl<T: Send + Sync + 'static> DefinedAt for RwSignal<T> {
-    #[inline(always)]
-    fn defined_at(&self) -> Option<&'static Location<'static>> {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.get().and_then(|inner| inner.defined_at())
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            None
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalWithUntracked for RwSignal<T> {
-    type Value = T;
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn try_with_untracked<U>(
-        &self,
-        fun: impl FnOnce(&Self::Value) -> U,
-    ) -> Option<U> {
-        self.inner
-            .get()
-            .and_then(|inner| inner.try_with_untracked(fun))
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalUpdate for RwSignal<T> {
-    type Value = T;
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        if let Some(inner) = self.inner.get() {
-            inner.update(fun)
-        }
-    }
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "debug", skip_all,)
-    )]
-    fn try_update<U>(
-        &self,
-        fun: impl FnOnce(&mut Self::Value) -> U,
-    ) -> Option<U> {
-        self.inner.get().and_then(|inner| inner.try_update(fun))
     }
 }
 
@@ -119,31 +126,6 @@ impl<T: Send + Sync + 'static> ToAnySource for RwSignal<T> {
         self.inner
             .get()
             .map(|inner| inner.to_any_source())
-            .expect("boo")
-    }
-}
-
-pub struct ReadSignal<T: Send + Sync + 'static>(RwSignal<T>);
-
-pub struct WriteSignal<T: Send + Sync + 'static>(RwSignal<T>);
-
-impl<T: Send + Sync + 'static> SignalUpdate for WriteSignal<T> {
-    type Value = T;
-
-    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        self.0.update(fun)
-    }
-
-    fn try_update<U>(
-        &self,
-        fun: impl FnOnce(&mut Self::Value) -> U,
-    ) -> Option<U> {
-        self.0.try_update(fun)
-    }
-}
-
-impl<T: Send + Sync + 'static> SignalIsDisposed for WriteSignal<T> {
-    fn is_disposed(&self) -> bool {
-        self.0.is_disposed()
+            .unwrap_or_else(unwrap_signal!(self))
     }
 }

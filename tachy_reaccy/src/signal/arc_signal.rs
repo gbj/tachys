@@ -1,3 +1,4 @@
+use super::{ArcReadSignal, ArcWriteSignal};
 use crate::{
     signal_traits::*,
     source::{
@@ -15,7 +16,7 @@ use std::{
 pub struct ArcRwSignal<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    value: Arc<RwLock<T>>,
+    pub(crate) value: Arc<RwLock<T>>,
     inner: Arc<RwLock<SubscriberSet>>,
 }
 
@@ -51,6 +52,32 @@ impl<T> ArcRwSignal<T> {
             defined_at: Location::caller(),
             value: Arc::new(RwLock::new(value)),
             inner: Arc::new(RwLock::new(SubscriberSet::new())),
+        }
+    }
+
+    #[inline(always)]
+    pub fn read_only(&self) -> ArcReadSignal<T> {
+        ArcReadSignal(self.clone())
+    }
+
+    #[inline(always)]
+    pub fn write_only(&self) -> ArcWriteSignal<T> {
+        ArcWriteSignal(self.clone())
+    }
+
+    #[inline(always)]
+    pub fn split(&self) -> (ArcReadSignal<T>, ArcWriteSignal<T>) {
+        (self.read_only(), self.write_only())
+    }
+
+    pub fn unite(
+        read: ArcReadSignal<T>,
+        write: ArcWriteSignal<T>,
+    ) -> Option<Self> {
+        if Arc::ptr_eq(&read.0.inner, &write.0.inner) {
+            Some(read.0.clone())
+        } else {
+            None
         }
     }
 }

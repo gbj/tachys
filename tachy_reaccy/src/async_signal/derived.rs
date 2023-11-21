@@ -4,9 +4,8 @@ use crate::{
     notify::NotificationSender,
     prelude::{DefinedAt, SignalWithUntracked},
     source::{
-        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SourceSet, Subscriber, SubscriberSet, ToAnySource, ToAnySubscriber,
-        Track,
+        AnySource, AnySubscriber, ReactiveNode, Source, SourceSet, Subscriber,
+        SubscriberSet, ToAnySource, ToAnySubscriber, Track,
     },
     spawn::{spawn, spawn_local},
     unwrap_signal,
@@ -260,8 +259,6 @@ impl<T: 'static> ToAnySubscriber for ArcAsyncDerived<T> {
 }
 
 impl ReactiveNode for RwLock<ArcAsyncDerivedInner> {
-    fn set_state(&self, _state: ReactiveNodeState) {}
-
     fn mark_dirty(&self) {
         self.write().notifier.notify();
     }
@@ -299,10 +296,6 @@ impl<T> Source for ArcAsyncDerived<T> {
 }
 
 impl<T> ReactiveNode for ArcAsyncDerived<T> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        self.inner.set_state(state);
-    }
-
     fn mark_dirty(&self) {
         self.inner.mark_dirty();
     }

@@ -137,12 +137,8 @@ struct MemoInner<T> {
 }
 
 impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        self.write().state = state;
-    }
-
     fn mark_dirty(&self) {
-        self.set_state(ReactiveNodeState::Dirty);
+        self.write().state = ReactiveNodeState::Dirty;
         self.mark_subscribers_check();
     }
 
@@ -223,10 +219,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
 }
 
 impl<T: Send + Sync + 'static> ReactiveNode for ArcMemo<T> {
-    fn set_state(&self, state: ReactiveNodeState) {
-        self.inner.set_state(state);
-    }
-
     fn mark_dirty(&self) {
         self.inner.mark_dirty();
     }

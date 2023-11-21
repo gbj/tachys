@@ -3,9 +3,6 @@ use smallvec::{IntoIter, SmallVec};
 use std::{fmt::Debug, hash::Hash, mem, slice, sync::Weak};
 
 pub trait ReactiveNode {
-    /// Sets the state of this source.
-    fn set_state(&self, state: ReactiveNodeState);
-
     /// Notifies the source's dependencies that it has changed.
     fn mark_dirty(&self);
 
@@ -105,12 +102,6 @@ impl Source for AnySource {
 }
 
 impl ReactiveNode for AnySource {
-    fn set_state(&self, state: ReactiveNodeState) {
-        if let Some(inner) = self.1.upgrade() {
-            inner.set_state(state)
-        }
-    }
-
     fn mark_dirty(&self) {
         if let Some(inner) = self.1.upgrade() {
             inner.mark_dirty()
@@ -178,12 +169,6 @@ impl Subscriber for AnySubscriber {
 }
 
 impl ReactiveNode for AnySubscriber {
-    fn set_state(&self, state: ReactiveNodeState) {
-        if let Some(inner) = self.1.upgrade() {
-            inner.set_state(state)
-        }
-    }
-
     fn mark_dirty(&self) {
         if let Some(inner) = self.1.upgrade() {
             inner.mark_dirty()

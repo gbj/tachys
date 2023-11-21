@@ -2,8 +2,8 @@ use crate::{
     arena::Owner,
     notify::NotificationSender,
     source::{
-        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, SourceSet,
-        Subscriber, ToAnySubscriber,
+        AnySource, AnySubscriber, ReactiveNode, SourceSet, Subscriber,
+        ToAnySubscriber,
     },
     spawn::spawn,
 };
@@ -99,8 +99,6 @@ impl ToAnySubscriber for Arc<RwLock<EffectInner>> {
 }
 
 impl ReactiveNode for RwLock<EffectInner> {
-    fn set_state(&self, _state: ReactiveNodeState) {}
-
     fn mark_subscribers_check(&self) {}
 
     fn update_if_necessary(&self) -> bool {

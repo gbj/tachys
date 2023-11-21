@@ -2,8 +2,8 @@ use super::{ArcReadSignal, ArcWriteSignal};
 use crate::{
     signal_traits::*,
     source::{
-        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        SubscriberSet, ToAnySource,
+        AnySource, AnySubscriber, ReactiveNode, Source, SubscriberSet,
+        ToAnySource,
     },
 };
 use parking_lot::RwLock;
@@ -83,8 +83,6 @@ impl<T> ArcRwSignal<T> {
 }
 
 impl ReactiveNode for RwLock<SubscriberSet> {
-    fn set_state(&self, _state: ReactiveNodeState) {}
-
     fn mark_dirty(&self) {
         self.mark_subscribers_check();
     }
@@ -118,8 +116,6 @@ impl Source for RwLock<SubscriberSet> {
 }
 
 impl<T> ReactiveNode for ArcRwSignal<T> {
-    fn set_state(&self, _state: ReactiveNodeState) {}
-
     fn mark_dirty(&self) {
         self.mark_subscribers_check();
     }

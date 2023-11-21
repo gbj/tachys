@@ -3,10 +3,7 @@ use crate::shared_context::HydrateSharedContext;
 use crate::{
     prelude::{DefinedAt, SignalUpdate, SignalWithUntracked},
     shared_context::{SharedContext, SsrSharedContext},
-    source::{
-        AnySource, AnySubscriber, ReactiveNode, ReactiveNodeState, Source,
-        Subscriber,
-    },
+    source::{AnySource, AnySubscriber, ReactiveNode, Source, Subscriber},
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -241,12 +238,6 @@ where
     T: StoredData,
     T::Data: ReactiveNode,
 {
-    fn set_state(&self, state: ReactiveNodeState) {
-        if let Some(inner) = self.get() {
-            inner.set_state(state);
-        }
-    }
-
     fn mark_dirty(&self) {
         if let Some(inner) = self.get() {
             inner.mark_dirty();

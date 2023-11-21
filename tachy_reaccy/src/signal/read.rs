@@ -31,10 +31,6 @@ impl<T> Clone for ArcReadSignal<T> {
 }
 
 impl<T> ReactiveNode for ArcReadSignal<T> {
-    fn set_state(&self, state: crate::source::ReactiveNodeState) {
-        todo!()
-    }
-
     fn mark_dirty(&self) {
         self.0.mark_dirty();
     }

@@ -1,73 +1,75 @@
-mod state;
-mod url;
+use core::fmt::Debug;
+use tachydom::dom::window;
+use wasm_bindgen::JsValue;
 
-use state::State;
-use tachy_reaccy::{prelude::Memo, signal::Signal};
-use url::Url;
+pub mod state;
 
-/// Creates a reactive location from the given path and state.
-pub fn create_location(path: Signal<String>, state: Signal<State>) -> Location {
-    let url = Memo::new(move |prev: Option<&Url>| {
-        path.with(|path| match Url::try_from(path.as_str()) {
-            Ok(url) => url,
-            Err(e) => {
-                //tachydom::error("[Leptos Router] Invalid path {path}\n\n{e:?}");
-                prev.cloned().unwrap()
-            }
-        })
-    });
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Url {
+    pub origin: String,
+    pub pathname: String,
+    pub search: String,
+    pub hash: String,
+}
 
-    let pathname = Memo::new(move |_| url.with(|url| url.pathname.clone()));
-    let search = Memo::new(move |_| url.with(|url| url.search.clone()));
-    let hash = Memo::new(move |_| url.with(|url| url.hash.clone()));
-    let query = Memo::new(move |_| url.with(|url| url.search_params.clone()));
+pub trait Location {
+    type Error: Debug;
 
-    Location {
-        pathname,
-        search,
-        hash,
-        query,
-        state,
+    fn try_into_url(self) -> Result<Url, Self::Error>;
+}
+
+const BASE: &str = "http://leptos.dev/";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestUrl(String);
+
+impl RequestUrl {
+    pub fn from_path(path: impl AsRef<str>) -> Self {
+        let path = path.as_ref();
+        let mut string = String::with_capacity(BASE.len() + path.len());
+        string.push_str(BASE);
+        string.push_str(path);
+        Self(string)
     }
 }
 
-/// A reactive description of the current URL, containing equivalents to the local parts of
-/// the browser's [`Location`](https://developer.mozilla.org/en-US/docs/Web/API/Location).
-#[derive(Debug, Clone, PartialEq)]
-pub struct Location {
-    /// The path of the URL, not containing the query string or hash fragment.
-    pub pathname: Memo<String>,
-    /// The raw query string.
-    pub search: Memo<String>,
-    /// The query string parsed into its key-value pairs.
-    pub query: Memo<ParamsMap>,
-    /// The hash fragment.
-    pub hash: Memo<String>,
-    /// The [`state`](https://developer.mozilla.org/en-US/docs/Web/API/History/state) at the top of the history stack.
-    pub state: ReadSignal<State>,
-}
-
-/// A description of a navigation.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LocationChange {
-    /// The new URL.
-    pub value: String,
-    /// If true, the new location will replace the current one in the history stack, i.e.,
-    /// clicking the "back" button will not return to the current location.
-    pub replace: bool,
-    /// If true, the router will scroll to the top of the page at the end of the navigation.
-    pub scroll: bool,
-    /// The [`state`](https://developer.mozilla.org/en-US/docs/Web/API/History/state) that will be added during navigation.
-    pub state: State,
-}
-
-impl Default for LocationChange {
+impl Default for RequestUrl {
     fn default() -> Self {
-        Self {
-            value: Default::default(),
-            replace: true,
-            scroll: true,
-            state: Default::default(),
-        }
+        Self(String::from(BASE))
+    }
+}
+
+impl Location for RequestUrl {
+    type Error = url::ParseError;
+
+    fn try_into_url(self) -> Result<Url, Self::Error> {
+        let url = url::Url::parse(&self.0)?;
+        Ok(Url {
+            origin: url.origin().unicode_serialization(),
+            pathname: url.path().to_string(),
+            search: url.query().unwrap_or_default().to_string(),
+            hash: Default::default(),
+        })
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BrowserUrl;
+
+impl Location for BrowserUrl {
+    type Error = JsValue;
+
+    fn try_into_url(self) -> Result<Url, Self::Error> {
+        let location = window().location();
+        Ok(Url {
+            origin: location.origin()?,
+            pathname: location.pathname()?,
+            search: location
+                .search()?
+                .strip_prefix('?')
+                .map(String::from)
+                .unwrap_or_default(),
+            hash: location.hash()?,
+        })
     }
 }

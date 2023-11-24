@@ -1,9 +1,25 @@
 use super::{PartialPathMatch, RouteMatch};
+use std::str::Chars;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParamSegment(pub &'static str);
 
 impl RouteMatch for ParamSegment {
+    fn matches_iter(&self, test: &mut Chars) -> bool {
+        let mut test = test.peekable();
+        // match an initial /
+        if test.peek() == Some(&'/') {
+            test.next();
+        }
+        for char in test {
+            // when we get a closing /, stop matching
+            if char == '/' {
+                break;
+            }
+        }
+        true
+    }
+
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
         let mut matched = String::new();
         let mut param_value = String::new();
@@ -38,6 +54,10 @@ impl RouteMatch for ParamSegment {
 pub struct WildcardSegment(pub &'static str);
 
 impl RouteMatch for WildcardSegment {
+    fn matches_iter(&self, _path: &mut Chars) -> bool {
+        true
+    }
+
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
         let mut matched = String::new();
         let mut param_value = String::new();
@@ -64,12 +84,13 @@ impl RouteMatch for WildcardSegment {
 #[cfg(test)]
 mod tests {
     use super::RouteMatch;
-    use crate::route2::{ParamSegment, StaticSegment, WildcardSegment};
+    use crate::matching::{ParamSegment, StaticSegment, WildcardSegment};
 
     #[test]
     fn single_param_match() {
         let path = "/foo";
         let def = ParamSegment("a");
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo");
         assert_eq!(matched.remaining(), "");
@@ -80,6 +101,7 @@ mod tests {
     fn single_param_match_with_trailing_slash() {
         let path = "/foo/";
         let def = ParamSegment("a");
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo");
         assert_eq!(matched.remaining(), "/");
@@ -90,6 +112,7 @@ mod tests {
     fn tuple_of_param_matches() {
         let path = "/foo/bar";
         let def = (ParamSegment("a"), ParamSegment("b"));
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo/bar");
         assert_eq!(matched.remaining(), "");
@@ -105,6 +128,7 @@ mod tests {
             StaticSegment("bar"),
             WildcardSegment("rest"),
         );
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo/bar/////");
         assert_eq!(matched.remaining(), "");

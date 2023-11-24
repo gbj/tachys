@@ -1,3 +1,9 @@
+mod param_segments;
+mod static_segment;
+pub use param_segments::*;
+pub use static_segment::*;
+use std::str::Chars;
+
 /// Defines a route which may or may not be matched by any given URL,
 /// or URL segment.
 ///
@@ -5,14 +11,20 @@
 /// as subsequent segments of the URL and tries to match them all. For a "vertical"
 /// matching that sees a tuple as alternatives to one another, see [`RouteChild`](super::RouteChild).
 pub trait RouteMatch {
+    fn matches(&self, path: &str) -> bool {
+        self.matches_iter(&mut path.chars())
+    }
+
+    fn matches_iter(&self, path: &mut Chars) -> bool;
+
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>;
 }
 
 #[derive(Debug)]
 pub struct PartialPathMatch<'a> {
-    remaining: &'a str,
-    params: Vec<(&'static str, String)>,
-    matched: String,
+    pub(crate) remaining: &'a str,
+    pub(crate) params: Vec<(&'static str, String)>,
+    pub(crate) matched: String,
 }
 
 impl<'a> PartialPathMatch<'a> {
@@ -51,6 +63,14 @@ macro_rules! tuples {
         where
 			$($ty: RouteMatch),*,
         {
+            fn matches_iter(&self, path: &mut Chars) -> bool
+            {
+				paste::paste! {
+					let ($([<$ty:lower>],)*) = &self;
+                    $([<$ty:lower>].matches_iter(path) &&)* true
+                }
+            }
+
             fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>
             {
 				let mut full_params = Vec::new();
@@ -111,7 +131,7 @@ tuples!(
 
 #[cfg(test)]
 mod tests {
-    use crate::route2::{ParamSegment, RouteMatch, StaticSegment};
+    use crate::matching::{ParamSegment, RouteMatch, StaticSegment};
 
     #[test]
     fn mixture_of_static_and_params() {

@@ -75,7 +75,7 @@ tuples!(
 
 #[cfg(test)]
 mod tests {
-    use crate::route2::{
+    use crate::route::{
         ParamSegment, PossibleRoutes, RouteMatch, StaticSegment,
     };
 

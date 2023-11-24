@@ -1,8 +1,13 @@
 use super::{PartialPathMatch, RouteMatch};
+use std::str::Chars;
 
 impl RouteMatch for () {
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
         Some(PartialPathMatch::new(path, [], ""))
+    }
+
+    fn matches_iter(&self, _path: &mut Chars) -> bool {
+        true
     }
 }
 
@@ -10,6 +15,33 @@ impl RouteMatch for () {
 pub struct StaticSegment(pub &'static str);
 
 impl RouteMatch for StaticSegment {
+    fn matches_iter(&self, test: &mut Chars) -> bool {
+        let mut this = self.0.chars();
+        let mut test = test.peekable();
+        if test.peek() == Some(&'/') {
+            test.next();
+        }
+
+        // unless this segment is empty, we start by
+        // assuming that it has not actually matched
+        let mut has_matched = self.0.is_empty();
+        for char in test {
+            // when we get a closing /, stop matching
+            if char == '/' {
+                break;
+            }
+            // if the next character in the path doesn't match the
+            // next character in the segment, we don't match
+            else if this.next() != Some(char) {
+                return false;
+            } else {
+                has_matched = true;
+            }
+        }
+
+        has_matched
+    }
+
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
         let mut matched = String::new();
         let mut test = path.chars();
@@ -73,6 +105,7 @@ mod tests {
     fn single_static_match_with_trailing_slash() {
         let path = "/foo/";
         let def = StaticSegment("foo");
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo");
         assert_eq!(matched.remaining(), "/");
@@ -83,6 +116,7 @@ mod tests {
     fn tuple_of_static_matches() {
         let path = "/foo/bar";
         let def = (StaticSegment("foo"), StaticSegment("bar"));
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo/bar");
         assert_eq!(matched.remaining(), "");
@@ -93,6 +127,7 @@ mod tests {
     fn tuple_static_mismatch() {
         let path = "/foo/baz";
         let def = (StaticSegment("foo"), StaticSegment("bar"));
+        assert!(!def.matches(path));
         assert!(def.test(path).is_none());
     }
 
@@ -107,6 +142,7 @@ mod tests {
             StaticSegment("bar"),
             (),
         );
+        assert!(def.matches(path));
         let matched = def.test(path).expect("couldn't match route");
         assert_eq!(matched.matched(), "/foo/bar");
         assert_eq!(matched.remaining(), "");

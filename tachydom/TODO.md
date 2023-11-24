@@ -1,0 +1,10 @@
+- server functions
+- ReadSignal
+- WriteSignal
+- Signal wrappers
+- SignalDispose implementations on all Copy types
+- more generic implementations of ReactiveNode stuff for Copy types?
+- router
+- building out examples to find missing features
+- NodeRef
+- fix order of el and key so they're the same across traits, in build and rebuild, for attr and property

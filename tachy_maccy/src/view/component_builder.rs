@@ -1,5 +1,4 @@
 use super::{fragment_to_tokens, TagType};
-#[cfg(debug_assertions)]
 use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use rstml::node::{NodeAttribute, NodeElement, NodeName};
@@ -204,6 +203,7 @@ pub(crate) fn component_to_tokens(
     component
 }
 
+#[cfg(debug_assertions)]
 fn ident_from_tag_name(tag_name: &NodeName) -> Ident {
     match tag_name {
         NodeName::Path(path) => path

@@ -1,3 +1,6 @@
+mod component_builder;
+
+use self::component_builder::component_to_tokens;
 use convert_case::{Case::Snake, Casing};
 use leptos_hot_reload::parsing::is_component_node;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
@@ -137,7 +140,7 @@ fn node_to_tokens(
         Node::Comment(_) => None,
         Node::Doctype(node) => {
             let value = node.value.to_string_best();
-            Some(quote! { ::tachydom::html::doctype(#value) })
+            Some(quote! { ::tachys::tachydom::html::doctype(#value) })
         }
         Node::Fragment(fragment) => fragment_to_tokens(
             &fragment.children,
@@ -167,7 +170,7 @@ fn text_to_tokens(text: &LitStr) -> TokenStream {
     // on nightly, can use static string optimization
     if cfg!(feature = "nightly") {
         quote! {
-            ::tachydom::view::static_types::Static::<#text>
+            ::tachys::tachydom::view::static_types::Static::<#text>
         }
     }
     // otherwise, just use the literal string
@@ -185,13 +188,13 @@ pub(crate) fn element_to_tokens(
 ) -> Option<TokenStream> {
     let name = node.name();
     if is_component_node(node) {
-        todo!()
+        // TODO slots
         /* if let Some(slot) = get_slot(node) {
             slot_to_tokens(node, slot, parent_slots, global_class);
             None
-        } else {
-            Some(component_to_tokens(node, global_class))
-        } */
+        } else { */
+        Some(component_to_tokens(node, global_class))
+        //}
     } else {
         let tag = name.to_string();
         // collect close_tag name to emit semantic information for IDE.
@@ -216,22 +219,22 @@ pub(crate) fn element_to_tokens(
                     /* proc_macro_error::emit_warning!(name.span(), "The view macro is assuming this is an HTML element, \
                     but it is ambiguous; if it is an SVG or MathML element, prefix with svg:: or math::"); */
                     quote! {
-                        ::tachydom::html::element::#name
+                        ::tachys::tachydom::html::element::#name
                     }
                 }
                 TagType::Html => {
-                    quote! { ::tachydom::html::element::#name }
+                    quote! { ::tachys::tachydom::html::element::#name }
                 }
                 TagType::Svg => {
-                    quote! { ::tachydom::svg::element::#name }
+                    quote! { ::tachys::tachydom::svg::element::#name }
                 }
                 TagType::Math => {
-                    quote! { ::tachydom::math::element::#name }
+                    quote! { ::tachys::tachydom::math::element::#name }
                 }
             }
         } else {
             parent_type = TagType::Html;
-            quote! { ::tachydom::html::element::#name }
+            quote! { ::tachys::tachydom::html::element::#name }
         };
 
         /* TODO restore this
@@ -389,9 +392,9 @@ fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
             quote! { undelegated }
         };
         // TODO undelegated
-        quote! { ::tachydom::html::event::#undelegated(::tachydom::html::event::#event_type) }
+        quote! { ::tachys::tachydom::html::event::#undelegated(::tachys::tachydom::html::event::#event_type) }
     } else {
-        quote! { ::tachydom::html::event::#event_type }
+        quote! { ::tachys::tachydom::html::event::#event_type }
     };
 
     quote! {
@@ -412,7 +415,7 @@ fn class_to_tokens(
     }
     /* else if is_static {
         quote! {
-            .attr(::tachydom::view::static_types::static_attr::<::tachydom::html::attribute::class, #value>())
+            .attr(::tachys::tachydom::view::static_types::static_attr::<::tachys::tachydom::html::attribute::class, #value>())
         }
     } */
     else {
@@ -605,7 +608,7 @@ fn attribute_value(attr: &KeyedAttribute) -> (TokenStream, bool) {
                 if cfg!(feature = "nightly") {
                     (
                         quote! {
-                            ::tachydom::view::static_types::Static::<#lit>
+                            ::tachys::tachydom::view::static_types::Static::<#lit>
                         },
                         true,
                     )

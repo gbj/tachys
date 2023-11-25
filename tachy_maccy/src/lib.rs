@@ -1,8 +1,11 @@
+mod component;
 mod view;
+use crate::component::module_name_from_fn;
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use proc_macro_error::abort;
-use quote::quote;
+use quote::{quote, ToTokens};
+use syn::{spanned::Spanned, token::Pub, ItemFn, Visibility};
 
 #[proc_macro_error::proc_macro_error]
 #[proc_macro]
@@ -19,7 +22,9 @@ pub fn view(tokens: TokenStream) -> TokenStream {
             if *first == "class" && eq.as_char() == '=' =>
         {
             match &fourth {
-                Some(TokenTree::Punct(comma)) if comma.as_char() == ',' => third.clone(),
+                Some(TokenTree::Punct(comma)) if comma.as_char() == ',' => {
+                    third.clone()
+                }
                 _ => {
                     abort!(
                         second, "To create a scope class with the view! macro you must put a comma `,` after the value";
@@ -49,6 +54,49 @@ pub fn view(tokens: TokenStream) -> TokenStream {
             #(#errors;)*
             #nodes_output
         }
+    }
+    .into()
+}
+
+#[proc_macro_error::proc_macro_error]
+#[proc_macro_attribute]
+pub fn component(
+    _args: proc_macro::TokenStream,
+    s: TokenStream,
+) -> TokenStream {
+    let unmodified = s.clone();
+    let mut fn_result = syn::parse::<ItemFn>(unmodified);
+    let parse_result = syn::parse::<component::Model>(s);
+
+    if let (Ok(ref mut unmodified), Ok(model)) = (&mut fn_result, parse_result)
+    {
+        let expanded = model.into_token_stream();
+        if !matches!(unmodified.vis, Visibility::Public(_)) {
+            unmodified.vis = Visibility::Public(Pub {
+                span: unmodified.vis.span(),
+            })
+        }
+        let module_name = module_name_from_fn(unmodified);
+        quote! {
+            #expanded
+            mod #module_name {
+                use super::*;
+
+                #[allow(non_snake_case, dead_code)]
+                #unmodified
+            }
+        }
+    } else if let Ok(unmodified) = fn_result {
+        quote! {
+            mod component {
+                use super::*;
+
+                #[allow(non_snake_case, dead_code)]
+                #unmodified
+            }
+        }
+    } else {
+        quote! {}
     }
     .into()
 }

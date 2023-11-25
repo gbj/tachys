@@ -310,7 +310,7 @@ impl Location for BrowserUrl {
         let cb = move || match loc.try_to_url() {
             Ok(url) => cb(url),
             Err(e) => {
-                #[cfg(debug_assertions)]
+                #[cfg(all(debug_assertions, feature = "tracing"))]
                 tracing::error!("Error encountered during routing: {e:?}");
                 _ = e;
             }

@@ -1,6 +1,20 @@
 #![allow(incomplete_features)] // yolo
 #![cfg_attr(feature = "nightly", feature(adt_const_params))]
 
+pub mod prelude {
+    pub use crate::{
+        html::{
+            attribute::global::{
+                ClassAttribute, GlobalAttributes, OnAttribute, PropAttribute,
+                StyleAttribute,
+            },
+            element::ElementChild,
+        },
+        renderer::{dom::Dom, Renderer, SpawningRenderer},
+        view::{Mountable, Render, RenderHtml},
+    };
+}
+
 use wasm_bindgen::JsValue;
 use web_sys::Node;
 

@@ -9,7 +9,7 @@ use tachydom::{
     renderer::Renderer,
     view::{
         either::{Either, EitherState, *},
-        Mountable, PositionState, Render, RenderHtml,
+        Mountable, Position, PositionState, Render, RenderHtml,
     },
 };
 
@@ -87,7 +87,7 @@ where
 {
     const MIN_LENGTH: usize = <Self as FallbackOrViewHtml>::MIN_LENGTH;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         self.fallback_or_view().to_html_with_buf(buf, position);
     }
 

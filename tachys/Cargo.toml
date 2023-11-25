@@ -1,0 +1,14 @@
+[package]
+name = "tachys"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tachydom = { path = "../tachydom", features = ["reaccy"] }
+tachy_maccy = { path = "../tachy_maccy" }
+tachy_reaccy = { path = "../tachy_reaccy" }
+typed-builder = "0.18"
+typed-builder-macro = "0.18"
+
+[features]
+web = ["tachy_reaccy/web"]

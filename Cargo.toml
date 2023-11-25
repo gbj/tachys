@@ -3,6 +3,7 @@ resolver = "2"
 members = [
 	"const_str_slice_concat",
 	"next_tuple",
+	"tachys",
 	"tachydom",
 	"tachy_maccy",
 	"tachy_reaccy",

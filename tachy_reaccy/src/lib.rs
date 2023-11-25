@@ -48,6 +48,21 @@ impl Observer {
     fn is(observer: &AnySubscriber) -> bool {
         OBSERVER.with(|o| o.borrow().as_ref() == Some(observer))
     }
+
+    fn take() -> Option<AnySubscriber> {
+        OBSERVER.with(|o| o.borrow_mut().take())
+    }
+
+    fn set(observer: Option<AnySubscriber>) {
+        OBSERVER.with(|o| *o.borrow_mut() = observer);
+    }
+}
+
+pub fn untrack<T>(fun: impl FnOnce() -> T) -> T {
+    let prev = Observer::take();
+    let value = fun();
+    Observer::set(prev);
+    value
 }
 
 #[cfg(feature = "web")]

@@ -61,7 +61,7 @@ impl SharedContext for SsrSharedContext {
         // pending async resources
         initial_chunk.push_str("__PENDING_RESOURCES=[");
         for (id, _) in &async_data {
-            write!(&mut initial_chunk, "{}", id.0).unwrap();
+            write!(&mut initial_chunk, "{},", id.0).unwrap();
         }
         initial_chunk.push_str("];");
 

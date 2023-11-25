@@ -20,7 +20,7 @@ async fn timer() {
 #[cfg(not(feature = "ssr"))]
 async fn timer() {}
 
-pub fn my_app() -> impl RenderHtml<Dom> {
+/* pub fn my_app() -> impl RenderHtml<Dom> {
     let count = Signal::new(0);
     let value = Resource::new(|| async {
         timer().await;
@@ -81,4 +81,89 @@ pub fn my_app() -> impl RenderHtml<Dom> {
             .suspend()
             .with_fallback("serde_lite..."),
     )
+} */
+
+pub fn my_app() -> impl RenderHtml<Dom> {
+    (
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+        EntryComponent(),
+    )
+}
+
+fn EntryComponent() -> impl RenderHtml<Dom> {
+    Component2()
+}
+
+fn Component2() -> impl RenderHtml<Dom> {
+    Component3()
+}
+
+fn Component3() -> impl RenderHtml<Dom> {
+    Component4()
+}
+
+fn Component4() -> impl RenderHtml<Dom> {
+    Component5()
+}
+
+fn Component5() -> impl RenderHtml<Dom> {
+    Component6()
+}
+
+fn Component6() -> impl RenderHtml<Dom> {
+    Component7()
+}
+
+fn Component7() -> impl RenderHtml<Dom> {
+    Component8()
+}
+
+fn Component8() -> impl RenderHtml<Dom> {
+    Component9()
+}
+
+fn Component9() -> impl RenderHtml<Dom> {
+    Component10()
+}
+
+fn Component10() -> impl RenderHtml<Dom> {
+    Component11()
+}
+
+fn Component11() -> impl RenderHtml<Dom> {
+    Component12()
+}
+
+fn Component12() -> impl RenderHtml<Dom> {
+    Component13()
+}
+
+fn Component13() -> impl RenderHtml<Dom> {
+    Component14()
+}
+
+fn Component14() -> impl RenderHtml<Dom> {
+    Component15()
+}
+
+fn Component15() -> impl RenderHtml<Dom> {
+    Component16()
+}
+
+fn Component16() -> impl RenderHtml<Dom> {
+    Component17()
+}
+
+fn Component17() -> impl RenderHtml<Dom> {
+    EndComponent()
+}
+
+fn EndComponent() -> impl RenderHtml<Dom> {
+    view! { <p>Test</p> }
 }

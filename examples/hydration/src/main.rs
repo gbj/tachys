@@ -19,19 +19,29 @@ async fn main() -> std::io::Result<()> {
             .route(
                 "/",
                 web::get().to(|| async {
-                    Root::global_ssr(move || {
-                        HttpResponse::Ok()
+                    let Root(owner, stream) = Root::global_ssr(move || {
+
+                                let app = hydration_ex::app::my_app();
+                                let app_stream =
+                                    app.to_html_stream_out_of_order();
+                                let shared_context =
+                                    Owner::shared_context().unwrap();
+                                // TODO nonce
+                                let shared_context = shared_context
+                                    .pending_data()
+                                    .unwrap()
+                                    .map(|chunk| {
+                                        format!("<script>{chunk}</script>")
+                                    });
+                                futures::stream::select(
+                                    app_stream,
+                                    shared_context,
+                                )
+                    });
+                                            HttpResponse::Ok()
                             .content_type(http::header::ContentType::html())
                             .streaming({
-                                let app = hydration_ex::app::my_app();
-                                let app_stream = app
-                                    .to_html_stream_out_of_order();
-                                let shared_context = Owner::shared_context().unwrap();
-                                // TODO nonce
-                                let shared_context = shared_context.pending_data().unwrap().map(|chunk| format!("<script>{chunk}</script>"));
-                                let stream = futures::stream::select(app_stream, shared_context);
-
-                                futures::stream::once(async move {
+                                                                futures::stream::once(async move {
                                     String::from(
                                         r#"<!DOCTYPE html>
                                             <html>
@@ -44,8 +54,7 @@ async fn main() -> std::io::Result<()> {
                                 .chain(futures::stream::once(async move {
                                     String::from("</body></html>")
                                 })).map(|html| Ok(web::Bytes::from(html)) as Result<web::Bytes>)
-                            })
-                    })
+                                                            })
                 }),
             )
         // serve the favicon from /favicon.ico

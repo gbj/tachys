@@ -1,5 +1,5 @@
 use crate::matching::{PartialPathMatch, RouteMatch};
-use std::{fmt::Debug, marker::PhantomData};
+use std::marker::PhantomData;
 use tachydom::{renderer::Renderer, view::Render};
 
 /// Defines a single route in a nested route tree. This is the return
@@ -17,9 +17,9 @@ pub struct RouteDefinition<Rndr, Pat, ViewFn, Children> {
 }
 
 impl<Rndr, Pat, ViewFn, Children> RouteDefinition<Rndr, Pat, ViewFn, Children> {
-    pub fn view<View>(&mut self) -> ViewFn::Output
+    pub fn view<View>(&self) -> ViewFn::Output
     where
-        ViewFn: FnMut() -> View,
+        ViewFn: Fn() -> View,
     {
         (self.view)()
     }
@@ -30,7 +30,7 @@ impl<Pat, ViewFn, View, Children, Rndr>
 where
     Pat: RouteMatch,
     Children: PossibleRoutes,
-    ViewFn: FnMut() -> View,
+    ViewFn: Fn() -> View,
     View: Render<Rndr>,
     Rndr: Renderer,
 {

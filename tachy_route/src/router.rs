@@ -14,63 +14,47 @@ use tachydom::{
 };
 
 #[derive(Debug)]
-pub struct Router<Rndr, Loc, Defs = (), Fallback = ()>
+pub struct Router<Rndr, Loc, Defs, FallbackFn>
 where
     Rndr: Renderer,
 {
     location: Loc,
     routes: Defs,
-    fallback: Fallback,
+    fallback: FallbackFn,
     rndr: PhantomData<Rndr>,
 }
 
-impl<Rndr, Loc> Router<Rndr, Loc, (), ()>
+impl<Rndr, Loc, Defs, FallbackFn, Fallback> Router<Rndr, Loc, Defs, FallbackFn>
 where
     Loc: Location,
     Rndr: Renderer,
+    FallbackFn: Fn() -> Fallback,
 {
-    pub fn new(location: Loc) -> Router<Rndr, Loc, (), ()> {
+    pub fn new(
+        location: Loc,
+        routes: Defs,
+        fallback: FallbackFn,
+    ) -> Router<Rndr, Loc, Defs, FallbackFn> {
         Self {
             location,
-            routes: (),
-            fallback: (),
-            rndr: PhantomData,
-        }
-    }
-}
-
-impl<Rndr, Fal, Loc> Router<Rndr, Loc, (), Fal>
-where
-    Rndr: Renderer,
-{
-    pub fn routes<Routes>(
-        self,
-        routes: Routes,
-    ) -> Router<Rndr, Loc, Routes, Fal> {
-        let fallback = self.fallback;
-        Router {
-            location: self.location,
             routes,
             fallback,
             rndr: PhantomData,
         }
     }
+
+    pub fn set_location(&mut self, new_location: Loc) {
+        self.location = new_location;
+    }
 }
 
-impl<Rndr, Loc, Defs> Router<Rndr, Loc, Defs, ()>
+impl<Rndr, Loc, Defs, FallbackFn, Fallback> Router<Rndr, Loc, Defs, FallbackFn>
 where
+    FallbackFn: Fn() -> Fallback,
     Rndr: Renderer,
 {
-    pub fn fallback<Fal>(self, fallback: Fal) -> Router<Rndr, Loc, Defs, Fal>
-    where
-        Fal: Render<Rndr>,
-    {
-        Router {
-            location: self.location,
-            routes: self.routes,
-            fallback,
-            rndr: PhantomData,
-        }
+    pub fn fallback(&self) -> Fallback {
+        (self.fallback)()
     }
 }
 
@@ -120,30 +104,34 @@ where
 pub trait FallbackOrView {
     type Output;
 
-    fn fallback_or_view(self) -> Self::Output;
+    fn fallback_or_view(&self) -> Self::Output;
 }
 
 pub trait FallbackOrViewHtml: FallbackOrView {
     const MIN_LENGTH: usize;
 }
 
-impl<Rndr, Loc, Fal> FallbackOrView for Router<Rndr, Loc, (), Fal>
+impl<Rndr, Loc, FallbackFn, Fal> FallbackOrView
+    for Router<Rndr, Loc, (), FallbackFn>
 where
     Rndr: Renderer,
     Loc: Location,
+    FallbackFn: Fn() -> Fal,
     Fal: Render<Rndr>,
 {
     type Output = Fal;
 
-    fn fallback_or_view(self) -> Self::Output {
-        self.fallback
+    fn fallback_or_view(&self) -> Self::Output {
+        (self.fallback)()
     }
 }
 
-impl<Rndr, Loc, Fal> FallbackOrViewHtml for Router<Rndr, Loc, (), Fal>
+impl<Rndr, Loc, FallbackFn, Fal> FallbackOrViewHtml
+    for Router<Rndr, Loc, (), FallbackFn>
 where
     Rndr: Renderer,
     Loc: Location,
+    FallbackFn: Fn() -> Fal,
     Fal: RenderHtml<Rndr>,
     Rndr::Element: Clone,
     Rndr::Node: Clone,
@@ -151,25 +139,31 @@ where
     const MIN_LENGTH: usize = Fal::MIN_LENGTH;
 }
 
-impl<Rndr, Loc, Fal, APat, AViewFn, AView, AChildren> FallbackOrView
-    for Router<Rndr, Loc, RouteDefinition<Rndr, APat, AViewFn, AChildren>, Fal>
+impl<Rndr, Loc, FallbackFn, Fal, APat, AViewFn, AView, AChildren> FallbackOrView
+    for Router<
+        Rndr,
+        Loc,
+        RouteDefinition<Rndr, APat, AViewFn, AChildren>,
+        FallbackFn,
+    >
 where
     Rndr: Renderer,
     Loc: Location,
     APat: RouteMatch,
-    AViewFn: FnMut() -> AView,
+    AViewFn: Fn() -> AView,
     AView: Render<Rndr>,
+    FallbackFn: Fn() -> Fal,
     Fal: Render<Rndr>,
 {
     type Output = Either<Fal, AView>;
 
-    fn fallback_or_view(mut self) -> Self::Output {
-        match self.location.try_into_url() {
+    fn fallback_or_view(&self) -> Self::Output {
+        match self.location.try_to_url() {
             Ok(url) => {
                 if self.routes.path.matches(&url.pathname) {
                     Either::Right(self.routes.view())
                 } else {
-                    Either::Left(self.fallback)
+                    Either::Left(self.fallback())
                 }
             }
             Err(e) => {
@@ -179,20 +173,27 @@ where
                         "Error converting location into URL: {e:?}"
                     );
                 }
-                Either::Left(self.fallback)
+                Either::Left(self.fallback())
             }
         }
     }
 }
 
-impl<Rndr, Loc, Fal, APat, AViewFn, AView, AChildren> FallbackOrViewHtml
-    for Router<Rndr, Loc, RouteDefinition<Rndr, APat, AViewFn, AChildren>, Fal>
+impl<Rndr, Loc, FallbackFn, Fal, APat, AViewFn, AView, AChildren>
+    FallbackOrViewHtml
+    for Router<
+        Rndr,
+        Loc,
+        RouteDefinition<Rndr, APat, AViewFn, AChildren>,
+        FallbackFn,
+    >
 where
     Rndr: Renderer,
     Loc: Location,
     APat: RouteMatch,
-    AViewFn: FnMut() -> AView,
+    AViewFn: Fn() -> AView,
     AView: RenderHtml<Rndr>,
+    FallbackFn: Fn() -> Fal,
     Fal: RenderHtml<Rndr>,
     Rndr::Element: Clone,
     Rndr::Node: Clone,
@@ -208,7 +209,7 @@ macro_rules! tuples {
     ($num:literal => $($ty:ident),* | $last:ident) => {
         paste::paste! {
             impl<
-                Rndr, Loc, $last,
+                Rndr, Loc, $last, FallbackFn,
                 $([<$ty Pat>], [<$ty View>], [<$ty ViewFn>], [<$ty Children>]),*,
             > FallbackOrView
                 for Router<
@@ -217,7 +218,7 @@ macro_rules! tuples {
                     (
                         $(RouteDefinition<Rndr, [<$ty Pat>], [<$ty ViewFn>], [<$ty Children>]>,)*
                     ),
-                    $last
+                    FallbackFn
                 >
             where
                 Rndr: Renderer,
@@ -226,16 +227,17 @@ macro_rules! tuples {
                 $(
                     [<$ty Pat>]: RouteMatch + std::fmt::Debug,
                     [<$ty View>]: Render<Rndr>,
-                    [<$ty ViewFn>]: FnMut() -> [<$ty View>],
+                    [<$ty ViewFn>]: Fn() -> [<$ty View>],
                 )*
+                FallbackFn: Fn() -> $last,
                 $last: Render<Rndr>,
                 Rndr: Renderer,
             {
                 type Output = [<EitherOf$num>]<$([<$ty View>],)* $last>;
 
-                fn fallback_or_view(self) -> Self::Output {
-                    let ($(mut [<$ty:lower>],)*) = self.routes;
-                    match self.location.try_into_url() {
+                fn fallback_or_view(&self) -> Self::Output {
+                    let ($([<$ty:lower>],)*) = &self.routes;
+                    match self.location.try_to_url() {
                         Ok(url) => {
                             $(
                                 if [<$ty:lower>].path.matches(&url.pathname) {
@@ -249,7 +251,7 @@ macro_rules! tuples {
                                     }
                                 }
                             )*
-                            [<EitherOf$num>]::$last(self.fallback)
+                            [<EitherOf$num>]::$last(self.fallback())
                         }
                         Err(e) => {
                             #[cfg(feature = "tracing")]
@@ -258,14 +260,14 @@ macro_rules! tuples {
                                     "Error converting location into URL: {e:?}"
                                 );
                             }
-                            [<EitherOf$num>]::$last(self.fallback)
+                            [<EitherOf$num>]::$last(self.fallback())
                         }
                     }
                 }
             }
 
             impl<
-                Rndr, Loc, $last,
+                Rndr, Loc, $last, FallbackFn,
                 $([<$ty Pat>], [<$ty View>], [<$ty ViewFn>], [<$ty Children>]),*,
             > FallbackOrViewHtml
                 for Router<
@@ -274,7 +276,7 @@ macro_rules! tuples {
                     (
                         $(RouteDefinition<Rndr, [<$ty Pat>], [<$ty ViewFn>], [<$ty Children>]>,)*
                     ),
-                    $last
+                    FallbackFn
                 >
             where
                 Rndr: Renderer,
@@ -283,8 +285,9 @@ macro_rules! tuples {
                 $(
                     [<$ty Pat>]: RouteMatch + std::fmt::Debug,
                     [<$ty View>]: RenderHtml<Rndr>,
-                    [<$ty ViewFn>]: FnMut() -> [<$ty View>],
+                    [<$ty ViewFn>]: Fn() -> [<$ty View>],
                 )*
+                FallbackFn: Fn() -> $last,
                 $last: RenderHtml<Rndr>,
                 Rndr::Element: Clone,
                 Rndr::Node: Clone
@@ -323,13 +326,17 @@ mod tests {
         location::RequestUrl,
         matching::{ParamSegment, StaticSegment},
         route::RouteDefinition,
+        router::FallbackOrView,
     };
-    use tachydom::{renderer::mock_dom::MockDom, view::RenderHtml};
+    use tachydom::{
+        renderer::mock_dom::MockDom,
+        view::{either::EitherOf4, RenderHtml},
+    };
 
     #[test]
     fn empty_router_with_fallback_renders_fallback() {
         let router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::default()).fallback("404");
+            Router::new(RequestUrl::default(), (), || "404");
         assert_eq!(router.to_html(), "404");
     }
 
@@ -339,17 +346,13 @@ mod tests {
         let routes: RouteDefinition<MockDom, _, _, _> =
             RouteDefinition::new(StaticSegment(""), (), || "Hello!");
         let _router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::default())
-                .fallback("404")
-                .routes(routes);
+            Router::new(RequestUrl::default(), routes, || "404");
 
         // can do routes first, then fallback
         let routes: RouteDefinition<MockDom, _, _, _> =
             RouteDefinition::new(StaticSegment(""), (), || "Hello!");
         let _router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::default())
-                .routes(routes)
-                .fallback("404");
+            Router::new(RequestUrl::default(), routes, || "404");
     }
 
     #[test]
@@ -358,17 +361,16 @@ mod tests {
         let routes: RouteDefinition<MockDom, _, _, _> =
             RouteDefinition::new(StaticSegment("foo"), (), || "Hello!");
         let router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::from_path("foo"))
-                .fallback("404")
-                .routes(routes);
+            Router::new(RequestUrl::from_path("foo"), routes, || "404");
         assert_eq!(router.to_html(), "Hello!<!>");
     }
 
     #[test]
     fn can_match_against_multiple_routes() {
         // can do fallback first, then routes
-        let router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::default()).fallback("404").routes((
+        let mut router: Router<MockDom, _, _, _> = Router::new(
+            RequestUrl::default(),
+            (
                 RouteDefinition::new(StaticSegment(""), (), || "Home"),
                 RouteDefinition::new(StaticSegment("about"), (), || "About"),
                 RouteDefinition::new(
@@ -376,39 +378,21 @@ mod tests {
                     (),
                     || "Post Number TODO",
                 ),
-            ));
-        assert_eq!(router.to_html(), "Home<!>");
+            ),
+            || "404",
+        );
+        let routed = router.fallback_or_view();
+        let html = RenderHtml::<MockDom>::to_html(routed);
+        assert_eq!(html, "Home<!>");
 
-        let router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::from_path("about"))
-                .fallback("404")
-                .routes((
-                    RouteDefinition::new(StaticSegment(""), (), || "Home"),
-                    RouteDefinition::new(StaticSegment("about"), (), || {
-                        "About"
-                    }),
-                    RouteDefinition::new(
-                        (StaticSegment("post"), ParamSegment("id")),
-                        (),
-                        || "Post Number TODO",
-                    ),
-                ));
-        assert_eq!(router.to_html(), "About<!>");
+        router.set_location(RequestUrl::from_path("about"));
+        let routed = router.fallback_or_view();
+        let html = RenderHtml::<MockDom>::to_html(routed);
+        assert_eq!(html, "About<!>");
 
-        let router: Router<MockDom, _, _, _> =
-            Router::new(RequestUrl::from_path("post/3"))
-                .fallback("404")
-                .routes((
-                    RouteDefinition::new(StaticSegment(""), (), || "Home"),
-                    RouteDefinition::new(StaticSegment("about"), (), || {
-                        "About"
-                    }),
-                    RouteDefinition::new(
-                        (StaticSegment("post"), ParamSegment("id")),
-                        (),
-                        || "Post Number TODO",
-                    ),
-                ));
-        assert_eq!(router.to_html(), "Post Number TODO<!>");
+        router.set_location(RequestUrl::from_path("post/3"));
+        let routed = router.fallback_or_view();
+        let html = RenderHtml::<MockDom>::to_html(routed);
+        assert_eq!(html, "Post Number TODO<!>");
     }
 }

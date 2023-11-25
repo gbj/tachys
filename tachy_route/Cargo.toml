@@ -7,7 +7,7 @@ edition = "2021"
 const_str_slice_concat = { path = "../const_str_slice_concat" }
 next_tuple = { path = "../next_tuple" }
 tachydom = { path = "../tachydom" }
-tachy_reaccy = { path = "../tachy_reaccy" }
+tachy_reaccy = { path = "../tachy_reaccy", optional = true }
 paste = "1.0.14"
 thiserror = "1.0.49"
 tuplestructops = "0.3.0"
@@ -44,3 +44,4 @@ features = [
 
 [features]
 tracing = ["dep:tracing"]
+reaccy = ["dep:tachy_reaccy"]

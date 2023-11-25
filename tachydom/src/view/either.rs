@@ -116,19 +116,19 @@ where
 {
     const MIN_LENGTH: usize = min_usize(&[A::MIN_LENGTH, B::MIN_LENGTH]);
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         match self {
             Either::Left(left) => left.to_html_with_buf(buf, position),
             Either::Right(right) => right.to_html_with_buf(buf, position),
         }
         buf.push_str("<!>");
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {
@@ -141,7 +141,7 @@ where
             }
         }
         buf.push_sync("<!>");
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -275,18 +275,18 @@ macro_rules! tuples {
             {
                 const MIN_LENGTH: usize = min_usize(&[$($ty ::MIN_LENGTH,)*]);
 
-                fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+                fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
                     match self {
                         $([<EitherOf $num>]::$ty(this) => this.to_html_with_buf(buf, position),)*
                     }
                     buf.push_str("<!>");
-                    position.set(Position::NextChild);
+                    *position = Position::NextChild;
                 }
 
                 fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
                     self,
                     buf: &mut StreamBuilder,
-                    position: &PositionState,
+                    position: &mut Position,
                 ) where
                     Self: Sized,
                 {
@@ -294,7 +294,7 @@ macro_rules! tuples {
                         $([<EitherOf $num>]::$ty(this) => this.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position),)*
                     }
                     buf.push_sync("<!>");
-                    position.set(Position::NextChild);
+                    *position = Position::NextChild;
                 }
 
                 fn hydrate<const FROM_SERVER: bool>(

@@ -14,7 +14,7 @@ where
 {
     type_id: TypeId,
     value: Box<dyn Any>,
-    to_html: fn(Box<dyn Any>, &mut String, &PositionState),
+    to_html: fn(Box<dyn Any>, &mut String, &mut Position),
     build: fn(Box<dyn Any>) -> AnyViewState<R>,
     rebuild: fn(TypeId, Box<dyn Any>, &mut AnyViewState<R>),
     #[allow(clippy::type_complexity)]
@@ -101,17 +101,16 @@ where
     fn into_any(self) -> AnyView<R> {
         let value = Box::new(self) as Box<dyn Any>;
 
-        let to_html = |value: Box<dyn Any>,
-                       buf: &mut String,
-                       position: &PositionState| {
-            let value = value
-                .downcast::<T>()
-                .expect("AnyView::to_html could not be downcast");
-            value.to_html_with_buf(buf, position);
-            // insert marker node
-            buf.push_str("<!>");
-            position.set(Position::NextChild);
-        };
+        let to_html =
+            |value: Box<dyn Any>, buf: &mut String, position: &mut Position| {
+                let value = value
+                    .downcast::<T>()
+                    .expect("AnyView::to_html could not be downcast");
+                value.to_html_with_buf(buf, position);
+                // insert marker node
+                buf.push_str("<!>");
+                *position = Position::NextChild;
+            };
         let build = |value: Box<dyn Any>| {
             let value = value
                 .downcast::<T>()
@@ -240,7 +239,7 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         (self.to_html)(self.value, buf, position);
     }
 

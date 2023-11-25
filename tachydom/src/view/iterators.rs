@@ -52,19 +52,19 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         if let Some(value) = self {
             value.to_html_with_buf(buf, position);
         }
         // placeholder
         buf.push_str("<!>");
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {
@@ -73,7 +73,7 @@ where
         }
         // placeholder
         buf.push_sync("<!>");
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -267,7 +267,7 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         let mut children = self.into_iter();
         if let Some(first) = children.next() {
             first.to_html_with_buf(buf, position);
@@ -280,7 +280,7 @@ where
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {

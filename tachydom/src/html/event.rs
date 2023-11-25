@@ -3,7 +3,7 @@ use crate::{
     renderer::DomRenderer,
     view::{Position, ToTemplate},
 };
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 use wasm_bindgen::convert::FromWasmAbi;
 
 pub fn on<E, R>(event: E, mut cb: impl FnMut(E::EventType) + 'static) -> On<R>
@@ -32,12 +32,14 @@ where
                 R::add_event_listener(el, &event.name(), cb)
             }
         }),
+        ty: PhantomData,
     }
 }
 pub struct On<R: DomRenderer> {
     name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
     setup: Box<dyn FnOnce(&R::Element)>,
+    ty: PhantomData<R>,
 }
 
 impl<R> Debug for On<R>
@@ -67,11 +69,13 @@ where
 
     #[inline(always)]
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) {
+        #[cfg(target_arch = "wasm32")]
         (self.setup)(el);
     }
 
     #[inline(always)]
     fn build(self, el: &R::Element) {
+        #[cfg(target_arch = "wasm32")]
         (self.setup)(el);
     }
 

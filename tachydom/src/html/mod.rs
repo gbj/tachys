@@ -1,6 +1,6 @@
 use crate::{
     renderer::Renderer,
-    view::{Render, RenderHtml},
+    view::{Position, Render, RenderHtml},
 };
 use std::marker::PhantomData;
 
@@ -37,14 +37,10 @@ where
     R::Element: Clone,
     R::Node: Clone,
 {
-    const MIN_LENGTH: usize = "<!DOCTYPE >".len() + 4;
+    const MIN_LENGTH: usize = "<!DOCTYPE html>".len();
 
-    fn to_html_with_buf(
-        self,
-        buf: &mut String,
-        _position: &crate::view::PositionState,
-    ) {
-        buf.push_str("<!DOCTYPE");
+    fn to_html_with_buf(self, buf: &mut String, _position: &mut Position) {
+        buf.push_str("<!DOCTYPE ");
         buf.push_str(self.value);
         buf.push('>');
     }

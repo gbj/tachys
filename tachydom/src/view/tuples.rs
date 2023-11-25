@@ -23,7 +23,7 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, _buf: &mut String, _position: &PositionState) {}
+    fn to_html_with_buf(self, _buf: &mut String, _position: &mut Position) {}
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -80,14 +80,14 @@ where
 {
     const MIN_LENGTH: usize = A::MIN_LENGTH;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         self.0.to_html_with_buf(buf, position);
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {
@@ -158,7 +158,7 @@ macro_rules! impl_view_for_tuples {
 		{
 			const MIN_LENGTH: usize = $first::MIN_LENGTH $(+ $ty::MIN_LENGTH)*;
 
-			fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+			fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
 					[<$first:lower>].to_html_with_buf(buf, position);
@@ -169,7 +169,7 @@ macro_rules! impl_view_for_tuples {
 			fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
 				self,
 				buf: &mut StreamBuilder,
-				position: &PositionState,
+				position: &mut Position,
 			) where
 				Self: Sized,
 			{

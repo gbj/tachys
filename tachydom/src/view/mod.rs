@@ -61,10 +61,7 @@ where
         Self: Sized,
     {
         let mut buf = String::with_capacity(Self::MIN_LENGTH);
-        self.to_html_with_buf(
-            &mut buf,
-            &PositionState::new(Position::FirstChild),
-        );
+        self.to_html_with_buf(&mut buf, &mut Position::FirstChild);
         buf
     }
 
@@ -76,7 +73,7 @@ where
         let mut builder = StreamBuilder::default();
         self.to_html_async_with_buf::<false>(
             &mut builder,
-            &PositionState::new(Position::FirstChild),
+            &mut Position::FirstChild,
         );
         builder.finish()
     }
@@ -89,7 +86,7 @@ where
         let mut builder = StreamBuilder::new(Some(vec![0]));
         self.to_html_async_with_buf::<true>(
             &mut builder,
-            &PositionState::new(Position::FirstChild),
+            &mut Position::FirstChild,
         );
         builder.finish()
     }
@@ -117,13 +114,13 @@ where
     } */
 
     /// Renders a view to HTML, writing it into the given buffer.
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position);
 
     /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {

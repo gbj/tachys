@@ -5,7 +5,7 @@ use crate::{
     ssr::StreamBuilder,
     view::{
         either::{Either, EitherState},
-        Mountable, PositionState, Render, RenderHtml,
+        Mountable, Position, PositionState, Render, RenderHtml,
     },
 };
 use futures::FutureExt;
@@ -120,14 +120,14 @@ impl<const TRANSITION: bool, Fal, Fut, Rndr> RenderHtml<Rndr>
 where
     Fal: RenderHtml<Rndr> + Send + Sync + 'static,
     Fut: Future + Send + Sync + 'static,
-    Fut::Output: RenderHtml<Rndr> + Send + Sync,
+    Fut::Output: RenderHtml<Rndr>,
     Rndr: SpawningRenderer + 'static,
     Rndr::Node: Clone,
     Rndr::Element: Clone,
 {
     const MIN_LENGTH: usize = Fal::MIN_LENGTH;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         Either::<Fal, Fut::Output>::Left(self.fallback)
             .to_html_with_buf(buf, position);
     }
@@ -135,7 +135,7 @@ where
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {
@@ -144,14 +144,8 @@ where
         let mut fut = Box::pin(self.fut);
         match fut.as_mut().now_or_never() {
             Some(resolved) => {
-                let mut builder = StreamBuilder::new(buf.clone_id());
                 Either::<Fal, Fut::Output>::Right(resolved)
-                    .to_html_async_with_buf::<OUT_OF_ORDER>(
-                        &mut builder,
-                        position,
-                    );
-                let builder = builder.finish();
-                buf.append(builder);
+                    .to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
             }
             None => {
                 let id = buf.clone_id();
@@ -167,19 +161,20 @@ where
                     buf.push_async(
                         false, // TODO should_block
                         {
-                            let position = position.clone();
+                            let mut position = *position;
                             async move {
                                 let value = fut.await;
                                 let mut builder = StreamBuilder::new(id);
                                 Either::<Fal, Fut::Output>::Right(value)
                                     .to_html_async_with_buf::<OUT_OF_ORDER>(
                                     &mut builder,
-                                    &position,
+                                    &mut position,
                                 );
                                 builder.finish().take_chunks()
                             }
                         },
                     );
+                    *position = Position::NextChild;
                 }
             }
         };

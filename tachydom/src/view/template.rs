@@ -1,4 +1,6 @@
-use super::{Mountable, PositionState, Render, RenderHtml, ToTemplate};
+use super::{
+    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+};
 use crate::{dom::document, hydration::Cursor, renderer::dom::Dom};
 use once_cell::unsync::Lazy;
 use rustc_hash::FxHashMap;
@@ -83,7 +85,7 @@ where
 {
     const MIN_LENGTH: usize = V::MIN_LENGTH;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         self.view.to_html_with_buf(buf, position)
     }
 

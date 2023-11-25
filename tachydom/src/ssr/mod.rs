@@ -85,7 +85,7 @@ impl StreamBuilder {
     pub fn push_fallback<View, Rndr>(
         &mut self,
         fallback: View,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         View: RenderHtml<Rndr>,
         Rndr: Renderer,
@@ -95,7 +95,7 @@ impl StreamBuilder {
         self.write_chunk_marker(true);
         fallback.to_html_with_buf(&mut self.sync_buf, position);
         self.write_chunk_marker(false);
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     pub fn next_id(&mut self) {
@@ -135,7 +135,7 @@ impl StreamBuilder {
         &mut self,
         should_block: bool,
         view: impl Future<Output = View> + Send + Sync + 'static,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         View: RenderHtml<Rndr>,
         Rndr: Renderer,
@@ -143,9 +143,9 @@ impl StreamBuilder {
         Rndr::Element: Clone,
     {
         let id = self.clone_id();
-        // don't be updated by additional iterations
+        // copy so it's not updated by additional iterations
         // i.e., restart in the same position we were at when we suspended
-        let position = position.deep_clone();
+        let mut position = *position;
 
         self.chunks.push_back(StreamChunk::OutOfOrder {
             should_block,
@@ -169,7 +169,10 @@ impl StreamBuilder {
                 if let Some(id) = subbuilder.id.as_mut() {
                     id.push(0);
                 }
-                view.to_html_async_with_buf::<true>(&mut subbuilder, &position);
+                view.to_html_async_with_buf::<true>(
+                    &mut subbuilder,
+                    &mut position,
+                );
 
                 subbuilder.sync_buf.push_str("<!></template>");
 
@@ -372,7 +375,7 @@ mod tests {
             );
 
         let html = stream.next().await.unwrap();
-        assert_eq!(html, "Suspended");
+        assert_eq!(html, "Suspended<!>");
     }
 
     #[tokio::test]
@@ -504,10 +507,9 @@ mod tests {
         ));
         let mut stream = el.to_html_stream_out_of_order();
 
-        // TODO can these comment nodes be removed anyway?
         assert_eq!(
             stream.next().await.unwrap(),
-            "<p>Before Suspense<!--s-1-o--><!>Loading...<!--s-1-c--><!>After \
+            "<p>Before Suspense<!--s-1-o--><!>Loading...<!--s-1-c-->After \
              Suspense</p>"
         );
         assert!(stream.next().await.unwrap().contains("Suspended"));
@@ -539,14 +541,13 @@ mod tests {
 
         assert_eq!(
             stream.next().await.unwrap(),
-            "<main>Before \
-             Suspense<!--s-1-o--><!>Loading...<!--s-1-c--><!>After \
+            "<main>Before Suspense<!--s-1-o--><!>Loading...<!--s-1-c-->After \
              Suspense</main>"
         );
         let loading_inner = stream.next().await.unwrap();
         assert!(loading_inner.contains(
             "<p>Before inner Suspense<!--s-1-1-o--><!>Loading \
-             Inner...<!--s-1-1-c--><!>After inner Suspense</p>"
+             Inner...<!--s-1-1-c-->After inner Suspense</p>"
         ));
         assert!(loading_inner.contains("let id = \"1-\";"));
 

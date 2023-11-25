@@ -205,7 +205,7 @@ where
         + E::TAG.len()
     };
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         // opening tag
         buf.push('<');
         buf.push_str(E::TAG);
@@ -244,7 +244,7 @@ where
 
         if !E::SELF_CLOSING {
             // children
-            position.set(Position::FirstChild);
+            *position = Position::FirstChild;
             self.children.to_html_with_buf(buf, position);
 
             // closing tag
@@ -252,13 +252,13 @@ where
             buf.push_str(E::TAG);
             buf.push('>');
         }
-        position.set(Position::NextChild);
+        *position = Position::NextChild;
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buffer: &mut StreamBuilder,
-        position: &PositionState,
+        position: &mut Position,
     ) where
         Self: Sized,
     {
@@ -302,7 +302,7 @@ where
 
         if !E::SELF_CLOSING {
             // children
-            position.set(Position::FirstChild);
+            *position = Position::FirstChild;
             self.children
                 .to_html_async_with_buf::<OUT_OF_ORDER>(buffer, position);
 
@@ -313,6 +313,7 @@ where
             buf.push('>');
             buffer.push_sync(&buf);
         }
+        *position = Position::NextChild;
     }
 
     fn hydrate<const FROM_SERVER: bool>(

@@ -2,6 +2,7 @@ use super::{Mountable, Position, PositionState, Render, RenderHtml};
 use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
+    ssr::StreamBuilder,
 };
 use drain_filter_polyfill::VecExt as VecDrainFilterExt;
 use indexmap::IndexSet;
@@ -141,11 +142,23 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         for item in self.items.into_iter() {
             let item = (self.view_fn)(item);
             item.to_html_with_buf(buf, position);
-            position.set(Position::NextChild);
+            *position = Position::NextChild;
+        }
+    }
+
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &mut Position,
+    ) {
+        for item in self.items.into_iter() {
+            let item = (self.view_fn)(item);
+            item.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
+            *position = Position::NextChild;
         }
     }
 

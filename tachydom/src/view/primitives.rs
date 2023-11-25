@@ -68,13 +68,13 @@ macro_rules! render_primitive {
 			{
 				const MIN_LENGTH: usize = 0;
 
-				fn to_html_with_buf(self, buf: &mut String, position: &PositionState) {
+				fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
 					// add a comment node to separate from previous sibling, if any
-					if matches!(position.get(), Position::NextChildAfterText) {
+					if matches!(position, Position::NextChildAfterText) {
 						buf.push_str("<!>")
 					}
 					write!(buf, "{}", self);
-					position.set(Position::NextChildAfterText);
+					*position = Position::NextChildAfterText;
 				}
 
 				fn hydrate<const FROM_SERVER: bool>(

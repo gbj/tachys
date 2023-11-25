@@ -125,7 +125,7 @@ where
         position.set(Position::NextChild);
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
@@ -134,10 +134,10 @@ where
     {
         match self {
             Either::Left(left) => {
-                left.to_html_async_buffered::<OUT_OF_ORDER>(buf, position)
+                left.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position)
             }
             Either::Right(right) => {
-                right.to_html_async_buffered::<OUT_OF_ORDER>(buf, position)
+                right.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position)
             }
         }
         buf.push_sync("<!>");
@@ -283,7 +283,7 @@ macro_rules! tuples {
                     position.set(Position::NextChild);
                 }
 
-                fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+                fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
                     self,
                     buf: &mut StreamBuilder,
                     position: &PositionState,
@@ -291,7 +291,7 @@ macro_rules! tuples {
                     Self: Sized,
                 {
                     match self {
-                        $([<EitherOf $num>]::$ty(this) => this.to_html_async_buffered::<OUT_OF_ORDER>(buf, position),)*
+                        $([<EitherOf $num>]::$ty(this) => this.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position),)*
                     }
                     buf.push_sync("<!>");
                     position.set(Position::NextChild);

@@ -78,7 +78,7 @@ where
         value.to_html_with_buf(buf, position)
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
@@ -86,7 +86,7 @@ where
         Self: Sized,
     {
         let value = self();
-        value.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+        value.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(

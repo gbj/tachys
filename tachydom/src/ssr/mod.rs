@@ -169,7 +169,7 @@ impl StreamBuilder {
                 if let Some(id) = subbuilder.id.as_mut() {
                     id.push(0);
                 }
-                view.to_html_async_buffered::<true>(&mut subbuilder, &position);
+                view.to_html_async_with_buf::<true>(&mut subbuilder, &position);
 
                 subbuilder.sync_buf.push_str("<!></template>");
 

@@ -84,14 +84,14 @@ where
         self.0.to_html_with_buf(buf, position);
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
     ) where
         Self: Sized,
     {
-        self.0.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+        self.0.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
     }
 
     fn hydrate<const FROM_SERVER: bool>(
@@ -166,7 +166,7 @@ macro_rules! impl_view_for_tuples {
 				}
 			}
 
-			fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+			fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
 				self,
 				buf: &mut StreamBuilder,
 				position: &PositionState,
@@ -175,8 +175,8 @@ macro_rules! impl_view_for_tuples {
 			{
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
-					[<$first:lower>].to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
-					$([<$ty:lower>].to_html_async_buffered::<OUT_OF_ORDER>(buf, position));*
+					[<$first:lower>].to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
+					$([<$ty:lower>].to_html_async_with_buf::<OUT_OF_ORDER>(buf, position));*
 				}
 			}
 

@@ -61,7 +61,7 @@ where
         position.set(Position::NextChild);
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
@@ -69,7 +69,7 @@ where
         Self: Sized,
     {
         if let Some(value) = self {
-            value.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+            value.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
         }
         // placeholder
         buf.push_sync("<!>");
@@ -277,7 +277,7 @@ where
         }
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
@@ -286,10 +286,10 @@ where
     {
         let mut children = self.into_iter();
         if let Some(first) = children.next() {
-            first.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+            first.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
         }
         for child in children {
-            child.to_html_async_buffered::<OUT_OF_ORDER>(buf, position);
+            child.to_html_async_with_buf::<OUT_OF_ORDER>(buf, position);
         }
     }
 

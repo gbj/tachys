@@ -74,7 +74,7 @@ where
         Self: Sized,
     {
         let mut builder = StreamBuilder::default();
-        self.to_html_async_buffered::<false>(
+        self.to_html_async_with_buf::<false>(
             &mut builder,
             &PositionState::new(Position::FirstChild),
         );
@@ -87,7 +87,7 @@ where
         Self: Sized,
     {
         let mut builder = StreamBuilder::new(Some(vec![0]));
-        self.to_html_async_buffered::<true>(
+        self.to_html_async_with_buf::<true>(
             &mut builder,
             &PositionState::new(Position::FirstChild),
         );
@@ -104,7 +104,7 @@ where
 
         let mut chunks = VecDeque::new();
         let mut curr = String::new();
-        self.to_html_async_buffered(
+        self.to_html_async_with_buf(
             &mut chunks,
             &mut curr,
             &PositionState::new(Position::FirstChild),
@@ -120,7 +120,7 @@ where
     fn to_html_with_buf(self, buf: &mut String, position: &PositionState);
 
     /// Renders a view into a buffer of (synchronous or asynchronous) HTML chunks.
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,

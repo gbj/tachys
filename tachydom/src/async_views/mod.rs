@@ -132,7 +132,7 @@ where
             .to_html_with_buf(buf, position);
     }
 
-    fn to_html_async_buffered<const OUT_OF_ORDER: bool>(
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
         self,
         buf: &mut StreamBuilder,
         position: &PositionState,
@@ -146,7 +146,7 @@ where
             Some(resolved) => {
                 let mut builder = StreamBuilder::new(buf.clone_id());
                 Either::<Fal, Fut::Output>::Right(resolved)
-                    .to_html_async_buffered::<OUT_OF_ORDER>(
+                    .to_html_async_with_buf::<OUT_OF_ORDER>(
                         &mut builder,
                         position,
                     );
@@ -172,7 +172,7 @@ where
                                 let value = fut.await;
                                 let mut builder = StreamBuilder::new(id);
                                 Either::<Fal, Fut::Output>::Right(value)
-                                    .to_html_async_buffered::<OUT_OF_ORDER>(
+                                    .to_html_async_with_buf::<OUT_OF_ORDER>(
                                     &mut builder,
                                     &position,
                                 );

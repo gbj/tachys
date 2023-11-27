@@ -107,8 +107,6 @@ impl ToTokens for Model {
 
         let no_props = props.is_empty();
 
-        let mut body = body.to_owned();
-
         // check for components that end ;
         let ends_semi =
             body.block.stmts.iter().last().and_then(|stmt| match stmt {
@@ -126,7 +124,7 @@ impl ToTokens for Model {
             );
         }
 
-        let module_name = module_name_from_fn(&body);
+        let module_name = module_name_from_fn_signature(&body.sig);
         //body.sig.ident = format_ident!("__{}", body.sig.ident);
         #[allow(clippy::redundant_clone)] // false positive
         let body_name = body.sig.ident.clone();
@@ -505,10 +503,10 @@ impl Model {
 /// used to improve IDEs and rust-analyzer's auto-completion behavior in case
 /// of a syntax error.
 pub struct DummyModel {
-    attrs: Vec<Attribute>,
-    vis: Visibility,
-    sig: Signature,
-    body: TokenStream,
+    pub attrs: Vec<Attribute>,
+    pub vis: Visibility,
+    pub sig: Signature,
+    pub body: TokenStream,
 }
 
 impl Parse for DummyModel {
@@ -546,7 +544,21 @@ impl ToTokens for DummyModel {
             let mut sig = sig.clone();
             sig.inputs.iter_mut().for_each(|arg| {
                 if let FnArg::Typed(ty) = arg {
-                    ty.attrs.clear();
+                    ty.attrs.retain(|attr| match &attr.meta {
+                        Meta::List(list) => list
+                            .path
+                            .segments
+                            .first()
+                            .map(|n| n.ident != "prop")
+                            .unwrap_or(true),
+                        Meta::NameValue(name_value) => name_value
+                            .path
+                            .segments
+                            .first()
+                            .map(|n| n.ident != "doc")
+                            .unwrap_or(true),
+                        _ => true,
+                    });
                 }
             });
             sig
@@ -1111,14 +1123,16 @@ fn prop_to_doc(
     }
 }
 
-pub fn module_name_from_fn(body: &ItemFn) -> Ident {
-    Ident::new(
-        &body
-            .sig
-            .ident
-            .to_string()
-            .from_case(Case::Camel)
-            .to_case(Case::Snake),
-        body.sig.ident.span(),
-    )
+pub fn module_name_from_fn_signature(sig: &Signature) -> Ident {
+    let snake = &sig
+        .ident
+        .to_string()
+        .from_case(Case::Camel)
+        .to_case(Case::Snake);
+    let name = format!("component_module_{snake}");
+    Ident::new(&name, sig.ident.span())
+}
+
+pub fn unmodified_fn_name_from_fn_name(ident: &Ident) -> Ident {
+    Ident::new(&format!("__{ident}"), ident.span())
 }

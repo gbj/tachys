@@ -21,11 +21,11 @@ use std::{cell::RefCell, pin::Pin};
 
 pub mod prelude {
     pub use crate::{
-        async_signal::{AsyncDerived, SerializedResource},
+        async_signal::{AsyncDerived, Resource},
         context::{provide_context, use_context},
         effect::Effect,
         memo::{ArcMemo, Memo},
-        signal::{ArcRwSignal, RwSignal},
+        signal::{signal, ArcRwSignal, ReadSignal, RwSignal},
         signal_traits::*,
         Root,
     };

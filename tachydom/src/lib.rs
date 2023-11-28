@@ -3,6 +3,7 @@
 
 pub mod prelude {
     pub use crate::{
+        async_views::FutureViewExt,
         html::{
             attribute::global::{
                 ClassAttribute, GlobalAttributes, OnAttribute, PropAttribute,

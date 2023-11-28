@@ -11,4 +11,5 @@ typed-builder = "0.18"
 typed-builder-macro = "0.18"
 
 [features]
-web = ["tachy_reaccy/web"]
+nightly = ["tachydom/nightly", "tachy_maccy/nightly"]
+web = ["tachydom/web", "tachy_reaccy/web"]

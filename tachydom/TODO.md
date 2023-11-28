@@ -1,4 +1,6 @@
 - router
+- inner_html
+- NodeRef
 - server functions
 - Signal wrappers
 - SignalDispose implementations on all Copy types

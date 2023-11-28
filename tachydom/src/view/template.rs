@@ -27,7 +27,7 @@ impl<V: Render<Dom> + ToTemplate + 'static> ViewTemplate<V> {
     }
 
     fn to_template() -> HtmlTemplateElement {
-        let tpl = TEMPLATES.with(|t| {
+        TEMPLATES.with(|t| {
             t.borrow_mut()
                 .entry(TypeId::of::<V>())
                 .or_insert_with(|| {
@@ -51,9 +51,7 @@ impl<V: Render<Dom> + ToTemplate + 'static> ViewTemplate<V> {
                     tpl
                 })
                 .clone()
-        });
-        //web_sys::console::log_1(&tpl);
-        tpl
+        })
     }
 }
 

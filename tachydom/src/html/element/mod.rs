@@ -29,7 +29,7 @@ where
     children: Ch,
 }
 
-impl<E, At, Ch, NewChild, Rndr> ElementChild<NewChild>
+impl<E, At, Ch, NewChild, Rndr> ElementChild<Rndr, NewChild>
     for HtmlElement<E, At, Ch, Rndr>
 where
     E: ElementType + ElementWithChildren,
@@ -37,6 +37,7 @@ where
     Ch: Render<Rndr> + TupleBuilder<NewChild>,
     <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
     Rndr: Renderer,
+    NewChild: Render<Rndr>,
 {
     type Output =
         HtmlElement<E, At, <Ch as TupleBuilder<NewChild>>::Output, Rndr>;
@@ -134,7 +135,11 @@ where
     }
 }
 
-pub trait ElementChild<NewChild> {
+pub trait ElementChild<Rndr, NewChild>
+where
+    NewChild: Render<Rndr>,
+    Rndr: Renderer,
+{
     type Output;
 
     fn child(self, child: NewChild) -> Self::Output;

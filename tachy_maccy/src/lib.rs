@@ -1,8 +1,6 @@
 mod component;
 mod view;
-use crate::component::{
-    module_name_from_fn_signature, unmodified_fn_name_from_fn_name,
-};
+use crate::component::unmodified_fn_name_from_fn_name;
 use component::DummyModel;
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
@@ -77,30 +75,21 @@ pub fn component(
                 span: unexpanded.vis.span(),
             })
         }
-        let module_name = module_name_from_fn_signature(&unexpanded.sig);
         unexpanded.sig.ident =
             unmodified_fn_name_from_fn_name(&unexpanded.sig.ident);
         quote! {
             #expanded
-            #[doc(hidden)]
-            mod #module_name {
-                use super::*;
 
-                #[allow(non_snake_case, dead_code, clippy::too_many_arguments)]
-                #unexpanded
-            }
+            #[doc(hidden)]
+            #[allow(non_snake_case, dead_code, clippy::too_many_arguments)]
+            #unexpanded
         }
     } else if let Ok(mut dummy) = dummy {
-        let module_name = module_name_from_fn_signature(&dummy.sig);
         dummy.sig.ident = unmodified_fn_name_from_fn_name(&dummy.sig.ident);
         quote! {
             #[doc(hidden)]
-            mod #module_name {
-                use super::*;
-
-                #[allow(non_snake_case, dead_code, clippy::too_many_arguments)]
-                #dummy
-            }
+            #[allow(non_snake_case, dead_code, clippy::too_many_arguments)]
+            #dummy
         }
     } else {
         quote! {}

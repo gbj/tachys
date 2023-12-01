@@ -178,15 +178,15 @@ macro_rules! impl_view_for_tuples {
 			$($ty::Error: Error + 'static),*,
 			Rndr: Renderer
 		{
-			type Error = Box<dyn Error>;
+			type Error = (); /* Box<dyn Error>; */
 			type FallibleState = ($first::FallibleState, $($ty::FallibleState,)*);
 
 			fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
 					Ok((
-						[<$first:lower>].try_build()?,
-						$([<$ty:lower>].try_build()?),*
+						[<$first:lower>].try_build().map_err(|_| ())?,
+						$([<$ty:lower>].try_build().map_err(|_| ())?),*
 					))
 				}
 			}
@@ -195,8 +195,8 @@ macro_rules! impl_view_for_tuples {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
 					let ([<view_ $first:lower>], $([<view_ $ty:lower>],)*) = state;
-					[<$first:lower>].try_rebuild([<view_ $first:lower>])?;
-					$([<$ty:lower>].try_rebuild([<view_ $ty:lower>])?);*
+					[<$first:lower>].try_rebuild([<view_ $first:lower>]).map_err(|_| ())?;
+					$([<$ty:lower>].try_rebuild([<view_ $ty:lower>]).map_err(|_| ())?);*
 				}
 				Ok(())
 			}

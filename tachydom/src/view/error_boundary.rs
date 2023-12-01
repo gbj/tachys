@@ -42,6 +42,28 @@ where
     }
 }
 
+pub trait TryCatchBoundary<Fal, FalFn, Rndr>
+where
+    Self: Sized + FallibleRender<Rndr>,
+    Fal: Render<Rndr>,
+    FalFn: FnMut(Self::Error) -> Fal,
+    Rndr: Renderer,
+{
+    fn catch(self, fallback: FalFn) -> Try<Self, Fal, FalFn, Rndr>;
+}
+
+impl<T, Fal, FalFn, Rndr> TryCatchBoundary<Fal, FalFn, Rndr> for T
+where
+    T: Sized + FallibleRender<Rndr>,
+    Fal: Render<Rndr>,
+    FalFn: FnMut(Self::Error) -> Fal,
+    Rndr: Renderer,
+{
+    fn catch(self, fallback: FalFn) -> Try<Self, Fal, FalFn, Rndr> {
+        Try::new(fallback, self)
+    }
+}
+
 pub struct Try<T, Fal, FalFn, Rndr>
 where
     T: FallibleRender<Rndr>,

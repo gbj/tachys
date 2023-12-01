@@ -12,7 +12,9 @@ pub mod prelude {
             element::ElementChild,
         },
         renderer::{dom::Dom, Renderer, SpawningRenderer},
-        view::{Mountable, Render, RenderHtml},
+        view::{
+            error_boundary::TryCatchBoundary, Mountable, Render, RenderHtml,
+        },
     };
 }
 

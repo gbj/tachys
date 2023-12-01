@@ -1,5 +1,6 @@
 use super::{
-    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+    InfallibleRender, Mountable, Position, PositionState, Render, RenderHtml,
+    ToTemplate,
 };
 use crate::{
     hydration::Cursor,
@@ -28,6 +29,8 @@ impl<'a, R: Renderer> Render<R> for &'a str {
         }
     }
 }
+
+impl<'a> InfallibleRender for &'a str {}
 
 impl<'a, R> RenderHtml<R> for &'a str
 where
@@ -139,6 +142,8 @@ impl<R: Renderer> Render<R> for String {
     }
 }
 
+impl InfallibleRender for String {}
+
 impl<R> RenderHtml<R> for String
 where
     R: Renderer,
@@ -219,6 +224,8 @@ impl<R: Renderer> Render<R> for Rc<str> {
         }
     }
 }
+
+impl InfallibleRender for Rc<str> {}
 
 impl<R> RenderHtml<R> for Rc<str>
 where
@@ -301,6 +308,8 @@ impl<R: Renderer> Render<R> for Arc<str> {
         }
     }
 }
+
+impl InfallibleRender for Arc<str> {}
 
 impl<R> RenderHtml<R> for Arc<str>
 where

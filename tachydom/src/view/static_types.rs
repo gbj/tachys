@@ -1,10 +1,15 @@
 use super::{
-    Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+    InfallibleRender, Mountable, Position, PositionState, Render, RenderHtml,
+    ToTemplate,
 };
 use crate::{
-    html::attribute::{Attribute, AttributeKey, AttributeValue},
+    html::{
+        attribute::{Attribute, AttributeKey, AttributeValue},
+        class::IntoClass,
+        style::IntoStyle,
+    },
     hydration::Cursor,
-    renderer::Renderer,
+    renderer::{DomRenderer, Renderer},
 };
 use std::marker::PhantomData;
 
@@ -96,6 +101,8 @@ where
     // This type is specified as static, so no rebuilding is done.
     fn rebuild(self, _state: &mut Self::State) {}
 }
+
+impl<const V: &'static str> InfallibleRender for Static<V> {}
 
 impl<const V: &'static str, R> RenderHtml<R> for Static<V>
 where

@@ -1,0 +1,25 @@
+[package]
+name = "playground"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+console_error_panic_hook = "0.1"
+tachys = { version = "0.1.0", path = "../../tachys", features = [
+	"web",
+	"nightly",
+] }
+tachy_route = { version = "0.1.0", path = "../../tachy_route", default-features = false, features = [
+	"reaccy",
+] }
+tracing = "0.1.40"
+tracing-subscriber-wasm = "0.1.0"
+tracing-subscriber = "0.3.18"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z'
+panic = "abort"
+
+[workspace]

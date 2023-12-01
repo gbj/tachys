@@ -51,13 +51,24 @@ where
     ) -> Result<(), Self::Error>;
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct NeverError;
+
+impl core::fmt::Display for NeverError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Ok(())
+    }
+}
+
+impl std::error::Error for NeverError {}
+
 impl<T, R> FallibleRender<R> for T
 where
     T: Render<R> + InfallibleRender,
     R: Renderer,
 {
     type FallibleState = Self::State;
-    type Error = ();
+    type Error = NeverError;
 
     fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
         Ok(self.build())

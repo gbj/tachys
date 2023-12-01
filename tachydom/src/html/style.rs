@@ -40,7 +40,7 @@ where
     fn to_html(
         self,
         _buf: &mut String,
-        _class: &mut String,
+        _style: &mut String,
         style: &mut String,
     ) {
         self.style.to_html(style);
@@ -66,8 +66,8 @@ where
 {
     fn to_template(
         _buf: &mut String,
-        _class: &mut String,
         _style: &mut String,
+        _class: &mut String,
         _position: &mut Position,
     ) {
         // TODO: should there be some templating for static styles?
@@ -79,7 +79,7 @@ where
 pub trait IntoStyle<R: DomRenderer> {
     type State;
 
-    fn to_html(self, class: &mut String);
+    fn to_html(self, style: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -91,7 +91,7 @@ pub trait IntoStyle<R: DomRenderer> {
 pub trait StylePropertyValue<R: DomRenderer> {
     type State;
 
-    fn to_html(self, name: &str, class: &mut String);
+    fn to_html(self, name: &str, style: &mut String);
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -233,6 +233,33 @@ where
         *prev = value;
     }
 }
+
+#[cfg(feature = "nightly")]
+impl<const V: &'static str, R> IntoStyle<R>
+    for crate::view::static_types::Static<V>
+where
+    R: DomRenderer,
+{
+    type State = ();
+
+    fn to_html(self, style: &mut String) {
+        style.push_str(V);
+        style.push(';');
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        _el: &<R>::Element,
+    ) -> Self::State {
+    }
+
+    fn build(self, el: &<R>::Element) -> Self::State {
+        R::set_attribute(el, "style", V);
+    }
+
+    fn rebuild(self, _state: &mut Self::State) {}
+}
+
 /*
 #[cfg(test)]
 mod tests {

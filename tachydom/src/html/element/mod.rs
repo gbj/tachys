@@ -4,7 +4,8 @@ use crate::{
     renderer::{CastFrom, Renderer},
     ssr::StreamBuilder,
     view::{
-        Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+        FallibleRender, Mountable, Position, PositionState, Render, RenderHtml,
+        ToTemplate,
     },
 };
 use const_str_slice_concat::{
@@ -162,7 +163,6 @@ where
     At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
-    Rndr::Node: Clone,
 {
     type State = ElementState<At::State, Ch::State, Rndr>;
 
@@ -185,6 +185,42 @@ where
             children,
             rndr: PhantomData,
         }
+    }
+}
+
+impl<E, At, Ch, Rndr> FallibleRender<Rndr> for HtmlElement<E, At, Ch, Rndr>
+where
+    E: CreateElement<Rndr>,
+    At: Attribute<Rndr>,
+    Ch: FallibleRender<Rndr>,
+    Rndr: Renderer,
+{
+    type Error = Ch::Error;
+    type FallibleState = ElementState<At::State, Ch::FallibleState, Rndr>;
+
+    fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
+        let el = Rndr::create_element::<E>();
+        let attrs = self.attributes.build(&el);
+        let mut children = self.children.try_build()?;
+        children.mount(&el, None);
+        Ok(ElementState {
+            el,
+            attrs,
+            children,
+            rndr: PhantomData,
+        })
+    }
+
+    fn try_rebuild(
+        self,
+        state: &mut Self::FallibleState,
+    ) -> Result<(), Self::Error> {
+        let ElementState {
+            attrs, children, ..
+        } = state;
+        self.attributes.rebuild(attrs);
+        self.children.try_rebuild(children)?;
+        Ok(())
     }
 }
 

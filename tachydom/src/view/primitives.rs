@@ -1,4 +1,6 @@
-use super::{Mountable, Position, PositionState, Render, RenderHtml};
+use super::{
+    InfallibleRender, Mountable, Position, PositionState, Render, RenderHtml,
+};
 use crate::{
     hydration::Cursor,
     renderer::{CastFrom, Renderer},
@@ -59,6 +61,8 @@ macro_rules! render_primitive {
 					}
 				}
 			}
+
+			impl<'a> InfallibleRender for $child_type {}
 
 			impl<'a, R> RenderHtml<R> for $child_type
 			where

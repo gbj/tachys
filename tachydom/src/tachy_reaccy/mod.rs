@@ -5,7 +5,8 @@ use crate::{
     renderer::{DomRenderer, Renderer},
     ssr::StreamBuilder,
     view::{
-        Mountable, Position, PositionState, Render, RenderHtml, ToTemplate,
+        FallibleRender, InfallibleRender, Mountable, Position, PositionState,
+        Render, RenderHtml, ToTemplate,
     },
 };
 use tachy_reaccy::{async_signal::ScopedFuture, render_effect::RenderEffect};
@@ -61,6 +62,30 @@ where
         let old_effect = std::mem::replace(state, self.build());
     }
 }
+
+impl<F, V> InfallibleRender for F where F: Fn() -> V + 'static {}
+
+/* impl<F, V, R> FallibleRender<R> for F
+where
+    F: Fn() -> V + 'static,
+    V: FallibleRender<R>,
+    V::State: 'static,
+    R: Renderer,
+{
+    type FallibleState = V::FallibleState;
+    type Error = V::Error;
+
+    fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
+        todo!()
+    }
+
+    fn try_rebuild(
+        self,
+        state: &mut Self::FallibleState,
+    ) -> Result<(), Self::Error> {
+        todo!()
+    }
+} */
 
 impl<F, V, R> RenderHtml<R> for F
 where

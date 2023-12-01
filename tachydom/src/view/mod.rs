@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 pub mod any_view;
 pub mod either;
+pub mod error_boundary;
 pub mod iterators;
 pub mod keyed;
 mod primitives;
@@ -29,6 +30,46 @@ pub trait Render<R: Renderer> {
 
     /// Updates the view with new data.
     fn rebuild(self, state: &mut Self::State);
+}
+
+pub trait InfallibleRender {}
+
+pub trait FallibleRender<R>: Sized + Render<R>
+where
+    R: Renderer,
+{
+    type FallibleState: Mountable<R>;
+    type Error;
+
+    /// Creates the view fallibly, handling any [`Result`] by propagating its `Err`.
+    fn try_build(self) -> Result<Self::FallibleState, Self::Error>;
+
+    /// Updates the view with new data fallibly, handling any [`Result`] by propagating its `Err`.
+    fn try_rebuild(
+        self,
+        state: &mut Self::FallibleState,
+    ) -> Result<(), Self::Error>;
+}
+
+impl<T, R> FallibleRender<R> for T
+where
+    T: Render<R> + InfallibleRender,
+    R: Renderer,
+{
+    type FallibleState = Self::State;
+    type Error = ();
+
+    fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
+        Ok(self.build())
+    }
+
+    fn try_rebuild(
+        self,
+        state: &mut Self::FallibleState,
+    ) -> Result<(), Self::Error> {
+        self.rebuild(state);
+        Ok(())
+    }
 }
 
 /// The `RenderHtml` trait allows rendering something to HTML, and transforming

@@ -2,10 +2,14 @@ use super::{
     Mountable, Position, PositionState, Render, RenderHtml, Renderer,
     ToTemplate,
 };
-use crate::{hydration::Cursor, view::StreamBuilder};
+use crate::{
+    hydration::Cursor,
+    view::{FallibleRender, InfallibleRender, StreamBuilder},
+};
 use const_str_slice_concat::{
     const_concat, const_concat_with_separator, str_from_buffer,
 };
+use std::error::Error;
 
 impl<R: Renderer> Render<R> for () {
     type State = ();
@@ -14,6 +18,8 @@ impl<R: Renderer> Render<R> for () {
 
     fn rebuild(self, _state: &mut Self::State) {}
 }
+
+impl InfallibleRender for () {}
 
 impl<R> RenderHtml<R> for ()
 where
@@ -68,6 +74,22 @@ impl<A: Render<R>, R: Renderer> Render<R> for (A,) {
 
     fn rebuild(self, state: &mut Self::State) {
         self.0.rebuild(state)
+    }
+}
+
+impl<A: FallibleRender<R>, R: Renderer> FallibleRender<R> for (A,) {
+    type Error = A::Error;
+    type FallibleState = A::FallibleState;
+
+    fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
+        self.0.try_build()
+    }
+
+    fn try_rebuild(
+        self,
+        state: &mut Self::FallibleState,
+    ) -> Result<(), Self::Error> {
+        self.0.try_rebuild(state)
     }
 }
 
@@ -145,6 +167,38 @@ macro_rules! impl_view_for_tuples {
 					[<$first:lower>].rebuild([<view_ $first:lower>]);
 					$([<$ty:lower>].rebuild([<view_ $ty:lower>]));*
 				}
+			}
+		}
+
+ 		impl<$first, $($ty),*, Rndr> FallibleRender<Rndr> for ($first, $($ty,)*)
+		where
+			$first: FallibleRender<Rndr>,
+			$($ty: FallibleRender<Rndr>),*,
+			$first::Error: Error + 'static,
+			$($ty::Error: Error + 'static),*,
+			Rndr: Renderer
+		{
+			type Error = Box<dyn Error>;
+			type FallibleState = ($first::FallibleState, $($ty::FallibleState,)*);
+
+			fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					Ok((
+						[<$first:lower>].try_build()?,
+						$([<$ty:lower>].try_build()?),*
+					))
+				}
+			}
+
+			fn try_rebuild(self, state: &mut Self::FallibleState) -> Result<(), Self::Error> {
+				paste::paste! {
+					let ([<$first:lower>], $([<$ty:lower>],)*) = self;
+					let ([<view_ $first:lower>], $([<view_ $ty:lower>],)*) = state;
+					[<$first:lower>].try_rebuild([<view_ $first:lower>])?;
+					$([<$ty:lower>].try_rebuild([<view_ $ty:lower>])?);*
+				}
+				Ok(())
 			}
 		}
 

@@ -258,6 +258,10 @@ impl DomRenderer for MockDom {
     ) {
         todo!()
     }
+
+    fn set_inner_html(el: &Self::Element, html: &str) {
+        todo!()
+    }
 }
 
 impl Default for Document {

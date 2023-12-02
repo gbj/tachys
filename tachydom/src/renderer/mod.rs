@@ -136,6 +136,9 @@ pub trait DomRenderer: Renderer {
         name: &str,
         value: &str,
     );
+
+    /// Sets the `innerHTML` of a DOM element, without escaping any values.
+    fn set_inner_html(el: &Self::Element, html: &str);
 }
 
 /// A renderer that is able to spawn async tasks during rendering.

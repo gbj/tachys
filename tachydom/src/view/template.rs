@@ -107,8 +107,9 @@ where
         buf: &mut String,
         class: &mut String,
         style: &mut String,
-        position: &mut super::Position,
+        inner_html: &mut String,
+        position: &mut Position,
     ) {
-        V::to_template(buf, class, style, position);
+        V::to_template(buf, class, style, inner_html, position);
     }
 }

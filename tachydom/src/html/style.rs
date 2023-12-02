@@ -42,6 +42,7 @@ where
         _buf: &mut String,
         _style: &mut String,
         style: &mut String,
+        _inner_html: &mut String,
     ) {
         self.style.to_html(style);
     }
@@ -68,6 +69,7 @@ where
         _buf: &mut String,
         _style: &mut String,
         _class: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
         // TODO: should there be some templating for static styles?

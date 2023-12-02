@@ -117,6 +117,7 @@ macro_rules! render_primitive {
 					buf: &mut String,
 					_class: &mut String,
 					_style: &mut String,
+					_inner_html: &mut String,
 					position: &mut Position,
 				) {
 					if matches!(*position, Position::NextChildAfterText) {

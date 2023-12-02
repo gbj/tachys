@@ -298,6 +298,10 @@ impl DomRenderer for Dom {
             "setProperty"
         );
     }
+
+    fn set_inner_html(el: &Self::Element, html: &str) {
+        el.set_inner_html(html);
+    }
 }
 
 impl Mountable<Dom> for Node {

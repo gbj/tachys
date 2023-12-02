@@ -60,6 +60,7 @@ impl ToTemplate for () {
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
     }
@@ -134,9 +135,10 @@ impl<A: ToTemplate> ToTemplate for (A,) {
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
-        A::to_template(buf, class, style, position)
+        A::to_template(buf, class, style, inner_html, position)
     }
 }
 
@@ -260,10 +262,10 @@ macro_rules! impl_view_for_tuples {
 				$first::STYLE, $($ty::STYLE),*
 			], ";"));
 
-			fn to_template(buf: &mut String, class: &mut String, style: &mut String, position: &mut Position)  {
+			fn to_template(buf: &mut String, class: &mut String, style: &mut String, inner_html: &mut String, position: &mut Position)  {
 				paste::paste! {
-					$first ::to_template(buf, class, style, position);
-					$($ty::to_template(buf, class, style, position));*;
+					$first ::to_template(buf, class, style, inner_html, position);
+					$($ty::to_template(buf, class, style, inner_html, position));*;
 				}
 			}
 		}

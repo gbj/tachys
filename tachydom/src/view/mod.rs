@@ -289,6 +289,7 @@ pub trait ToTemplate {
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     );
 }

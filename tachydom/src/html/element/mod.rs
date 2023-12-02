@@ -15,8 +15,10 @@ use next_tuple::TupleBuilder;
 use std::marker::PhantomData;
 
 mod elements;
+mod inner_html;
 use super::attribute::global::AddAttribute;
 pub use elements::*;
+pub use inner_html::*;
 
 pub struct HtmlElement<E, At, Ch, Rndr>
 where
@@ -264,9 +266,11 @@ where
         // is no class or style on an element
         let mut class = String::new();
         let mut style = String::new();
+        let mut inner_html = String::new();
 
         // inject regular attributes, and fill class and style
-        self.attributes.to_html(buf, &mut class, &mut style);
+        self.attributes
+            .to_html(buf, &mut class, &mut style, &mut inner_html);
 
         if !class.is_empty() {
             buf.push(' ');
@@ -321,9 +325,15 @@ where
         // is no class or style on an element
         let mut class = String::new();
         let mut style = String::new();
+        let mut inner_html = String::new();
 
         // inject regular attributes, and fill class and style
-        self.attributes.to_html(&mut buf, &mut class, &mut style);
+        self.attributes.to_html(
+            &mut buf,
+            &mut class,
+            &mut style,
+            &mut inner_html,
+        );
 
         if !class.is_empty() {
             buf.push(' ');
@@ -450,15 +460,23 @@ where
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
         // opening tag and attributes
         let mut class = String::new();
         let mut style = String::new();
+        let mut inner_html = String::new();
 
         buf.push('<');
         buf.push_str(E::TAG);
-        <At as ToTemplate>::to_template(buf, &mut class, &mut style, position);
+        <At as ToTemplate>::to_template(
+            buf,
+            &mut class,
+            &mut style,
+            &mut inner_html,
+            position,
+        );
 
         if !class.is_empty() {
             buf.push(' ');
@@ -478,7 +496,8 @@ where
         *position = Position::FirstChild;
         class.clear();
         style.clear();
-        Ch::to_template(buf, &mut class, &mut style, position);
+        inner_html.clear();
+        Ch::to_template(buf, &mut class, &mut style, &mut inner_html, position);
 
         // closing tag
         buf.push_str("</");

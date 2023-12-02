@@ -277,10 +277,12 @@ pub(crate) fn element_to_tokens(
             None
         };
 
+        // attributes are placed second because this allows `inner_html`
+        // to object if there are already children
         Some(quote! {
             #name()
-                #attributes
                 #children
+                #attributes
         })
     }
 }

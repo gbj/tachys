@@ -45,6 +45,7 @@ where
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
     ) {
     }
 
@@ -70,6 +71,7 @@ where
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
     }

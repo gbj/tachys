@@ -25,10 +25,11 @@ where
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
         // FIXME this seems wrong
-        V::to_template(buf, class, style, position)
+        V::to_template(buf, class, style, inner_html, position)
     }
 }
 

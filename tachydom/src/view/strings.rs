@@ -85,6 +85,7 @@ impl<'a> ToTemplate for &'a str {
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         position: &mut Position,
     ) {
         if matches!(*position, Position::NextChildAfterText) {
@@ -174,9 +175,12 @@ impl ToTemplate for String {
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
-        <&str as ToTemplate>::to_template(buf, class, style, position)
+        <&str as ToTemplate>::to_template(
+            buf, class, style, inner_html, position,
+        )
     }
 }
 
@@ -258,9 +262,12 @@ impl ToTemplate for Rc<str> {
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
-        <&str as ToTemplate>::to_template(buf, class, style, position)
+        <&str as ToTemplate>::to_template(
+            buf, class, style, inner_html, position,
+        )
     }
 }
 
@@ -342,9 +349,12 @@ impl ToTemplate for Arc<str> {
         buf: &mut String,
         class: &mut String,
         style: &mut String,
+        inner_html: &mut String,
         position: &mut Position,
     ) {
-        <&str as ToTemplate>::to_template(buf, class, style, position)
+        <&str as ToTemplate>::to_template(
+            buf, class, style, inner_html, position,
+        )
     }
 }
 

@@ -14,7 +14,13 @@ pub trait Attribute<R: Renderer> {
 
     type State;
 
-    fn to_html(self, buf: &mut String, class: &mut String, style: &mut String);
+    fn to_html(
+        self,
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        inner_html: &mut String,
+    );
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State;
 
@@ -36,6 +42,7 @@ where
         _buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
     ) {
     }
 
@@ -64,6 +71,7 @@ where
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
         V::to_template(K::KEY, buf);
@@ -85,6 +93,7 @@ where
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
     ) {
         self.1.to_html(K::KEY, buf);
     }
@@ -114,11 +123,11 @@ macro_rules! impl_attr_for_tuples {
 
 			type State = ($first::State, $($ty::State,)*);
 
-			fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {
+			fn to_html(self, buf: &mut String, class: &mut String, style: &mut String, inner_html: &mut String,) {
 				paste::paste! {
 					let ([<$first:lower>], $([<$ty:lower>],)* ) = self;
-					[<$first:lower>].to_html(buf, class, style);
-					$([<$ty:lower>].to_html(buf, class, style));*
+					[<$first:lower>].to_html(buf, class, style, inner_html);
+					$([<$ty:lower>].to_html(buf, class, style, inner_html));*
 				}
 			}
 
@@ -163,8 +172,14 @@ where
 
     type State = A::State;
 
-    fn to_html(self, buf: &mut String, class: &mut String, style: &mut String) {
-        self.0.to_html(buf, class, style);
+    fn to_html(
+        self,
+        buf: &mut String,
+        class: &mut String,
+        style: &mut String,
+        inner_html: &mut String,
+    ) {
+        self.0.to_html(buf, class, style, inner_html);
     }
 
     fn hydrate<const FROM_SERVER: bool>(

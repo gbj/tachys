@@ -40,6 +40,7 @@ where
         _buf: &mut String,
         class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
     ) {
         class.push(' ');
         self.class.to_html(class);
@@ -69,6 +70,7 @@ where
         _buf: &mut String,
         class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
         C::to_template(class);

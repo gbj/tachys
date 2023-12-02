@@ -33,6 +33,13 @@ pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
     ty: PhantomData<K>,
 }
 
+impl<K: AttributeKey, const V: &'static str> PartialEq for StaticAttr<K, V> {
+    fn eq(&self, _other: &Self) -> bool {
+        // by definition, two static attrs with same key and same const V are same
+        true
+    }
+}
+
 pub fn static_attr<K: AttributeKey, const V: &'static str>() -> StaticAttr<K, V>
 {
     StaticAttr { ty: PhantomData }
@@ -46,6 +53,7 @@ where
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         _position: &mut Position,
     ) {
         buf.push(' ');
@@ -70,6 +78,7 @@ where
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
     ) {
         AttributeValue::<R>::to_html(V, K::KEY, buf)
     }
@@ -86,6 +95,19 @@ where
 
 #[derive(Debug)]
 pub struct Static<const V: &'static str>;
+
+impl<const V: &'static str> PartialEq for Static<V> {
+    fn eq(&self, _other: &Self) -> bool {
+        // by definition, two static values of same const V are same
+        true
+    }
+}
+
+impl<const V: &'static str> AsRef<str> for Static<V> {
+    fn as_ref(&self) -> &str {
+        V
+    }
+}
 
 impl<const V: &'static str, R: Renderer> Render<R> for Static<V>
 where
@@ -149,6 +171,7 @@ impl<const V: &'static str> ToTemplate for Static<V> {
         buf: &mut String,
         _class: &mut String,
         _style: &mut String,
+        _inner_html: &mut String,
         position: &mut Position,
     ) {
         if matches!(*position, Position::NextChildAfterText) {

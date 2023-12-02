@@ -9,7 +9,7 @@ pub mod prelude {
                 ClassAttribute, GlobalAttributes, OnAttribute, PropAttribute,
                 StyleAttribute,
             },
-            element::ElementChild,
+            element::{ElementChild, InnerHtmlAttribute},
         },
         renderer::{dom::Dom, Renderer, SpawningRenderer},
         view::{

@@ -34,6 +34,7 @@ pub mod mathml;
 pub mod renderer;
 pub mod spawner;
 pub mod ssr;
+pub mod svg;
 pub mod view;
 
 #[cfg(all(feature = "leptos", not(feature = "reaccy")))]

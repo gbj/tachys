@@ -9,6 +9,7 @@ use crate::{
     },
     renderer::DomRenderer,
 };
+use core::convert::From;
 
 pub trait AddAttribute<NewAttr, Rndr>
 where

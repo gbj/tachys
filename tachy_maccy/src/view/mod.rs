@@ -8,9 +8,9 @@ use proc_macro_error::abort;
 use quote::{quote, quote_spanned, ToTokens};
 use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName};
 use std::collections::HashMap;
-use syn::{spanned::Spanned, Expr, ExprLit, ExprPath, Lit, LitStr};
+use syn::{spanned::Spanned, Expr, ExprPath, Lit, LitStr};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TagType {
     Unknown,
     Html,
@@ -244,11 +244,15 @@ pub(crate) fn element_to_tokens(
 
         let attributes = node.attributes();
         let attributes = if attributes.len() == 1 {
-            Some(attribute_to_tokens(&attributes[0], global_class))
+            Some(attribute_to_tokens(
+                parent_type,
+                &attributes[0],
+                global_class,
+            ))
         } else {
-            let nodes = attributes
-                .iter()
-                .map(|node| attribute_to_tokens(node, global_class));
+            let nodes = attributes.iter().map(|node| {
+                attribute_to_tokens(parent_type, node, global_class)
+            });
             Some(quote! {
                 #(#nodes)*
             })
@@ -288,6 +292,7 @@ pub(crate) fn element_to_tokens(
 }
 
 fn attribute_to_tokens(
+    tag_type: TagType,
     node: &NodeAttribute,
     global_class: Option<&TokenTree>,
 ) -> TokenStream {
@@ -333,7 +338,10 @@ fn attribute_to_tokens(
                     _ => unreachable!(),
                 };
                 prop_to_tokens(node, prop.into_token_stream(), name)
-            } else if name.contains('-') {
+            } else if name.contains('-')
+                // we don't provide statically-checked methods for SVG attributes
+                || tag_type == TagType::Svg
+            {
                 let value = attribute_value(node);
                 quote! {
                     .attr(#name, #value)

@@ -25,8 +25,8 @@ pub trait Renderer: Sized {
         + Clone;
 
     /// Creates a new element node.
-    fn create_element<E: CreateElement<Self>>() -> Self::Element {
-        E::create_element()
+    fn create_element<E: CreateElement<Self>>(tag: E) -> Self::Element {
+        tag.create_element()
     }
 
     /// Creates a new text node.

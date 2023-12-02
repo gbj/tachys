@@ -205,13 +205,13 @@ pub(crate) fn element_to_tokens(
             let name = node.name().to_string();
             // link custom ident to name span for IDE docs
             let custom = Ident::new("custom", name.span());
-            quote! { ::leptos::leptos_dom::html::#custom(::leptos::leptos_dom::html::Custom::new(#name)) }
+            quote! { ::tachys::tachydom::html::element::#custom(#name) }
         } else if is_svg_element(&tag) {
             parent_type = TagType::Svg;
-            quote! { ::leptos::leptos_dom::svg::#name() }
+            quote! { ::tachys::tachydom::svg::element::#name() }
         } else if is_math_ml_element(&tag) {
             parent_type = TagType::Math;
-            quote! { ::leptos::leptos_dom::math::#name() }
+            quote! { ::tachys::tachydom::math::element::#name() }
         } else if is_ambiguous_element(&tag) {
             match parent_type {
                 TagType::Unknown => {
@@ -219,22 +219,22 @@ pub(crate) fn element_to_tokens(
                     /* proc_macro_error::emit_warning!(name.span(), "The view macro is assuming this is an HTML element, \
                     but it is ambiguous; if it is an SVG or MathML element, prefix with svg:: or math::"); */
                     quote! {
-                        ::tachys::tachydom::html::element::#name
+                        ::tachys::tachydom::html::element::#name()
                     }
                 }
                 TagType::Html => {
-                    quote! { ::tachys::tachydom::html::element::#name }
+                    quote! { ::tachys::tachydom::html::element::#name() }
                 }
                 TagType::Svg => {
-                    quote! { ::tachys::tachydom::svg::element::#name }
+                    quote! { ::tachys::tachydom::svg::element::#name() }
                 }
                 TagType::Math => {
-                    quote! { ::tachys::tachydom::math::element::#name }
+                    quote! { ::tachys::tachydom::math::element::#name() }
                 }
             }
         } else {
             parent_type = TagType::Html;
-            quote! { ::tachys::tachydom::html::element::#name }
+            quote! { ::tachys::tachydom::html::element::#name() }
         };
 
         /* TODO restore this
@@ -280,9 +280,9 @@ pub(crate) fn element_to_tokens(
         // attributes are placed second because this allows `inner_html`
         // to object if there are already children
         Some(quote! {
-            #name()
-                #children
-                #attributes
+            #name
+            #children
+            #attributes
         })
     }
 }

@@ -21,7 +21,6 @@ pub fn app() -> impl Render<Dom> {
                 data-something="test"
                 hx-get="bar"
             />
-
         },
         // this version uses a TryCatchError extension trait that lets us
         // .catch() an Err on any view

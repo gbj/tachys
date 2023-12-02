@@ -22,7 +22,7 @@ macro_rules! html_elements {
                     Rndr: Renderer
                 {
                     HtmlElement {
-                        ty: PhantomData,
+                        tag: [<$tag:camel>],
                         attributes: (),
                         children: (),
                         rndr: PhantomData,
@@ -54,9 +54,9 @@ macro_rules! html_elements {
                             At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
                         {
-                            let HtmlElement { ty, rndr, children, attributes } = self;
+                            let HtmlElement { tag, rndr, children, attributes } = self;
                             HtmlElement {
-                                ty,
+                                tag,
                                 rndr,
                                 children,
                                 attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
@@ -68,12 +68,17 @@ macro_rules! html_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
+
+                    #[inline(always)]
+                    fn tag(&self) -> &str {
+                        Self::TAG
+                    }
                 }
 
                 impl ElementWithChildren for [<$tag:camel>] {}
 
                 impl CreateElement<Dom> for [<$tag:camel>] {
-                    fn create_element() -> <Dom as Renderer>::Element {
+                    fn create_element(&self) -> <Dom as Renderer>::Element {
                         use wasm_bindgen::JsCast;
 
                         thread_local! {
@@ -102,7 +107,7 @@ macro_rules! html_self_closing_elements {
                         attributes: (),
                         children: (),
                         rndr: PhantomData,
-                        ty: PhantomData
+                        tag: [<$tag:camel>]
                     }
                 }
 
@@ -127,9 +132,9 @@ macro_rules! html_self_closing_elements {
                             At: TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>,
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output: Attribute<Rndr>,
                         {
-                            let HtmlElement { ty, rndr, children, attributes } = self;
+                            let HtmlElement { tag, rndr, children, attributes } = self;
                             HtmlElement {
-                                ty,
+                                tag,
                                 rndr,
                                 children,
                                 attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
@@ -145,10 +150,15 @@ macro_rules! html_self_closing_elements {
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = true;
+
+                    #[inline(always)]
+                    fn tag(&self) -> &str {
+                        Self::TAG
+                    }
                 }
 
                 impl CreateElement<Dom> for [<$tag:camel>] {
-                    fn create_element() -> <Dom as Renderer>::Element {
+                    fn create_element(&self) -> <Dom as Renderer>::Element {
                         use wasm_bindgen::JsCast;
 
                         thread_local! {
@@ -284,20 +294,15 @@ html_elements! {
   video [controls, controlslist, crossorigin, disablepictureinpicture, disableremoteplayback, height, r#loop, muted, playsinline, poster, preload, src, width],
 }
 
-pub fn option<At, Ch, Rndr>(
-    attributes: At,
-    children: Ch,
-) -> HtmlElement<Option_, At, Ch, Rndr>
+pub fn option<Rndr>() -> HtmlElement<Option_, (), (), Rndr>
 where
-    At: Attribute<Rndr>,
-    Ch: Render<Rndr>,
     Rndr: Renderer,
 {
     HtmlElement {
-        ty: PhantomData,
+        tag: Option_,
         rndr: PhantomData,
-        attributes,
-        children,
+        attributes: (),
+        children: (),
     }
 }
 
@@ -307,10 +312,15 @@ pub struct Option_;
 impl ElementType for Option_ {
     const TAG: &'static str = "option";
     const SELF_CLOSING: bool = false;
+
+    #[inline(always)]
+    fn tag(&self) -> &str {
+        Self::TAG
+    }
 }
 
 impl CreateElement<Dom> for Option_ {
-    fn create_element() -> <Dom as Renderer>::Element {
+    fn create_element(&self) -> <Dom as Renderer>::Element {
         use wasm_bindgen::JsCast;
 
         thread_local! {

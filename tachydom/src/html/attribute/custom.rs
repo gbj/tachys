@@ -4,8 +4,6 @@ use crate::{
     renderer::DomRenderer,
     view::{Position, ToTemplate},
 };
-#[cfg(feature = "nightly")]
-use const_str_slice_concat::{const_concat, str_from_buffer};
 use std::{borrow::Cow, marker::PhantomData, rc::Rc, sync::Arc};
 
 #[inline(always)]

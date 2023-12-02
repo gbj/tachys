@@ -14,19 +14,22 @@ use const_str_slice_concat::{
 use next_tuple::TupleBuilder;
 use std::marker::PhantomData;
 
+mod custom;
 mod elements;
 mod inner_html;
 use super::attribute::global::AddAttribute;
+pub use custom::*;
 pub use elements::*;
 pub use inner_html::*;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct HtmlElement<E, At, Ch, Rndr>
 where
     At: Attribute<Rndr>,
     Ch: Render<Rndr>,
     Rndr: Renderer,
 {
-    ty: PhantomData<E>,
+    tag: E,
     rndr: PhantomData<Rndr>,
     attributes: At,
     children: Ch,
@@ -35,7 +38,7 @@ where
 impl<E, At, Ch, NewChild, Rndr> ElementChild<Rndr, NewChild>
     for HtmlElement<E, At, Ch, Rndr>
 where
-    E: ElementType + ElementWithChildren,
+    E: ElementWithChildren,
     At: Attribute<Rndr>,
     Ch: Render<Rndr> + TupleBuilder<NewChild>,
     <Ch as TupleBuilder<NewChild>>::Output: Render<Rndr>,
@@ -47,13 +50,13 @@ where
 
     fn child(self, child: NewChild) -> Self::Output {
         let HtmlElement {
-            ty,
+            tag,
             rndr,
             attributes,
             children,
         } = self;
         HtmlElement {
-            ty,
+            tag,
             rndr,
             attributes,
             children: children.next_tuple(child),
@@ -75,13 +78,13 @@ where
 
     fn add_attr(self, attr: NewAttr) -> Self::Output {
         let HtmlElement {
-            ty,
+            tag,
             attributes,
             children,
             rndr,
         } = self;
         HtmlElement {
-            ty,
+            tag,
             attributes: attributes.next_tuple(attr),
             children,
             rndr,
@@ -102,12 +105,14 @@ where
 pub trait ElementType {
     const TAG: &'static str;
     const SELF_CLOSING: bool;
+
+    fn tag(&self) -> &str;
 }
 
 pub trait ElementWithChildren {}
 
 pub trait CreateElement<R: Renderer> {
-    fn create_element() -> R::Element;
+    fn create_element(&self) -> R::Element;
 }
 
 impl<E, At, Ch, Rndr> Render<Rndr> for HtmlElement<E, At, Ch, Rndr>
@@ -128,7 +133,7 @@ where
     }
 
     fn build(self) -> Self::State {
-        let el = Rndr::create_element::<E>();
+        let el = Rndr::create_element(self.tag);
         let attrs = self.attributes.build(&el);
         let mut children = self.children.build();
         children.mount(&el, None);
@@ -152,7 +157,7 @@ where
     type FallibleState = ElementState<At::State, Ch::FallibleState, Rndr>;
 
     fn try_build(self) -> Result<Self::FallibleState, Self::Error> {
-        let el = Rndr::create_element::<E>();
+        let el = Rndr::create_element(self.tag);
         let attrs = self.attributes.build(&el);
         let mut children = self.children.try_build()?;
         children.mount(&el, None);
@@ -323,6 +328,12 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
+        // non-Static custom elements need special support in templates
+        // because they haven't been inserted type-wise
+        if E::TAG.is_empty() && !FROM_SERVER {
+            todo!()
+        }
+
         if position.get() == Position::FirstChild {
             cursor.child();
         } else {
@@ -414,47 +425,56 @@ where
         inner_html: &mut String,
         position: &mut Position,
     ) {
-        // opening tag and attributes
-        let mut class = String::new();
-        let mut style = String::new();
-        let mut inner_html = String::new();
+        // for custom elements without type known at compile time, do nothing
+        if !E::TAG.is_empty() {
+            // opening tag and attributes
+            let mut class = String::new();
+            let mut style = String::new();
+            let mut inner_html = String::new();
 
-        buf.push('<');
-        buf.push_str(E::TAG);
-        <At as ToTemplate>::to_template(
-            buf,
-            &mut class,
-            &mut style,
-            &mut inner_html,
-            position,
-        );
+            buf.push('<');
+            buf.push_str(E::TAG);
+            <At as ToTemplate>::to_template(
+                buf,
+                &mut class,
+                &mut style,
+                &mut inner_html,
+                position,
+            );
 
-        if !class.is_empty() {
-            buf.push(' ');
-            buf.push_str("class=\"");
-            buf.push_str(class.trim_start().trim_end());
-            buf.push('"');
+            if !class.is_empty() {
+                buf.push(' ');
+                buf.push_str("class=\"");
+                buf.push_str(class.trim_start().trim_end());
+                buf.push('"');
+            }
+            if !style.is_empty() {
+                buf.push(' ');
+                buf.push_str("style=\"");
+                buf.push_str(style.trim_start().trim_end());
+                buf.push('"');
+            }
+            buf.push('>');
+
+            // children
+            *position = Position::FirstChild;
+            class.clear();
+            style.clear();
+            inner_html.clear();
+            Ch::to_template(
+                buf,
+                &mut class,
+                &mut style,
+                &mut inner_html,
+                position,
+            );
+
+            // closing tag
+            buf.push_str("</");
+            buf.push_str(E::TAG);
+            buf.push('>');
+            *position = Position::NextChild;
         }
-        if !style.is_empty() {
-            buf.push(' ');
-            buf.push_str("style=\"");
-            buf.push_str(style.trim_start().trim_end());
-            buf.push('"');
-        }
-        buf.push('>');
-
-        // children
-        *position = Position::FirstChild;
-        class.clear();
-        style.clear();
-        inner_html.clear();
-        Ch::to_template(buf, &mut class, &mut style, &mut inner_html, position);
-
-        // closing tag
-        buf.push_str("</");
-        buf.push_str(E::TAG);
-        buf.push('>');
-        *position = Position::NextChild;
     }
 }
 

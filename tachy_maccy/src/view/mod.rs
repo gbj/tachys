@@ -208,10 +208,10 @@ pub(crate) fn element_to_tokens(
             quote! { ::tachys::tachydom::html::element::#custom(#name) }
         } else if is_svg_element(&tag) {
             parent_type = TagType::Svg;
-            quote! { ::tachys::tachydom::svg::element::#name() }
+            quote! { ::tachys::tachydom::svg::#name() }
         } else if is_math_ml_element(&tag) {
             parent_type = TagType::Math;
-            quote! { ::tachys::tachydom::math::element::#name() }
+            quote! { ::tachys::tachydom::mathml::#name() }
         } else if is_ambiguous_element(&tag) {
             match parent_type {
                 TagType::Unknown => {
@@ -226,10 +226,10 @@ pub(crate) fn element_to_tokens(
                     quote! { ::tachys::tachydom::html::element::#name() }
                 }
                 TagType::Svg => {
-                    quote! { ::tachys::tachydom::svg::element::#name() }
+                    quote! { ::tachys::tachydom::svg::#name() }
                 }
                 TagType::Math => {
-                    quote! { ::tachys::tachydom::math::element::#name() }
+                    quote! { ::tachys::tachydom::math::#name() }
                 }
             }
         } else {

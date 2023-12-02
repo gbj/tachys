@@ -32,18 +32,14 @@ macro_rules! html_elements {
                 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
                 pub struct [<$tag:camel>];
 
-                // Element creation
-                //#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                //pub struct [<$tag:camel>];
-
-                                // Typed attribute methods
-                $(
-                    impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
-                    where
-                        At: Attribute<Rndr>,
-                        Ch: Render<Rndr>,
-                        Rndr: Renderer,
-                    {
+                // Typed attribute methods
+                impl<At, Ch, Rndr> HtmlElement<[<$tag:camel>], At, Ch, Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Ch: Render<Rndr>,
+                    Rndr: Renderer,
+                {
+                    $(
                         pub fn $attr<V>(self, value: V) -> HtmlElement <
                             [<$tag:camel>],
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
@@ -62,8 +58,8 @@ macro_rules! html_elements {
                                 attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
                             }
                         }
-                    }
-                )*
+                    )*
+                }
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);
@@ -115,12 +111,12 @@ macro_rules! html_self_closing_elements {
                 pub struct [<$tag:camel>];
 
                 // Typed attribute methods
-                $(
-                    impl<At, Rndr> HtmlElement<[<$tag:camel>], At, (), Rndr>
-                    where
-                        At: Attribute<Rndr>,
-                        Rndr: Renderer,
-                    {
+                impl<At, Rndr> HtmlElement<[<$tag:camel>], At, (), Rndr>
+                where
+                    At: Attribute<Rndr>,
+                    Rndr: Renderer,
+                {
+                    $(
                         pub fn $attr<V>(self, value: V) -> HtmlElement<
                             [<$tag:camel>],
                             <At as TupleBuilder<Attr<$crate::html::attribute::[<$attr:camel>], V, Rndr>>>::Output,
@@ -140,12 +136,8 @@ macro_rules! html_self_closing_elements {
                                 attributes: attributes.next_tuple($crate::html::attribute::$attr(value))
                             }
                         }
-                    }
-                )*
-
-                // Element creation
-                //#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-                //pub struct [<$tag:camel>];
+                    )*
+                }
 
                 impl ElementType for [<$tag:camel>] {
                     const TAG: &'static str = stringify!($tag);

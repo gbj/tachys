@@ -30,6 +30,7 @@ macro_rules! attributes {
 
 // TODO attribute names with underscores should be kebab-cased
 attributes! {
+    // HTML
     abbr "abbr", // [],
     accept_charset "accept-charset", // [],
     accept "accept", // [],
@@ -269,4 +270,38 @@ attributes! {
     ontoggle "ontoggle", // [], // [GlobalAttribute] // [EventHandlerAttribute],
     onvolumechange "onvolumechange", // [], // [GlobalAttribute] // [EventHandlerAttribute],
     onwaiting "onwaiting", // [], // [GlobalAttribute] // [EventHandlerAttribute],
+
+    // MathML attributes that aren't in HTML
+    accent "accent",
+    accentunder "accentunder",
+    columnalign "columnalign",
+    columnlines "columnlines",
+    columnspacing "columnspacing",
+    columnspan "columnspan",
+    depth "depth",
+    display "display",
+    displaystyle "displaystyle",
+    fence "fence",
+    frame "frame",
+    framespacing "framespacing",
+    linethickness "linethickness",
+    lspace "lspace",
+    mathbackground "mathbackground",
+    mathcolor "mathcolor",
+    mathsize "mathsize",
+    mathvariant "mathvariant",
+    maxsize "maxsize",
+    minsize "minsize",
+    movablelimits "movablelimits",
+    notation "notation",
+    rowalign "rowalign",
+    rowlines "rowlines",
+    rowspacing "rowspacing",
+    rspace "rspace",
+    scriptlevel "scriptlevel",
+    separator "separator",
+    stretchy "stretchy",
+    symmetric "symmetric",
+    voffset "voffset",
+    xmlns "xmlns"
 }

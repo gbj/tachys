@@ -12,6 +12,24 @@ pub fn app() -> impl Render<Dom> {
     let value = RwSignal::new("123".to_string());
     (
         view! {
+            <math mathcolor="red">
+                <mrow>
+                    <msup>
+                    <mi>a</mi>
+                    <mn>2</mn>
+                    </msup>
+                    <mo>+</mo>
+                    <msup>
+                    <mi>b</mi>
+                    <mn>2</mn>
+                    </msup>
+                    <mo>=</mo>
+                    <msup>
+                    <mi>c</mi>
+                    <mn>2</mn>
+                    </msup>
+                </mrow>
+            </math>
             <custom-element custom-attribute=move || value.get()/>
             <input
                 on:input=move |ev| {

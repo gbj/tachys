@@ -30,6 +30,7 @@ pub mod dom;
 pub mod error;
 pub mod html;
 pub mod hydration;
+pub mod mathml;
 pub mod renderer;
 pub mod spawner;
 pub mod ssr;

@@ -29,10 +29,10 @@ where
     Ch: Render<Rndr>,
     Rndr: Renderer,
 {
-    tag: E,
-    rndr: PhantomData<Rndr>,
-    attributes: At,
-    children: Ch,
+    pub(crate) tag: E,
+    pub(crate) rndr: PhantomData<Rndr>,
+    pub(crate) attributes: At,
+    pub(crate) children: Ch,
 }
 
 impl<E, At, Ch, NewChild, Rndr> ElementChild<Rndr, NewChild>

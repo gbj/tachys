@@ -5,9 +5,12 @@ pub mod prelude {
     pub use crate::{
         async_views::FutureViewExt,
         html::{
-            attribute::global::{
-                ClassAttribute, GlobalAttributes, OnAttribute, PropAttribute,
-                StyleAttribute,
+            attribute::{
+                aria::AriaAttributes,
+                global::{
+                    ClassAttribute, GlobalAttributes, OnAttribute,
+                    PropAttribute, StyleAttribute,
+                },
             },
             element::{ElementChild, InnerHtmlAttribute},
         },

@@ -8,7 +8,7 @@ use proc_macro_error::abort;
 use quote::{quote, quote_spanned, ToTokens};
 use rstml::node::{KeyedAttribute, Node, NodeAttribute, NodeElement, NodeName};
 use std::collections::HashMap;
-use syn::{spanned::Spanned, Expr, ExprLit, ExprPath, LitStr};
+use syn::{spanned::Spanned, Expr, ExprLit, ExprPath, Lit, LitStr};
 
 #[derive(Clone, Copy)]
 pub(crate) enum TagType {
@@ -598,6 +598,8 @@ fn attribute_name(name: &NodeName) -> TokenStream {
     let s = name.to_string();
     if s == "as" || s == "async" || s == "loop" || s == "for" || s == "type" {
         Ident::new_raw(&s, name.span()).to_token_stream()
+    } else if s.starts_with("aria-") {
+        Ident::new(&s.replace('-', "_"), name.span()).to_token_stream()
     } else {
         name.to_token_stream()
     }
@@ -608,18 +610,17 @@ fn attribute_value(attr: &KeyedAttribute) -> (TokenStream, bool) {
         Some(value) => {
             if let Expr::Lit(lit) = value {
                 if cfg!(feature = "nightly") {
-                    (
-                        quote! {
-                            ::tachys::tachydom::view::static_types::Static::<#lit>
-                        },
-                        true,
-                    )
-                } else {
-                    (quote! { #value }, false)
+                    if let Lit::Str(str) = &lit.lit {
+                        return (
+                            quote! {
+                                ::tachys::tachydom::view::static_types::Static::<#str>
+                            },
+                            true,
+                        );
+                    }
                 }
-            } else {
-                (quote! { #value }, false)
             }
+            (quote! { #value }, false)
         }
         None => (quote! { true }, true),
     }

@@ -1,3 +1,4 @@
+pub mod aria;
 pub mod global;
 mod key;
 mod value;

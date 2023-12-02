@@ -1,5 +1,7 @@
 - router
-- inner_html
+- data-\* attributes
+- custom attributes
+- custom elements
 - NodeRef
 - server functions
 - Signal wrappers

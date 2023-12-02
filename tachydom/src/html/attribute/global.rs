@@ -3,7 +3,6 @@ use crate::{
     html::{
         attribute::*,
         class::{class, Class, IntoClass},
-        element::{inner_html, InnerHtml},
         event::{on, EventDescriptor, On},
         property::{property, IntoProperty, Property},
         style::{style, IntoStyle, Style},
@@ -52,7 +51,7 @@ where
         + AddAttribute<Attr<Translate, V, Rndr>, Rndr>
         + AddAttribute<Attr<Virtualkeyboardpolicy, V, Rndr>, Rndr>,
     V: AttributeValue<Rndr>,
-    Rndr: DomRenderer,
+    Rndr: Renderer,
 {
     fn accesskey(
         self,
@@ -346,7 +345,7 @@ where
         + AddAttribute<Attr<Translate, V, Rndr>, Rndr>
         + AddAttribute<Attr<Virtualkeyboardpolicy, V, Rndr>, Rndr>,
     V: AttributeValue<Rndr>,
-    Rndr: DomRenderer,
+    Rndr: Renderer,
 {
 }
 

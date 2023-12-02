@@ -12,11 +12,14 @@ pub fn app() -> impl Render<Dom> {
     let value = RwSignal::new("123".to_string());
     (
         view! {
+            <custom-element custom-attribute=move || value.get()/>
             <input
                 on:input=move |ev| {
                     value.set(event_target_value(&ev))
                 }
                 prop:value=move || value.get()
+                data-something="test"
+                hx-get="bar"
             />
 
         },

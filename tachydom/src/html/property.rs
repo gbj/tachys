@@ -3,37 +3,37 @@ use crate::{
     renderer::DomRenderer,
     view::{Position, ToTemplate},
 };
-use std::{borrow::Cow, marker::PhantomData};
+use std::marker::PhantomData;
 use wasm_bindgen::JsValue;
 
 #[inline(always)]
-pub fn property<P, R>(
-    key: impl Into<Cow<'static, str>>,
-    value: P,
-) -> Property<P, R>
+pub fn property<K, P, R>(key: K, value: P) -> Property<K, P, R>
 where
+    K: AsRef<str>,
     P: IntoProperty<R>,
     R: DomRenderer,
 {
     Property {
-        key: key.into(),
+        key,
         value,
         rndr: PhantomData,
     }
 }
 
-pub struct Property<P, R>
+pub struct Property<K, P, R>
 where
+    K: AsRef<str>,
     P: IntoProperty<R>,
     R: DomRenderer,
 {
-    key: Cow<'static, str>,
+    key: K,
     value: P,
     rndr: PhantomData<R>,
 }
 
-impl<P, R> Attribute<R> for Property<P, R>
+impl<K, P, R> Attribute<R> for Property<K, P, R>
 where
+    K: AsRef<str>,
     P: IntoProperty<R>,
     R: DomRenderer,
 {
@@ -50,20 +50,21 @@ where
     }
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
-        self.value.hydrate::<FROM_SERVER>(el, &self.key)
+        self.value.hydrate::<FROM_SERVER>(el, self.key.as_ref())
     }
 
     fn build(self, el: &R::Element) -> Self::State {
-        self.value.build(el, &self.key)
+        self.value.build(el, self.key.as_ref())
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        self.value.rebuild(state, &self.key)
+        self.value.rebuild(state, self.key.as_ref())
     }
 }
 
-impl<P, R> ToTemplate for Property<P, R>
+impl<K, P, R> ToTemplate for Property<K, P, R>
 where
+    K: AsRef<str>,
     P: IntoProperty<R>,
     R: DomRenderer,
 {

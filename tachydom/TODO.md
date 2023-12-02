@@ -1,6 +1,4 @@
 - router
-- data-\* attributes
-- custom attributes
 - custom elements
 - NodeRef
 - server functions

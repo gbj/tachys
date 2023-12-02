@@ -89,55 +89,6 @@ where
     }
 }
 
-impl<E, At, Ch, Rndr> HtmlElement<E, At, Ch, Rndr>
-where
-    At: Attribute<Rndr>,
-    Ch: Render<Rndr>,
-    Rndr: Renderer,
-{
-    /// Adds any attribute to the element. This is a compile-time operation, and modifies
-    /// the type of the view tree.
-    /// ```rust
-    /// use tachydom::{
-    ///     html::{
-    ///         attribute::id,
-    ///         class::class,
-    ///         element::{p, HtmlElement},
-    ///     },
-    ///     renderer::mock_dom::MockDom,
-    ///     view::Render,
-    /// };
-    /// let el: HtmlElement<_, _, _, MockDom> =
-    ///     p().attr(id("foo")).attr(class("bar"));
-    /// let el = el.build();
-    /// assert_eq!(el.el.to_debug_html(), "<p class=\"bar\" id=\"foo\"></p>");
-    /// ```
-    #[inline(always)]
-    pub fn attr<NewAttr>(
-        self,
-        attr: NewAttr,
-    ) -> HtmlElement<E, <At as TupleBuilder<NewAttr>>::Output, Ch, Rndr>
-    where
-        E: ElementType,
-        At: TupleBuilder<NewAttr>,
-        At: Attribute<Rndr> + TupleBuilder<NewAttr>,
-        <At as TupleBuilder<NewAttr>>::Output: Attribute<Rndr>,
-    {
-        let HtmlElement {
-            ty,
-            rndr,
-            attributes,
-            children,
-        } = self;
-        HtmlElement {
-            ty,
-            rndr,
-            children,
-            attributes: attributes.next_tuple(attr),
-        }
-    }
-}
-
 pub trait ElementChild<Rndr, NewChild>
 where
     NewChild: Render<Rndr>,

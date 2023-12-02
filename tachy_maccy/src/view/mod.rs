@@ -333,9 +333,14 @@ fn attribute_to_tokens(
                     _ => unreachable!(),
                 };
                 prop_to_tokens(node, prop.into_token_stream(), name)
+            } else if name.contains('-') {
+                let value = attribute_value(node);
+                quote! {
+                    .attr(#name, #value)
+                }
             } else {
                 let key = attribute_name(&node.key);
-                let (value, is_static) = attribute_value(node);
+                let value = attribute_value(node);
                 quote! {
                     .#key(#value)
                 }
@@ -345,7 +350,7 @@ fn attribute_to_tokens(
 }
 
 fn event_to_tokens(name: &str, node: &KeyedAttribute) -> TokenStream {
-    let (handler, _) = attribute_value(node);
+    let handler = attribute_value(node);
 
     let (event_type, is_custom, is_force_undelegated) = parse_event_name(name);
 
@@ -409,18 +414,12 @@ fn class_to_tokens(
     class: TokenStream,
     class_name: Option<&str>,
 ) -> TokenStream {
-    let (value, is_static) = attribute_value(node);
+    let value = attribute_value(node);
     if let Some(class_name) = class_name {
         quote! {
             .#class((#class_name, #value))
         }
-    }
-    /* else if is_static {
-        quote! {
-            .attr(::tachys::tachydom::view::static_types::static_attr::<::tachys::tachydom::html::attribute::class, #value>())
-        }
-    } */
-    else {
+    } else {
         quote! {
             .#class(#value)
         }
@@ -432,7 +431,7 @@ fn style_to_tokens(
     style: TokenStream,
     style_name: Option<&str>,
 ) -> TokenStream {
-    let (value, is_static) = attribute_value(node);
+    let value = attribute_value(node);
     if let Some(style_name) = style_name {
         quote! {
             .#style((#style_name, #value))
@@ -449,7 +448,7 @@ fn prop_to_tokens(
     prop: TokenStream,
     key: &str,
 ) -> TokenStream {
-    let (value, _) = attribute_value(node);
+    let value = attribute_value(node);
     quote! {
         .#prop(#key, #value)
     }
@@ -605,24 +604,21 @@ fn attribute_name(name: &NodeName) -> TokenStream {
     }
 }
 
-fn attribute_value(attr: &KeyedAttribute) -> (TokenStream, bool) {
+fn attribute_value(attr: &KeyedAttribute) -> TokenStream {
     match attr.value() {
         Some(value) => {
             if let Expr::Lit(lit) = value {
                 if cfg!(feature = "nightly") {
                     if let Lit::Str(str) = &lit.lit {
-                        return (
-                            quote! {
-                                ::tachys::tachydom::view::static_types::Static::<#str>
-                            },
-                            true,
-                        );
+                        return quote! {
+                            ::tachys::tachydom::view::static_types::Static::<#str>
+                        };
                     }
                 }
             }
-            (quote! { #value }, false)
+            quote! { #value }
         }
-        None => (quote! { true }, true),
+        None => quote! { true },
     }
 }
 

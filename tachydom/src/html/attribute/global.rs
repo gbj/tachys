@@ -9,7 +9,7 @@ use crate::{
     },
     renderer::DomRenderer,
 };
-use std::borrow::Cow;
+
 pub trait AddAttribute<NewAttr, Rndr>
 where
     Rndr: Renderer,
@@ -266,17 +266,18 @@ where
     }
 }
 
-pub trait PropAttribute<P, Rndr>
+pub trait PropAttribute<K, P, Rndr>
 where
+    K: AsRef<str>,
     P: IntoProperty<Rndr>,
     Rndr: DomRenderer,
-    Self: Sized + AddAttribute<Property<P, Rndr>, Rndr>,
+    Self: Sized + AddAttribute<Property<K, P, Rndr>, Rndr>,
 {
     fn prop(
         self,
-        key: impl Into<Cow<'static, str>>,
+        key: K,
         value: P,
-    ) -> <Self as AddAttribute<Property<P, Rndr>, Rndr>>::Output {
+    ) -> <Self as AddAttribute<Property<K, P, Rndr>, Rndr>>::Output {
         self.add_attr(property(key, value))
     }
 }
@@ -357,9 +358,10 @@ where
 {
 }
 
-impl<T, P, Rndr> PropAttribute<P, Rndr> for T
+impl<T, K, P, Rndr> PropAttribute<K, P, Rndr> for T
 where
-    T: AddAttribute<Property<P, Rndr>, Rndr>,
+    T: AddAttribute<Property<K, P, Rndr>, Rndr>,
+    K: AsRef<str>,
     P: IntoProperty<Rndr>,
     Rndr: DomRenderer,
 {

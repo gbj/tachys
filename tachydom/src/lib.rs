@@ -7,6 +7,7 @@ pub mod prelude {
         html::{
             attribute::{
                 aria::AriaAttributes,
+                custom::CustomAttribute,
                 global::{
                     ClassAttribute, GlobalAttributes, OnAttribute,
                     PropAttribute, StyleAttribute,

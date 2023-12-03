@@ -5,7 +5,7 @@ use crate::{
         AnySource, AnySubscriber, ReactiveNode, SourceSet, Subscriber,
         ToAnySubscriber,
     },
-    spawn::spawn,
+    spawn::{spawn, spawn_local},
 };
 use futures::StreamExt;
 use parking_lot::RwLock;
@@ -36,13 +36,10 @@ impl<T> Clone for Effect<T> {
     }
 }
 
-impl<T> Effect<T>
-where
-    T: Send + Sync + 'static,
-{
-    pub fn new(
-        mut fun: impl FnMut(Option<T>) -> T + Send + Sync + 'static,
-    ) -> Self {
+// pulled out into a macro because we need to distinguish between
+// spawn (for Send + Sync) and spawn_local (for !Send) but do it generically
+macro_rules! spawn_effect {
+    ($fun:ident, $spawner:ident) => {{
         let (mut observer, mut rx) = NotificationSender::channel();
 
         // spawn the effect asynchronously
@@ -57,7 +54,7 @@ where
         }));
         let owner = Owner::new();
 
-        spawn({
+        $spawner({
             let value = Arc::clone(&value);
             let subscriber = inner.to_any_subscriber();
 
@@ -67,12 +64,21 @@ where
 
                     let old_value = mem::take(&mut *value.write());
                     let new_value = owner
-                        .with(|| subscriber.with_observer(|| fun(old_value)));
+                        .with(|| subscriber.with_observer(|| $fun(old_value)));
                     *value.write() = Some(new_value);
                 }
             }
         });
         Self { value, inner }
+    }};
+}
+
+impl<T> Effect<T>
+where
+    T: 'static,
+{
+    pub fn new(mut fun: impl FnMut(Option<T>) -> T + 'static) -> Self {
+        spawn_effect!(fun, spawn_local)
     }
 
     pub fn with_value_mut<U>(
@@ -80,6 +86,17 @@ where
         fun: impl FnOnce(&mut T) -> U,
     ) -> Option<U> {
         self.value.write().as_mut().map(fun)
+    }
+}
+
+impl<T> Effect<T>
+where
+    T: Send + Sync + 'static,
+{
+    pub fn new_sync(
+        mut fun: impl FnMut(Option<T>) -> T + Send + Sync + 'static,
+    ) -> Self {
+        spawn_effect!(fun, spawn)
     }
 }
 

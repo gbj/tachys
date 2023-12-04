@@ -15,6 +15,7 @@ tachy_route = { version = "0.1.0", path = "../../tachy_route", default-features 
 tracing = "0.1.40"
 tracing-subscriber-wasm = "0.1.0"
 tracing-subscriber = "0.3.18"
+web-sys = "0.3.66"
 
 [profile.release]
 codegen-units = 1

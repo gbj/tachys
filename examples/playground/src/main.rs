@@ -1,8 +1,14 @@
 use tachys::{
     prelude::*,
+    tachy_reaccy::render_effect::RenderEffect,
     tachydom::{
         dom::{body, event_target_value},
-        html::element::p,
+        html::{
+            element::{p, HtmlElement, Input},
+            event,
+        },
+        log,
+        node_ref::NodeRef,
         view::error_boundary::Try,
     },
 };
@@ -10,7 +16,22 @@ use tracing_subscriber::prelude::*;
 
 pub fn app() -> impl Render<Dom> {
     let value = RwSignal::new("123".to_string());
-    (
+    let node = NodeRef::new();
+    view! {
+        <input
+            node_ref=node
+            /*on:input=move |ev| {
+                value.set(event_target_value(&ev))
+            }
+            prop:value=move || value.get()
+            data-something="test"
+            hx-get="bar"
+            id="test" */
+            value="test"
+        />
+        <p></p>
+    }
+    /* (
         view! {
             <math mathcolor="red">
                 <mrow>
@@ -37,6 +58,7 @@ pub fn app() -> impl Render<Dom> {
             </svg>
             <custom-element custom-attribute=move || value.get()/>
             <input
+                node_ref=&mut el
                 on:input=move |ev| {
                     value.set(event_target_value(&ev))
                 }
@@ -83,7 +105,7 @@ pub fn app() -> impl Render<Dom> {
                 }
             })
         },
-    )
+    ) */
 }
 
 fn main() {

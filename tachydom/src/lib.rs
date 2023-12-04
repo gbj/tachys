@@ -14,6 +14,7 @@ pub mod prelude {
                 },
             },
             element::{ElementChild, InnerHtmlAttribute},
+            node_ref::NodeRefAttribute,
         },
         renderer::{dom::Dom, Renderer, SpawningRenderer},
         view::{
@@ -42,6 +43,8 @@ mod leptos;
 
 #[cfg(feature = "reaccy")]
 mod tachy_reaccy;
+#[cfg(feature = "reaccy")]
+pub use tachy_reaccy::node_ref;
 
 pub fn log(text: &str) {
     web_sys::console::log_1(&JsValue::from_str(text));

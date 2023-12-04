@@ -300,12 +300,15 @@ fn attribute_to_tokens(
         NodeAttribute::Block(_) => todo!(),
         NodeAttribute::Attribute(node) => {
             let name = node.key.to_string();
-            if name == "ref"
-                || name == "_ref"
-                || name == "ref_"
-                || name == "node_ref"
-            {
-                todo!()
+            if name == "node_ref" {
+                let node_ref = match &node.key {
+                    NodeName::Path(path) => path.path.get_ident(),
+                    _ => unreachable!(),
+                };
+                let value = attribute_value(node);
+                quote! {
+                    .#node_ref(#value)
+                }
             } else if let Some(name) = name.strip_prefix("on:") {
                 event_to_tokens(name, node)
             } else if let Some(name) = name.strip_prefix("class:") {

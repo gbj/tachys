@@ -1,7 +1,4 @@
 - router
-- MathML
-- SVG
-- NodeRef
 - server functions
 - Signal wrappers
 - SignalDispose implementations on all Copy types

@@ -103,6 +103,9 @@ where
 }
 
 pub trait ElementType {
+    /// The underlying native widget type that this represents.
+    type Output;
+
     const TAG: &'static str;
     const SELF_CLOSING: bool;
 

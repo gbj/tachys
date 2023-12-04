@@ -26,6 +26,8 @@ impl<E> ElementType for Custom<E>
 where
     E: CustomElementKey,
 {
+    type Output = web_sys::HtmlElement;
+
     const TAG: &'static str = E::KEY;
     const SELF_CLOSING: bool = false;
 

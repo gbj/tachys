@@ -8,6 +8,7 @@ pub mod attribute;
 pub mod class;
 pub mod element;
 pub mod event;
+pub mod node_ref;
 pub mod property;
 pub mod style;
 

@@ -87,6 +87,8 @@ macro_rules! svg_elements {
 				}
 
                 impl ElementType for [<$tag:camel>] {
+                    type Output = web_sys::SvgElement;
+
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
 

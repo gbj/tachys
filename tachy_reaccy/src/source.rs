@@ -41,7 +41,11 @@ pub trait Source: ReactiveNode {
     fn clear_subscribers(&self);
 }
 
-pub trait Track: Source + ToAnySource {
+pub trait Track {
+    fn track(&self);
+}
+
+impl<T: Source + ToAnySource> Track for T {
     fn track(&self) {
         if let Some(subscriber) = Observer::get() {
             subscriber.add_source(self.to_any_source());
@@ -49,8 +53,6 @@ pub trait Track: Source + ToAnySource {
         }
     }
 }
-
-impl<T: Source + ToAnySource> Track for T {}
 
 #[derive(Clone)]
 pub struct AnySource(pub usize, pub Weak<dyn Source + Send + Sync>);

@@ -12,6 +12,7 @@ use crate::{
 use tachy_reaccy::{async_signal::ScopedFuture, render_effect::RenderEffect};
 
 mod class;
+pub mod node_ref;
 mod style;
 
 impl<F, V> ToTemplate for F

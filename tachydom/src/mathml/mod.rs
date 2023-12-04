@@ -95,6 +95,8 @@ macro_rules! mathml_elements {
 				}
 
                 impl ElementType for [<$tag:camel>] {
+                    type Output = web_sys::Element;
+
                     const TAG: &'static str = stringify!($tag);
                     const SELF_CLOSING: bool = false;
 

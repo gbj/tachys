@@ -22,6 +22,14 @@ impl<T: Send + Sync + 'static> StoredData for ReadSignal<T> {
     }
 }
 
+impl<T: Send + Sync + 'static> Clone for ReadSignal<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Send + Sync + 'static> Copy for ReadSignal<T> {}
+
 pub struct ArcReadSignal<T>(pub(crate) ArcRwSignal<T>);
 
 impl<T> Clone for ArcReadSignal<T> {

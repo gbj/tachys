@@ -20,6 +20,14 @@ impl<T: Send + Sync + 'static> StoredData for WriteSignal<T> {
     }
 }
 
+impl<T: Send + Sync + 'static> Clone for WriteSignal<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Send + Sync + 'static> Copy for WriteSignal<T> {}
+
 impl<T: Send + Sync + 'static> SignalIsDisposed for WriteSignal<T> {
     fn is_disposed(&self) -> bool {
         !self.inner.exists()

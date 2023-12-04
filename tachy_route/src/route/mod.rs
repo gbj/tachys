@@ -16,12 +16,26 @@ pub struct RouteDefinition<Rndr, Pat, ViewFn, Children> {
     rndr: PhantomData<Rndr>,
 }
 
+pub struct MatchedRoute {
+    pub(crate) params: Vec<(&'static str, String)>,
+    pub(crate) matched: String,
+}
+
+impl MatchedRoute {
+    pub fn param(&self, key: &str) -> Option<&str> {
+        self.params
+            .iter()
+            .find(|n| n.0 == key)
+            .map(|(_, v)| v.as_str())
+    }
+}
+
 impl<Rndr, Pat, ViewFn, Children> RouteDefinition<Rndr, Pat, ViewFn, Children> {
-    pub fn view<View>(&self) -> ViewFn::Output
+    pub fn view<View>(&self, matched: MatchedRoute) -> ViewFn::Output
     where
-        ViewFn: Fn() -> View,
+        ViewFn: Fn(MatchedRoute) -> View,
     {
-        (self.view)()
+        (self.view)(matched)
     }
 }
 
@@ -30,7 +44,7 @@ impl<Pat, ViewFn, View, Children, Rndr>
 where
     Pat: RouteMatch,
     Children: PossibleRoutes,
-    ViewFn: Fn() -> View,
+    ViewFn: Fn(MatchedRoute) -> View,
     View: Render<Rndr>,
     Rndr: Renderer,
 {

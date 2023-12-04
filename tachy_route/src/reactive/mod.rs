@@ -23,15 +23,13 @@ where
     Router<R, Loc, Defs, FallbackFn>: RenderHtml<R>,
 {
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
+
     location.set_navigation_hook({
         let url = url.clone();
         move |new_url| url.set(new_url)
     });
+
     location.init();
-    /* location.on_url_change({
-        let url = url.clone();
-        move |new_url| url.set(new_url)
-    }); */
 
     move || {
         url.track();

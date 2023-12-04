@@ -1,7 +1,7 @@
 use crate::{
     location::Location,
     matching::{PartialPathMatch, RouteMatch},
-    route::{PossibleRoutes, RouteDefinition},
+    route::{MatchedRoute, PossibleRoutes, RouteDefinition},
 };
 use std::{cmp, marker::PhantomData};
 use tachydom::{
@@ -150,7 +150,7 @@ where
     Rndr: Renderer,
     Loc: Location,
     APat: RouteMatch,
-    AViewFn: Fn() -> AView,
+    AViewFn: Fn(MatchedRoute) -> AView,
     AView: Render<Rndr>,
     FallbackFn: Fn() -> Fal,
     Fal: Render<Rndr>,
@@ -161,10 +161,17 @@ where
         match self.location.try_to_url() {
             Ok(url) => {
                 if self.routes.path.matches(&url.pathname) {
-                    Either::Right(self.routes.view())
-                } else {
-                    Either::Left(self.fallback())
+                    let PartialPathMatch {
+                        params,
+                        matched,
+                        remaining,
+                    } = self.routes.path.test(&url.pathname).unwrap();
+                    if remaining.is_empty() {
+                        let matched = MatchedRoute { params, matched };
+                        return Either::Right(self.routes.view(matched));
+                    }
                 }
+                Either::Left(self.fallback())
             }
             Err(e) => {
                 #[cfg(feature = "tracing")]
@@ -191,7 +198,7 @@ where
     Rndr: Renderer,
     Loc: Location,
     APat: RouteMatch,
-    AViewFn: Fn() -> AView,
+    AViewFn: Fn(MatchedRoute) -> AView,
     AView: RenderHtml<Rndr>,
     FallbackFn: Fn() -> Fal,
     Fal: RenderHtml<Rndr>,
@@ -227,7 +234,7 @@ macro_rules! tuples {
                 $(
                     [<$ty Pat>]: RouteMatch + std::fmt::Debug,
                     [<$ty View>]: Render<Rndr>,
-                    [<$ty ViewFn>]: Fn() -> [<$ty View>],
+                    [<$ty ViewFn>]: Fn(MatchedRoute) -> [<$ty View>],
                 )*
                 FallbackFn: Fn() -> $last,
                 $last: Render<Rndr>,
@@ -247,7 +254,8 @@ macro_rules! tuples {
                                         remaining,
                                     } = [<$ty:lower>].path.test(&url.pathname).unwrap();
                                     if remaining.is_empty() {
-                                        return [<EitherOf$num>]::$ty([<$ty:lower>].view())
+                                        let matched = MatchedRoute { params, matched };
+                                        return [<EitherOf$num>]::$ty([<$ty:lower>].view(matched))
                                     }
                                 }
                             )*
@@ -285,7 +293,7 @@ macro_rules! tuples {
                 $(
                     [<$ty Pat>]: RouteMatch + std::fmt::Debug,
                     [<$ty View>]: RenderHtml<Rndr>,
-                    [<$ty ViewFn>]: Fn() -> [<$ty View>],
+                    [<$ty ViewFn>]: Fn(MatchedRoute) -> [<$ty View>],
                 )*
                 FallbackFn: Fn() -> $last,
                 $last: RenderHtml<Rndr>,
@@ -344,13 +352,13 @@ mod tests {
     fn can_construct_router_in_either_direction() {
         // can do fallback first, then routes
         let routes: RouteDefinition<MockDom, _, _, _> =
-            RouteDefinition::new(StaticSegment(""), (), || "Hello!");
+            RouteDefinition::new(StaticSegment(""), (), |_| "Hello!");
         let _router: Router<MockDom, _, _, _> =
             Router::new(RequestUrl::default(), routes, || "404");
 
         // can do routes first, then fallback
         let routes: RouteDefinition<MockDom, _, _, _> =
-            RouteDefinition::new(StaticSegment(""), (), || "Hello!");
+            RouteDefinition::new(StaticSegment(""), (), |_| "Hello!");
         let _router: Router<MockDom, _, _, _> =
             Router::new(RequestUrl::default(), routes, || "404");
     }
@@ -359,7 +367,7 @@ mod tests {
     fn can_match_on_single_route() {
         // can do fallback first, then routes
         let routes: RouteDefinition<MockDom, _, _, _> =
-            RouteDefinition::new(StaticSegment("foo"), (), || "Hello!");
+            RouteDefinition::new(StaticSegment("foo"), (), |_| "Hello!");
         let router: Router<MockDom, _, _, _> =
             Router::new(RequestUrl::from_path("foo"), routes, || "404");
         assert_eq!(router.to_html(), "Hello!<!>");
@@ -371,12 +379,12 @@ mod tests {
         let mut router: Router<MockDom, _, _, _> = Router::new(
             RequestUrl::default(),
             (
-                RouteDefinition::new(StaticSegment(""), (), || "Home"),
-                RouteDefinition::new(StaticSegment("about"), (), || "About"),
+                RouteDefinition::new(StaticSegment(""), (), |_| "Home"),
+                RouteDefinition::new(StaticSegment("about"), (), |_| "About"),
                 RouteDefinition::new(
                     (StaticSegment("post"), ParamSegment("id")),
                     (),
-                    || "Post Number TODO",
+                    |_| "Post Number TODO",
                 ),
             ),
             || "404",

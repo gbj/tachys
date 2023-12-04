@@ -459,6 +459,40 @@ impl<T: Send + Sync + 'static> AsyncDerived<T> {
         }
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    pub fn new_unsync<Fut>(fun: impl Fn() -> Fut + 'static) -> Self
+    where
+        T: 'static,
+        Fut: Future<Output = T> + 'static,
+    {
+        Self {
+            inner: Stored::new(ArcAsyncDerived::new_unsync(fun)),
+        }
+    }
+
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    pub fn new_unsync_with_initial<Fut>(
+        initial_value: AsyncState<T>,
+        fun: impl Fn() -> Fut + 'static,
+    ) -> Self
+    where
+        T: 'static,
+        Fut: Future<Output = T> + 'static,
+    {
+        Self {
+            inner: Stored::new(ArcAsyncDerived::new_unsync_with_initial(
+                initial_value,
+                fun,
+            )),
+        }
+    }
+
     #[track_caller]
     pub fn ready(&self) -> AsyncDerivedReadyFuture<T> {
         let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));

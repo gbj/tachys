@@ -167,7 +167,11 @@ where
                         remaining,
                     } = self.routes.path.test(&url.pathname).unwrap();
                     if remaining.is_empty() {
-                        let matched = MatchedRoute { params, matched };
+                        let matched = MatchedRoute {
+                            params,
+                            matched,
+                            search_params: url.search_params.clone(),
+                        };
                         return Either::Right(self.routes.view(matched));
                     }
                 }
@@ -254,7 +258,7 @@ macro_rules! tuples {
                                         remaining,
                                     } = [<$ty:lower>].path.test(&url.pathname).unwrap();
                                     if remaining.is_empty() {
-                                        let matched = MatchedRoute { params, matched };
+                                        let matched = MatchedRoute { params, matched, search_params: url.search_params.clone() };
                                         return [<EitherOf$num>]::$ty([<$ty:lower>].view(matched))
                                     }
                                 }

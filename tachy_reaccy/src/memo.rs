@@ -19,6 +19,7 @@ pub struct Memo<T: Send + Sync + 'static> {
 }
 
 impl<T: Send + Sync + 'static> Memo<T> {
+    #[track_caller]
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "debug", skip_all,)
@@ -73,6 +74,7 @@ pub struct ArcMemo<T> {
 }
 
 impl<T: Send + Sync + 'static> ArcMemo<T> {
+    #[track_caller]
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "trace", skip_all,)
@@ -339,6 +341,7 @@ impl<T> DefinedAt for ArcMemo<T> {
 impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
     type Value = T;
 
+    #[track_caller]
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "trace", skip_all,)
@@ -352,7 +355,7 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
         // safe to unwrap here because update_if_necessary
         // guarantees the value is Some
         let lock = self.inner.read();
-        let value = lock.value.as_ref().unwrap();
+        let value = lock.value.as_ref()?;
         Some(fun(value))
     }
 }

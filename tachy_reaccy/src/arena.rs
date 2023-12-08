@@ -1,6 +1,7 @@
 #[cfg(feature = "web")]
 use crate::shared_context::HydrateSharedContext;
 use crate::{
+    log,
     prelude::{DefinedAt, SignalUpdate, SignalWithUntracked},
     shared_context::{SharedContext, SsrSharedContext},
     source::{AnySource, AnySubscriber, ReactiveNode, Source, Subscriber},
@@ -324,6 +325,7 @@ where
 {
     type Value = <<T as StoredData>::Data as SignalWithUntracked>::Value;
 
+    #[track_caller]
     fn try_with_untracked<U>(
         &self,
         fun: impl FnOnce(&Self::Value) -> U,

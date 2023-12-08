@@ -1,13 +1,14 @@
 use self::state::State;
+use crate::matching::Params;
 use core::fmt::Debug;
-use js_sys::Reflect;
+use js_sys::{try_iter, Array, JsString, Reflect};
 use std::{cell::RefCell, rc::Rc};
 use tachydom::{
     dom::{document, window},
     log,
 };
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
-use web_sys::{Event, HtmlAnchorElement, MouseEvent};
+use web_sys::{Event, HtmlAnchorElement, MouseEvent, UrlSearchParams};
 
 pub mod state;
 
@@ -16,6 +17,7 @@ pub struct Url {
     pub origin: String,
     pub pathname: String,
     pub search: String,
+    pub search_params: Params<String>,
     pub hash: String,
 }
 
@@ -94,6 +96,7 @@ impl Location for RequestUrl {
             origin: url.origin().unicode_serialization(),
             pathname: url.path().to_string(),
             search: url.query().unwrap_or_default().to_string(),
+            search_params: todo!(),
             hash: Default::default(),
         })
     }
@@ -140,6 +143,9 @@ impl BrowserUrl {
                 .strip_prefix('?')
                 .map(String::from)
                 .unwrap_or_default(),
+            search_params: search_params_from_web_url(
+                &location.search_params(),
+            )?,
             hash: location.hash(),
         })
     }
@@ -168,6 +174,30 @@ impl BrowserUrl {
             window().scroll_to_with_x_and_y(0.0, 0.0);
         }
     }
+}
+
+fn search_params_from_web_url(
+    params: &web_sys::UrlSearchParams,
+) -> Result<Params<String>, JsValue> {
+    let mut search_params = Params::new();
+    for pair in try_iter(params)?.into_iter().flatten() {
+        let row = pair?.unchecked_into::<Array>();
+        search_params.push((
+            row.get(0).unchecked_into::<JsString>().into(),
+            row.get(1).unchecked_into::<JsString>().into(),
+        ));
+    }
+    /* let search_params = try_iter(&location.search_params())?
+    .into_iter()
+    .flatten()
+    .flat_map(|value| {
+        Ok((
+            value?.dyn_into::<JsString>()?.into(),
+            value?.dyn_into::<JsString>()?.into(),
+        ))
+    })
+    .collect::<Params>()?; */
+    Ok(search_params)
 }
 
 impl Location for BrowserUrl {
@@ -297,6 +327,9 @@ impl Location for BrowserUrl {
                 .strip_prefix('?')
                 .map(String::from)
                 .unwrap_or_default(),
+            search_params: search_params_from_web_url(
+                &UrlSearchParams::new_with_str(&location.search()?)?,
+            )?,
             hash: location.hash()?,
         })
     }

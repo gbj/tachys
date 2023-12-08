@@ -4,6 +4,8 @@ pub use param_segments::*;
 pub use static_segment::*;
 use std::str::Chars;
 
+pub(crate) type Params<K> = Vec<(K, String)>;
+
 /// Defines a route which may or may not be matched by any given URL,
 /// or URL segment.
 ///
@@ -23,14 +25,14 @@ pub trait RouteMatch {
 #[derive(Debug)]
 pub struct PartialPathMatch<'a> {
     pub(crate) remaining: &'a str,
-    pub(crate) params: Vec<(&'static str, String)>,
+    pub(crate) params: Params<&'static str>,
     pub(crate) matched: String,
 }
 
 impl<'a> PartialPathMatch<'a> {
     pub fn new(
         remaining: &'a str,
-        params: impl Into<Vec<(&'static str, String)>>,
+        params: impl Into<Params<&'static str>>,
         matched: impl Into<String>,
     ) -> Self {
         Self {

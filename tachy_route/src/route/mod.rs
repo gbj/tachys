@@ -1,4 +1,4 @@
-use crate::matching::{PartialPathMatch, RouteMatch};
+use crate::matching::{Params, PartialPathMatch, RouteMatch};
 use std::marker::PhantomData;
 use tachydom::{renderer::Renderer, view::Render};
 
@@ -17,7 +17,8 @@ pub struct RouteDefinition<Rndr, Pat, ViewFn, Children> {
 }
 
 pub struct MatchedRoute {
-    pub(crate) params: Vec<(&'static str, String)>,
+    pub(crate) search_params: Params<String>,
+    pub(crate) params: Params<&'static str>,
     pub(crate) matched: String,
 }
 
@@ -65,7 +66,7 @@ pub trait PossibleRoutes {
 }
 
 pub struct FullRouteMatch<'a, View> {
-    params: Vec<(&'static str, String)>,
+    params: Params<&'static str>,
     matched: String,
     view: &'a dyn Fn() -> View,
 }

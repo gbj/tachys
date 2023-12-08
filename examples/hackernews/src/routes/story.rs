@@ -1,35 +1,34 @@
 use crate::api;
-use leptos_meta::*;
-use leptos_router::*;
-use tachys::prelude::*;
+use tachy_route::reactive::ReactiveMatchedRoute;
+//use leptos_meta::*;
+//use leptos_router::*;
+use tachys::{prelude::*, tachydom::view::either::Either};
 
-#[component]
-pub fn Story() -> impl RenderHtml<Dom> {
-    let params = use_params_map();
-    let story = create_resource(
-        move || params().get("id").cloned().unwrap_or_default(),
-        move |id| async move {
+pub fn Story(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
+    let id = matched.param("id");
+    let story = AsyncDerived::new_unsync(move || {
+        let id = id.get().unwrap_or_default();
+        async move {
             if id.is_empty() {
                 None
             } else {
                 api::fetch_api::<api::Story>(&api::story(&format!("item/{id}")))
                     .await
             }
-        },
-    );
-    let meta_description = move || {
+        }
+    });
+    /* let meta_description = move || {
         story
             .get()
             .and_then(|story| story.map(|story| story.title))
             .unwrap_or_else(|| "Loading story...".to_string())
-    };
+    }; */
 
-    view! {
-        <Suspense fallback=|| view! { "Loading..." }>
-            <Meta name="description" content=meta_description/>
-            {move || story.get().map(|story| match story {
-                None => view! {  <div class="item-view">"Error loading this story."</div> },
-                Some(story) => view! {
+    move || {
+        async move {
+        match story.await {
+            None => Either::Left(view! {  <div class="item-view">"Error loading this story."</div> }),
+            Some(story) => Either::Right(view! {
                     <div class="item-view">
                         <div class="item-view-header">
                         <a href=story.url target="_blank">
@@ -41,7 +40,7 @@ pub fn Story() -> impl RenderHtml<Dom> {
                         {story.user.map(|user| view! {  <p class="meta">
                             {story.points}
                             " points | by "
-                            <A href=format!("/users/{user}")>{user.clone()}</A>
+                            <a href=format!("/users/{user}")>{user.clone()}</a>
                             {format!(" {}", story.time_ago)}
                         </p>})}
                         </div>
@@ -54,40 +53,41 @@ pub fn Story() -> impl RenderHtml<Dom> {
                             }}
                         </p>
                         <ul class="comment-children">
-                            <For
+                            /* <For
                                 each=move || story.comments.clone().unwrap_or_default()
                                 key=|comment| comment.id
                                 let:comment
                             >
                                 <Comment comment />
-                            </For>
+                            </For> */
                         </ul>
                     </div>
                 </div>
-            }})}
-        </Suspense>
+            })
+        }
+    }.suspend().with_fallback("Loading...")
     }
 }
 
 #[component]
 pub fn Comment(comment: api::Comment) -> impl RenderHtml<Dom> {
-    let (open, set_open) = create_signal(true);
+    let open = RwSignal::new(true);
 
     view! {
         <li class="comment">
         <div class="by">
-            <A href=format!("/users/{}", comment.user.clone().unwrap_or_default())>{comment.user.clone()}</A>
+            <a href=format!("/users/{}", comment.user.clone().unwrap_or_default())>{comment.user.clone()}</a>
             {format!(" {}", comment.time_ago)}
         </div>
-        <div class="text" inner_html=comment.content></div>
+        <div class="text" inner_html=comment.content.unwrap_or_default()></div>
         {(!comment.comments.is_empty()).then(|| {
             view! {
                 <div>
-                    <div class="toggle" class:open=open>
-                        <a on:click=move |_| set_open.update(|n| *n = !*n)>
+                    <div class="toggle" class:open=move || open.get()>
+                        <a on:click=move |_| open.update(|n| *n = !*n)>
                             {
                                 let comments_len = comment.comments.len();
-                                move || if open() {
+                                move || if open.get() {
                                     "[-]".into()
                                 } else {
                                     format!("[+] {}{} collapsed", comments_len, pluralize(comments_len))
@@ -95,17 +95,14 @@ pub fn Comment(comment: api::Comment) -> impl RenderHtml<Dom> {
                             }
                         </a>
                     </div>
-                    {move || open().then({
+                    {move || open.get().then({
                         let comments = comment.comments.clone();
                         move || view! {
                             <ul class="comment-children">
-                                <For
-                                    each=move || comments.clone()
-                                    key=|comment| comment.id
-                                    let:comment
-                                >
-                                    <Comment comment />
-                                </For>
+                                {comments.into_iter().map(|comment| {
+                                    "nested"
+                                    //view! { <Comment comment /> }
+                                }).collect::<Vec<_>>()}
                             </ul>
                         }
                     })}

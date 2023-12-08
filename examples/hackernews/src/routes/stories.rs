@@ -1,6 +1,6 @@
 use crate::api;
-use leptos_router::*;
-use tachys::prelude::*;
+use tachy_route::reactive::ReactiveMatchedRoute;
+use tachys::{prelude::*, tachydom::view::either::Either};
 
 fn category(from: &str) -> &'static str {
     match from {
@@ -12,32 +12,49 @@ fn category(from: &str) -> &'static str {
     }
 }
 
-#[component]
-pub fn Stories() -> impl RenderHtml<Dom> {
-    let query = use_query_map();
-    let params = use_params_map();
+pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
+    tachys::tachydom::log("running Stories");
+    let page = matched.search("page");
+    let story_type = matched.param("stories");
     let page = move || {
-        query
-            .with(|q| q.get("page").and_then(|page| page.parse::<usize>().ok()))
+        page.get()
+            .and_then(|page| page.parse::<usize>().ok())
             .unwrap_or(1)
     };
-    let story_type = move || {
-        params
-            .with(|p| p.get("stories").cloned())
-            .unwrap_or_else(|| "top".to_string())
-    };
-    let stories = create_resource(
-        move || (page(), story_type()),
-        move |(page, story_type)| async move {
+    let story_type =
+        move || story_type.get().unwrap_or_else(|| "top".to_string());
+    let stories = AsyncDerived::new_unsync(move || {
+        let page = page();
+        let story_type = story_type();
+        async move {
             let path = format!("{}?page={}", category(&story_type), page);
             api::fetch_api::<Vec<api::Story>>(&api::story(&path)).await
-        },
-    );
-    let (pending, set_pending) = create_signal(false);
+        }
+    });
+    //let (pending, set_pending) = create_signal(false); // TODO
 
-    let hide_more_link = move || {
+    /* let hide_more_link = move || {
         stories.get().unwrap_or(None).unwrap_or_default().len() < 28
             || pending()
+    }; */
+
+    let stories = move || {
+        async move {
+            match stories.await {
+                None => Either::Left(view! { <p>"Error loading stories."</p> }),
+                Some(stories) => Either::Right(view! {
+                    <ul>
+                        {stories.into_iter().map(|story| {
+                            view! { <Story story /> }
+                        }).collect::<Vec<_>>()}
+                    </ul>
+                }),
+            }
+        }
+        .suspend()
+        .track()
+        .transition()
+        .with_fallback("Loading...")
     };
 
     view! {
@@ -45,26 +62,26 @@ pub fn Stories() -> impl RenderHtml<Dom> {
             <div class="news-list-nav">
                 <span>
                     {move || if page() > 1 {
-                        view! {
+                        Either::Left(view! {
                             <a class="page-link"
                                 href=move || format!("/{}?page={}", story_type(), page() - 1)
-                                attr:aria_label="Previous Page"
+                                aria-label="Previous Page"
                             >
                                 "< prev"
                             </a>
-                        }.into_any()
+                        })
                     } else {
-                        view! {
+                        Either::Right(view! {
                             <span class="page-link disabled" aria-hidden="true">
                                 "< prev"
                             </span>
-                        }.into_any()
+                        })
                     }}
                 </span>
                 <span>"page " {page}</span>
                 <span class="page-link"
-                    class:disabled=hide_more_link
-                    aria-hidden=hide_more_link
+                    //class:disabled=hide_more_link // TODO
+                    //aria-hidden=hide_more_link
                 >
                     <a href=move || format!("/{}?page={}", story_type(), page() + 1)
                         aria-label="Next Page"
@@ -75,28 +92,7 @@ pub fn Stories() -> impl RenderHtml<Dom> {
             </div>
             <main class="news-list">
                 <div>
-                    <Transition
-                        fallback=move || view! { <p>"Loading..."</p> }
-                        set_pending
-                    >
-                        {move || match stories.get() {
-                            None => None,
-                            Some(None) => Some(view! { <p>"Error loading stories."</p> }.into_any()),
-                            Some(Some(stories)) => {
-                                Some(view! {
-                                    <ul>
-                                        <For
-                                            each=move || stories.clone()
-                                            key=|story| story.id
-                                            let:story
-                                        >
-                                            <Story story/>
-                                        </For>
-                                    </ul>
-                                }.into_any())
-                            }
-                        }}
-                    </Transition>
+                    {stories}
                 </div>
             </main>
         </div>
@@ -110,39 +106,40 @@ fn Story(story: api::Story) -> impl RenderHtml<Dom> {
             <span class="score">{story.points}</span>
             <span class="title">
                 {if !story.url.starts_with("item?id=") {
-                    view! {
+                    Either::Left(view! {
                         <span>
                             <a href=story.url target="_blank" rel="noreferrer">
                                 {story.title.clone()}
                             </a>
                             <span class="host">"("{story.domain}")"</span>
                         </span>
-                    }.into_view()
+                    })
                 } else {
                     let title = story.title.clone();
-                    view! { <A href=format!("/stories/{}", story.id)>{title.clone()}</A> }.into_view()
+                    // TODO <A>
+                    Either::Right(view! { <a href=format!("/stories/{}", story.id)>{title.clone()}</a> })
                 }}
             </span>
             <br />
             <span class="meta">
                 {if story.story_type != "job" {
-                    view! {
+                    Either::Left(view! {
                         <span>
                             {"by "}
-                            {story.user.map(|user| view ! {  <A href=format!("/users/{user}")>{user.clone()}</A>})}
+                            {story.user.map(|user| view ! { <a href=format!("/users/{user}")>{user.clone()}</a>})}
                             {format!(" {} | ", story.time_ago)}
-                            <A href=format!("/stories/{}", story.id)>
+                            <a href=format!("/stories/{}", story.id)>
                                 {if story.comments_count.unwrap_or_default() > 0 {
                                     format!("{} comments", story.comments_count.unwrap_or_default())
                                 } else {
                                     "discuss".into()
                                 }}
-                            </A>
+                            </a>
                         </span>
-                    }.into_view()
+                    })
                 } else {
                     let title = story.title.clone();
-                    view! { <A href=format!("/item/{}", story.id)>{title.clone()}</A> }.into_view()
+                    Either::Right(view! {<a href=format!("/item/{}", story.id)>{title.clone()}</a>})
                 }}
             </span>
             {(story.story_type != "link").then(|| view! {

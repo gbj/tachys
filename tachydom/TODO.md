@@ -1,9 +1,23 @@
-- router
+- hackernews example
+  - finish implementation
+  - TODOs
+  - doubling up on requests?
+  - Suspense/Transition/Await components
+  - Show component
+  - For component
+  - nicer routing components
+  - async routing (waiting for data to load before navigation)
+  - metadata
+  - `<A>` component
+- unnecessary bracket warnings
+- escaping HTML correctly (attributes + text nodes)
+- nested routes
 - server functions
 - Signal wrappers
 - SignalDispose implementations on all Copy types
+- untracked access warnings
+- nicer type than -> `impl RenderHtml<Dom>`
 - building out examples to find missing features
-- NodeRef
 - fix order of el and key so they're the same across traits, in build and rebuild, for attr and property
 - update streaming SSR tests
 - islands

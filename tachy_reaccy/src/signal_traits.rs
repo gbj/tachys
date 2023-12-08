@@ -3,7 +3,9 @@ use std::panic::Location;
 
 #[macro_export]
 macro_rules! unwrap_signal {
-    ($signal:ident) => {
+    ($signal:ident) => {{
+        #[cfg(debug_assertions)]
+        let location = std::panic::Location::caller();
         || {
             #[cfg(debug_assertions)]
             {
@@ -11,7 +13,7 @@ macro_rules! unwrap_signal {
                     "{}",
                     $crate::signal_traits::panic_getting_disposed_signal(
                         $signal.defined_at(),
-                        std::panic::Location::caller()
+                        location
                     )
                 );
             }
@@ -23,7 +25,7 @@ macro_rules! unwrap_signal {
                 );
             }
         }
-    };
+    }};
 }
 
 pub trait SignalWithUntracked: DefinedAt {

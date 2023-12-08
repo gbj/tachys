@@ -1,27 +1,38 @@
 use tachy_route::{
     location::BrowserUrl,
     matching::{ParamSegment, StaticSegment},
-    reactive::ReactiveRouter,
+    reactive::{reactive_route, ReactiveRouter},
     route::RouteDefinition,
 };
 use tachys::{prelude::*, tachydom::dom::body};
 mod api;
 mod routes;
-//use routes::{nav::*, stories::*, story::*, users::*};
-use routes::{nav::Nav, users::User};
+use routes::{nav::Nav, stories::Stories, story::Story, users::User};
 
 #[component]
-pub fn App() -> impl RenderHtml<Dom> {
+pub fn App() -> impl Render<Dom> {
     //provide_meta_context();
     let (is_routing, set_is_routing) = signal(false);
 
     let router = ReactiveRouter(
         BrowserUrl::new(),
         || {
-            RouteDefinition::new(
-                (StaticSegment("users"), ParamSegment("id")),
-                (),
-                User,
+            (
+                RouteDefinition::new(
+                    (StaticSegment("users"), ParamSegment("id")),
+                    (),
+                    reactive_route(User),
+                ),
+                RouteDefinition::new(
+                    (StaticSegment("stories"), ParamSegment("id")),
+                    (),
+                    reactive_route(Story),
+                ),
+                RouteDefinition::new(
+                    (ParamSegment("stories")),
+                    (),
+                    reactive_route(Stories),
+                ),
             )
         },
         || "Not Found",

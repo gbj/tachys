@@ -11,7 +11,7 @@ pub fn user(path: &str) -> String {
 #[cfg(not(feature = "ssr"))]
 pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Default,
 {
     // abort in-flight requests if, e.g., we've navigated away from this page
     // TODO on_cleanup
@@ -49,7 +49,7 @@ where
         .ok()?
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Default)]
 pub struct Story {
     pub id: usize,
     pub title: String,
@@ -67,7 +67,7 @@ pub struct Story {
     pub comments_count: Option<usize>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Default)]
 pub struct Comment {
     pub id: usize,
     pub level: usize,
@@ -78,7 +78,7 @@ pub struct Comment {
     pub comments: Vec<Comment>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Default)]
 pub struct User {
     pub created: usize,
     pub id: String,

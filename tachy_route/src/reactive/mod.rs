@@ -6,7 +6,7 @@ use tachy_reaccy::{
     memo::Memo,
     signal::ArcRwSignal,
     signal_traits::{SignalSet, SignalWith, Track},
-    untrack,
+    untrack, Owner,
 };
 use tachydom::{
     log,
@@ -31,18 +31,39 @@ where
     Fallback: Render<R> + 'static,
     Router<R, Loc, Defs, FallbackFn>: Render<R>,
 {
+    // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
 
+    // initial the location service with a router hook that will update
+    // this URL signal
     location.set_navigation_hook({
         let url = url.clone();
         move |new_url| url.set(new_url)
     });
-
     location.init();
 
+    // create a reactive owner
+    // this will be the sibling of the RenderEffect that builds/rebuilds the Router below
+    // this means that if we run the routes() function as its child, route signals will not
+    // be disposed when the URL changes — which is essential if we’re going to memoize
+    // navigations to the same route
+    let owner = Owner::new();
+
+    // return a reactive router that will update if and only if the URL signal changes
     move || {
+        // track the URL
         url.track();
-        Router::new(location.clone(), routes(), fallback.clone())
+
+        // untrack everything else (i.e., reading from a signal in the route definitions
+        // will not cause this to rerender)
+        untrack(|| {
+            Router::new(
+                location.clone(),
+                // run the route definitions under the separate owner
+                owner.with(&routes),
+                fallback.clone(),
+            )
+        })
     }
 }
 

@@ -98,6 +98,9 @@ where
     R::Node: Clone,
     R::Element: Clone,
 {
+    // inlining allows the compiler to remove the unused functions
+    // i.e., doesn't ship HTML-generating code that isn't used
+    #[inline(always)]
     fn into_any(self) -> AnyView<R> {
         let value = Box::new(self) as Box<dyn Any>;
 

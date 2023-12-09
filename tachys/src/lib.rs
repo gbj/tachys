@@ -4,8 +4,11 @@ pub mod prelude {
     pub use tachydom::prelude::*;
 }
 
-// pub mod children; // TODO fix children
+pub extern crate self as tachys;
+
+pub mod children; // TODO fix children
 pub mod component;
+pub mod show;
 
 pub use tachy_maccy::*;
 pub use tachy_reaccy;

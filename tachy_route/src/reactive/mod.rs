@@ -42,28 +42,11 @@ where
     });
     location.init();
 
-    // create a reactive owner
-    // this will be the sibling of the RenderEffect that builds/rebuilds the Router below
-    // this means that if we run the routes() function as its child, route signals will not
-    // be disposed when the URL changes — which is essential if we’re going to memoize
-    // navigations to the same route
-    let owner = Owner::new();
-
     // return a reactive router that will update if and only if the URL signal changes
     move || {
-        // track the URL
         url.track();
 
-        // untrack everything else (i.e., reading from a signal in the route definitions
-        // will not cause this to rerender)
-        untrack(|| {
-            Router::new(
-                location.clone(),
-                // run the route definitions under the separate owner
-                owner.with(&routes),
-                fallback.clone(),
-            )
-        })
+        Router::new(location.clone(), routes(), fallback.clone())
     }
 }
 

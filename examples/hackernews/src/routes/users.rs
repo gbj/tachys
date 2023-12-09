@@ -1,4 +1,5 @@
 use crate::api::{self, User};
+use send_wrapper::SendWrapper;
 use std::{collections::HashMap, future::IntoFuture};
 use tachy_reaccy::async_signal::ArcAsyncDerived;
 use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
@@ -9,24 +10,19 @@ use tachys::{
     },
 };
 
-pub fn User(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
+pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
     // There's no actual way to navigate from a User to another User,
     // so we're going to do non-reactive accesses here
-    let id = matched.param("id");
-    let id = move || id.get().unwrap_or_default();
-    let user = AsyncDerived::new_unsync({
-        move || async move {
-            let id = id();
-            if id.is_empty() {
-                None
-            } else {
-                api::fetch_api::<User>(&api::user(&id)).await
-            }
+    let id = matched.param("id").unwrap_or_default().to_owned();
+    let user = async move {
+        if id.is_empty() {
+            None
+        } else {
+            api::fetch_api::<User>(&api::user(&id)).await
         }
-    });
-    let user_view = move || {
-        async move {
-            match user.await {
+    };
+    let user_view = SendWrapper::new(async move {
+        match user.await {
                 None => Either::Left(view! { <h1>"User not found."</h1> }),
                 Some(user) => Either::Right(view! {
                     <div>
@@ -48,9 +44,7 @@ pub fn User(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
                     </div>
                 }),
             }
-        }
-        .suspend()
-    };
+    }).suspend().with_fallback("Loading...");
     view! {
         <div class="user-view">{user_view}</div>
     }

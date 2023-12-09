@@ -21,15 +21,15 @@ pub fn App() -> impl Render<Dom> {
                 RouteDefinition::new(
                     (StaticSegment("users"), ParamSegment("id")),
                     (),
-                    reactive_route(User),
+                    User,
                 ),
                 RouteDefinition::new(
                     (StaticSegment("stories"), ParamSegment("id")),
                     (),
-                    reactive_route(Story),
+                    Story,
                 ),
                 RouteDefinition::new(
-                    (ParamSegment("stories")),
+                    ParamSegment("stories"),
                     (),
                     reactive_route(Stories),
                 ),
@@ -45,7 +45,6 @@ pub fn App() -> impl Render<Dom> {
     }
 
     /* view! {
-        <h1>"Hello, world!"</h1>
         //<Stylesheet id="leptos" href="/pkg/hackernews.css"/>
         //<Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
         //<Meta name="description" content="Leptos implementation of a HackerNews demo."/>

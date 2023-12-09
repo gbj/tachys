@@ -13,7 +13,6 @@ fn category(from: &str) -> &'static str {
 }
 
 pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
-    tachys::tachydom::log("running Stories");
     let page = matched.search("page");
     let story_type = matched.param("stories");
     let page = move || {

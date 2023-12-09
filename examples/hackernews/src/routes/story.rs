@@ -1,22 +1,27 @@
 use crate::api;
-use tachy_route::reactive::ReactiveMatchedRoute;
+use send_wrapper::SendWrapper;
+use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
 //use leptos_meta::*;
 //use leptos_router::*;
-use tachys::{prelude::*, tachydom::view::either::Either};
+use tachys::{
+    prelude::*,
+    tachydom::view::{any_view::IntoAny, either::Either},
+};
 
-pub fn Story(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
-    let id = matched.param("id");
-    let story = AsyncDerived::new_unsync(move || {
-        let id = id.get().unwrap_or_default();
-        async move {
-            if id.is_empty() {
-                None
-            } else {
-                api::fetch_api::<api::Story>(&api::story(&format!("item/{id}")))
-                    .await
-            }
+pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
+    // There's no actual way to navigate from a Story to another Story,
+    // so we're going to do non-reactive accesses here
+    let mut path = String::from("item/");
+    let id = matched.param("id").unwrap_or_default();
+    let id_is_empty = id.is_empty();
+    path.push_str(id);
+    let story = async move {
+        if id_is_empty {
+            None
+        } else {
+            api::fetch_api::<api::Story>(&api::story(&path)).await
         }
-    });
+    };
     /* let meta_description = move || {
         story
             .get()
@@ -24,8 +29,7 @@ pub fn Story(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
             .unwrap_or_else(|| "Loading story...".to_string())
     }; */
 
-    move || {
-        async move {
+    SendWrapper::new(async move {
         match story.await {
             None => Either::Left(view! {  <div class="item-view">"Error loading this story."</div> }),
             Some(story) => Either::Right(view! {
@@ -53,20 +57,18 @@ pub fn Story(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
                             }}
                         </p>
                         <ul class="comment-children">
-                            /* <For
-                                each=move || story.comments.clone().unwrap_or_default()
-                                key=|comment| comment.id
-                                let:comment
-                            >
-                                <Comment comment />
-                            </For> */
+                            {story.comments
+                                .into_iter()
+                                .flatten()
+                                .map(|comment| view! { <Comment comment/> })
+                                .collect::<Vec<_>>()
+                            }
                         </ul>
                     </div>
                 </div>
             })
         }
-    }.suspend().with_fallback("Loading...")
-    }
+    }).suspend().with_fallback("Loading...")
 }
 
 #[component]
@@ -100,8 +102,10 @@ pub fn Comment(comment: api::Comment) -> impl RenderHtml<Dom> {
                         move || view! {
                             <ul class="comment-children">
                                 {comments.into_iter().map(|comment| {
-                                    "nested"
-                                    //view! { <Comment comment /> }
+                                    // TODO I'd like to find a better way to enable
+                                    // statically-typed recursive/self-referencing components
+                                    // IntoAny is an extremely blunt tool here
+                                    view! { <Comment comment /> }.into_any()
                                 }).collect::<Vec<_>>()}
                             </ul>
                         }

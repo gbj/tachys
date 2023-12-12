@@ -9,7 +9,7 @@ use crate::{
         style::IntoStyle,
     },
     hydration::Cursor,
-    renderer::{DomRenderer, Renderer},
+    renderer::{DomRenderer, Renderer, StringRenderer},
 };
 use std::marker::PhantomData;
 
@@ -109,7 +109,7 @@ impl<const V: &'static str> AsRef<str> for Static<V> {
     }
 }
 
-impl<const V: &'static str, R: Renderer> Render<R> for Static<V>
+impl<const V: &'static str, R: StringRenderer> Render<R> for Static<V>
 where
     R::Text: Mountable<R>,
 {
@@ -128,7 +128,7 @@ impl<const V: &'static str> InfallibleRender for Static<V> {}
 
 impl<const V: &'static str, R> RenderHtml<R> for Static<V>
 where
-    R: Renderer,
+    R: StringRenderer,
     R::Node: Clone,
     R::Element: Clone,
     R::Text: Mountable<R>,

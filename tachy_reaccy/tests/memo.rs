@@ -168,7 +168,7 @@ async fn dynamic_dependencies() {
 
     // we forget it so it continues running
     // if it's dropped, it will stop listening
-    mem::forget(Effect::new({
+    mem::forget(Effect::new_sync({
         let combined_count = Arc::clone(&combined_count);
         move |_| {
             _ = name.get();

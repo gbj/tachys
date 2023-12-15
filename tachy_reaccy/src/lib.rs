@@ -14,6 +14,7 @@ pub mod signal;
 pub mod signal_traits;
 mod source;
 pub mod spawn;
+pub mod store;
 use crate::source::AnySubscriber;
 pub use arena::{Owner, Root};
 use futures::{Future, Stream};

@@ -19,7 +19,7 @@ async fn effect_runs() {
 
     // we forget it so it continues running
     // if it's dropped, it will stop listening
-    mem::forget(Effect::new({
+    mem::forget(Effect::new_sync({
         let b = b.clone();
         move |_| {
             let formatted = format!("Value is {}", a.get());
@@ -45,7 +45,7 @@ async fn dynamic_dependencies() {
 
     let combined_count = Arc::new(RwLock::new(0));
 
-    mem::forget(Effect::new({
+    mem::forget(Effect::new_sync({
         let combined_count = Arc::clone(&combined_count);
         move |_| {
             *combined_count.write() += 1;

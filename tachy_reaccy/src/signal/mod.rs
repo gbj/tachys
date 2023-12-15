@@ -4,7 +4,6 @@ mod write;
 use crate::{
     arena::{Stored, StoredData},
     signal_traits::*,
-    source::{AnySource, ToAnySource},
     unwrap_signal,
 };
 pub use arc_signal::ArcRwSignal;
@@ -47,7 +46,7 @@ impl<T: Send + Sync + 'static> RwSignal<T> {
     pub fn read_only(&self) -> ReadSignal<T> {
         ReadSignal {
             inner: Stored::new(
-                self.get()
+                self.get_value()
                     .map(|inner| inner.read_only())
                     .unwrap_or_else(unwrap_signal!(self)),
             ),
@@ -58,7 +57,7 @@ impl<T: Send + Sync + 'static> RwSignal<T> {
     pub fn write_only(&self) -> WriteSignal<T> {
         WriteSignal {
             inner: Stored::new(
-                self.get()
+                self.get_value()
                     .map(|inner| inner.write_only())
                     .unwrap_or_else(unwrap_signal!(self)),
             ),
@@ -112,20 +111,11 @@ impl<T: Send + Sync + 'static> SignalIsDisposed for RwSignal<T> {
 impl<T: Send + Sync + 'static> StoredData for RwSignal<T> {
     type Data = ArcRwSignal<T>;
 
-    fn get(&self) -> Option<Self::Data> {
+    fn get_value(&self) -> Option<Self::Data> {
         self.inner.get()
     }
 
     fn dispose(&self) {
         self.inner.dispose();
-    }
-}
-
-impl<T: Send + Sync + 'static> ToAnySource for RwSignal<T> {
-    fn to_any_source(&self) -> AnySource {
-        self.inner
-            .get()
-            .map(|inner| inner.to_any_source())
-            .unwrap_or_else(unwrap_signal!(self))
     }
 }

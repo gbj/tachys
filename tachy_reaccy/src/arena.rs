@@ -1,10 +1,13 @@
 #[cfg(feature = "web")]
 use crate::shared_context::HydrateSharedContext;
 use crate::{
-    log,
     prelude::{DefinedAt, SignalUpdate, SignalWithUntracked},
     shared_context::{SharedContext, SsrSharedContext},
-    source::{AnySource, AnySubscriber, ReactiveNode, Source, Subscriber},
+    source::{
+        AnySource, AnySubscriber, ReactiveNode, Source, Subscriber,
+        ToAnySource, ToAnySubscriber,
+    },
+    unwrap_signal,
 };
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
@@ -199,7 +202,7 @@ where
         }
     }
 
-    pub fn with<U>(&self, fun: impl FnOnce(&T) -> U) -> Option<U> {
+    pub fn with_value<U>(&self, fun: impl FnOnce(&T) -> U) -> Option<U> {
         let m = MAP.read();
         let m = m.get(self.node);
 
@@ -210,7 +213,7 @@ where
     where
         T: Clone,
     {
-        self.with(T::clone)
+        self.with_value(T::clone)
     }
 
     pub fn exists(&self) -> bool
@@ -229,7 +232,7 @@ where
 pub trait StoredData {
     type Data;
 
-    fn get(&self) -> Option<Self::Data>;
+    fn get_value(&self) -> Option<Self::Data>;
 
     fn dispose(&self);
 }
@@ -240,25 +243,25 @@ where
     T::Data: ReactiveNode,
 {
     fn mark_dirty(&self) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.mark_dirty();
         }
     }
 
     fn mark_check(&self) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.mark_check();
         }
     }
 
     fn mark_subscribers_check(&self) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.mark_subscribers_check();
         }
     }
 
     fn update_if_necessary(&self) -> bool {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.update_if_necessary()
         } else {
             false
@@ -272,19 +275,19 @@ where
     T::Data: Source,
 {
     fn add_subscriber(&self, subscriber: AnySubscriber) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.add_subscriber(subscriber);
         }
     }
 
     fn remove_subscriber(&self, subscriber: &AnySubscriber) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.remove_subscriber(subscriber);
         }
     }
 
     fn clear_subscribers(&self) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.clear_subscribers();
         }
     }
@@ -296,13 +299,13 @@ where
     T::Data: Subscriber,
 {
     fn add_source(&self, source: AnySource) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.add_source(source);
         }
     }
 
     fn clear_sources(&self, subscriber: &AnySubscriber) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.clear_sources(subscriber);
         }
     }
@@ -314,7 +317,31 @@ where
     T::Data: DefinedAt,
 {
     fn defined_at(&self) -> Option<&'static Location<'static>> {
-        self.get().and_then(|n| n.defined_at())
+        self.get_value().and_then(|n| n.defined_at())
+    }
+}
+
+impl<T> ToAnySource for T
+where
+    T: StoredData,
+    T::Data: ToAnySource + DefinedAt,
+{
+    fn to_any_source(&self) -> AnySource {
+        self.get_value()
+            .map(|inner| inner.to_any_source())
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+impl<T> ToAnySubscriber for T
+where
+    T: StoredData,
+    T::Data: ToAnySubscriber + DefinedAt,
+{
+    fn to_any_subscriber(&self) -> AnySubscriber {
+        self.get_value()
+            .map(|inner| inner.to_any_subscriber())
+            .unwrap_or_else(unwrap_signal!(self))
     }
 }
 
@@ -330,7 +357,7 @@ where
         &self,
         fun: impl FnOnce(&Self::Value) -> U,
     ) -> Option<U> {
-        self.get().and_then(|n| n.try_with_untracked(fun))
+        self.get_value().and_then(|n| n.try_with_untracked(fun))
     }
 }
 
@@ -342,7 +369,7 @@ where
     type Value = <<T as StoredData>::Data as SignalUpdate>::Value;
 
     fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        if let Some(inner) = self.get() {
+        if let Some(inner) = self.get_value() {
             inner.update(fun)
         }
     }
@@ -351,6 +378,6 @@ where
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        self.get().and_then(|inner| inner.try_update(fun))
+        self.get_value().and_then(|inner| inner.try_update(fun))
     }
 }

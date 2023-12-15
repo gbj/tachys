@@ -58,7 +58,7 @@ impl<T: Send + Sync + 'static> Debug for Memo<T> {
 impl<T: Send + Sync + 'static> StoredData for Memo<T> {
     type Data = ArcMemo<T>;
 
-    fn get(&self) -> Option<Self::Data> {
+    fn get_value(&self) -> Option<Self::Data> {
         self.inner.get()
     }
 
@@ -357,17 +357,5 @@ impl<T: Send + Sync + 'static> SignalWithUntracked for ArcMemo<T> {
         let lock = self.inner.read();
         let value = lock.value.as_ref()?;
         Some(fun(value))
-    }
-}
-
-impl<T: Send + Sync + 'static> ToAnySource for Memo<T> {
-    fn to_any_source(&self) -> AnySource {
-        self.inner.get().unwrap().to_any_source()
-    }
-}
-
-impl<T: Send + Sync + 'static> ToAnySubscriber for Memo<T> {
-    fn to_any_subscriber(&self) -> AnySubscriber {
-        self.inner.get().unwrap().to_any_subscriber()
     }
 }

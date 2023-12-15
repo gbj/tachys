@@ -11,7 +11,7 @@ pub struct WriteSignal<T: Send + Sync + 'static> {
 impl<T: Send + Sync + 'static> StoredData for WriteSignal<T> {
     type Data = ArcWriteSignal<T>;
 
-    fn get(&self) -> Option<Self::Data> {
+    fn get_value(&self) -> Option<Self::Data> {
         self.inner.get()
     }
 

@@ -415,7 +415,7 @@ pub struct AsyncDerived<T: Send + Sync + 'static> {
 impl<T: Send + Sync + 'static> StoredData for AsyncDerived<T> {
     type Data = ArcAsyncDerived<T>;
 
-    fn get(&self) -> Option<Self::Data> {
+    fn get_value(&self) -> Option<Self::Data> {
         self.inner.get()
     }
 
@@ -497,14 +497,6 @@ impl<T: Send + Sync + 'static> AsyncDerived<T> {
     pub fn ready(&self) -> AsyncDerivedReadyFuture<T> {
         let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));
         this.ready()
-    }
-}
-
-impl<T: Send + Sync + 'static> ToAnySource for AsyncDerived<T> {
-    #[track_caller]
-    fn to_any_source(&self) -> AnySource {
-        let this = self.inner.get().unwrap_or_else(unwrap_signal!(self));
-        this.to_any_source()
     }
 }
 

@@ -2,7 +2,7 @@ use super::ArcRwSignal;
 use crate::{
     arena::{Stored, StoredData},
     prelude::{DefinedAt, SignalWithUntracked},
-    source::{AnySubscriber, ReactiveNode, Source},
+    source::{AnySource, AnySubscriber, ReactiveNode, Source, ToAnySource},
 };
 use std::panic::Location;
 
@@ -13,7 +13,7 @@ pub struct ReadSignal<T: Send + Sync + 'static> {
 impl<T: Send + Sync + 'static> StoredData for ReadSignal<T> {
     type Data = ArcReadSignal<T>;
 
-    fn get(&self) -> Option<Self::Data> {
+    fn get_value(&self) -> Option<Self::Data> {
         self.inner.get()
     }
 
@@ -67,6 +67,12 @@ impl<T> Source for ArcReadSignal<T> {
 
     fn clear_subscribers(&self) {
         self.0.clear_subscribers();
+    }
+}
+
+impl<T> ToAnySource for ArcReadSignal<T> {
+    fn to_any_source(&self) -> AnySource {
+        self.0.to_any_source()
     }
 }
 

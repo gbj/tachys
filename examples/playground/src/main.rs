@@ -1,5 +1,6 @@
 use tachys::{
     prelude::*,
+    show::Show,
     tachy_reaccy::render_effect::RenderEffect,
     tachydom::{
         dom::{body, event_target_value},
@@ -16,20 +17,10 @@ use tracing_subscriber::prelude::*;
 
 pub fn app() -> impl Render<Dom> {
     let value = RwSignal::new("123".to_string());
-    let node = NodeRef::new();
     view! {
-        <input
-            node_ref=node
-            /*on:input=move |ev| {
-                value.set(event_target_value(&ev))
-            }
-            prop:value=move || value.get()
-            data-something="test"
-            hx-get="bar"
-            id="test" */
-            value="test"
-        />
-        <p></p>
+        <Show when=move || value.get() == "123">
+            <p>"Got it!"</p>
+        </Show>
     }
     /* (
         view! {

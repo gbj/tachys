@@ -1,6 +1,6 @@
 use crate::api;
 use tachy_route::reactive::ReactiveMatchedRoute;
-use tachys::{prelude::*, tachydom::view::either::Either};
+use tachys::{prelude::*, show::Show, tachydom::view::either::Either};
 
 fn category(from: &str) -> &'static str {
     match from {
@@ -60,22 +60,20 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
         <div class="news-view">
             <div class="news-list-nav">
                 <span>
-                    {move || if page() > 1 {
-                        Either::Left(view! {
-                            <a class="page-link"
+                    <Show when=move || { page() > 1 }
+                        fallback=|| view! {
+                            <span class="page-link disabled" aria-hidden="true">
+                                "< prev"
+                            </span>
+                        }
+                    >
+                        <a class="page-link"
                                 href=move || format!("/{}?page={}", story_type(), page() - 1)
                                 aria-label="Previous Page"
                             >
                                 "< prev"
                             </a>
-                        })
-                    } else {
-                        Either::Right(view! {
-                            <span class="page-link disabled" aria-hidden="true">
-                                "< prev"
-                            </span>
-                        })
-                    }}
+                    </Show>
                 </span>
                 <span>"page " {page}</span>
                 <span class="page-link"

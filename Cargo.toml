@@ -7,5 +7,6 @@ members = [
 	"tachydom",
 	"tachy_maccy",
 	"tachy_reaccy",
+	"tachy_reaccy_macro",
 	"tachy_route",
 ]

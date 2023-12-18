@@ -105,7 +105,9 @@ where
 pub trait SignalUpdate {
     type Value;
 
-    fn update(&self, fun: impl FnOnce(&mut Self::Value));
+    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
+        self.try_update(fun);
+    }
 
     fn try_update<U>(
         &self,
@@ -114,13 +116,13 @@ pub trait SignalUpdate {
 }
 
 pub trait SignalSet: SignalUpdate + SignalIsDisposed {
-    fn set(&self, value: Self::Value) {
-        self.update(|n| *n = value);
+    fn set(&self, value: impl Into<Self::Value>) {
+        self.update(|n| *n = value.into());
     }
 
-    fn try_set(&self, value: Self::Value) -> Option<Self::Value> {
+    fn try_set(&self, value: impl Into<Self::Value>) -> Option<Self::Value> {
         if self.is_disposed() {
-            Some(value)
+            Some(value.into())
         } else {
             self.set(value);
             None

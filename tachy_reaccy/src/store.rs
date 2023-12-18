@@ -1,6 +1,11 @@
 use crate::{
-    prelude::{ArcRwSignal, SignalSet},
+    arena::{Stored, StoredData},
+    prelude::{
+        ArcRwSignal, DefinedAt, SignalIsDisposed, SignalSet, SignalUpdate,
+        SignalWithUntracked,
+    },
     source::Track,
+    unwrap_signal,
 };
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard,
@@ -8,16 +13,76 @@ use parking_lot::{
 };
 use rustc_hash::FxHashMap;
 use std::{
-    any::Any,
-    cell::RefCell,
-    collections::HashSet,
-    hash::Hash,
-    mem,
+    fmt::Debug,
     ops::{Deref, DerefMut},
     panic::Location,
-    path::Path,
-    sync::Arc,
+    sync::{Arc, Weak},
 };
+
+pub struct Store<T: Send + Sync + 'static> {
+    inner: Stored<ArcStore<T>>,
+}
+
+impl<T: Send + Sync + 'static> Store<T> {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "debug", skip_all,)
+    )]
+    pub fn new(value: T) -> Self {
+        Self {
+            inner: Stored::new(ArcStore::new(value)),
+        }
+    }
+
+    #[track_caller]
+    pub fn at(&self) -> ReadStoreField<T, T> {
+        self.get_value()
+            .map(|inner| inner.at())
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+
+    #[track_caller]
+    pub fn at_mut(&self) -> WriteStoreField<T, T> {
+        self.get_value()
+            .map(|inner| inner.at_mut())
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+}
+
+impl<T: Send + Sync + 'static> Copy for Store<T> {}
+
+impl<T: Send + Sync + 'static> Clone for Store<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: Debug + Send + Sync + 'static> Debug for Store<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Store")
+            .field("type", &std::any::type_name::<T>())
+            .field("store", &self.inner)
+            .finish()
+    }
+}
+
+impl<T: Send + Sync + 'static> SignalIsDisposed for Store<T> {
+    fn is_disposed(&self) -> bool {
+        self.inner.exists()
+    }
+}
+
+impl<T: Send + Sync + 'static> StoredData for Store<T> {
+    type Data = ArcStore<T>;
+
+    fn get_value(&self) -> Option<Self::Data> {
+        self.inner.get()
+    }
+
+    fn dispose(&self) {
+        self.inner.dispose();
+    }
+}
 
 pub struct ArcStore<T> {
     #[cfg(debug_assertions)]
@@ -25,6 +90,16 @@ pub struct ArcStore<T> {
     pub(crate) value: Arc<RwLock<T>>,
     //inner: Arc<RwLock<SubscriberSet>>,
     signals: Arc<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+}
+
+impl<T: Debug> Debug for ArcStore<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArcStore")
+            .field("defined_at", &self.defined_at)
+            .field("value", &self.value)
+            .field("signals", &self.signals)
+            .finish()
+    }
 }
 
 impl<T> Clone for ArcStore<T> {
@@ -35,6 +110,213 @@ impl<T> Clone for ArcStore<T> {
             value: Arc::clone(&self.value),
             signals: Arc::clone(&self.signals),
         }
+    }
+}
+
+impl<T> DefinedAt for ArcStore<T> {
+    #[inline(always)]
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        #[cfg(debug_assertions)]
+        {
+            Some(self.defined_at)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+}
+
+pub struct ReadStoreField<Orig, T> {
+    #[cfg(debug_assertions)]
+    defined_at: &'static Location<'static>,
+    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+    path: Vec<StorePath>,
+    data: Weak<RwLock<Orig>>,
+    data_fn: Box<dyn Fn(&Orig) -> &T>,
+}
+
+impl<Orig, T> ReadStoreField<Orig, T> {
+    pub fn subfield<U>(
+        self,
+        subfield_id: usize,
+        transform: impl Fn(&T) -> &U + 'static,
+    ) -> ReadStoreField<Orig, U>
+    where
+        Orig: 'static,
+        T: 'static,
+    {
+        let Self {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            mut path,
+            data,
+            data_fn,
+        } = self;
+        path.push(subfield_id);
+        ReadStoreField {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            path,
+            data,
+            data_fn: Box::new(move |orig| {
+                let prev = data_fn(orig);
+                transform(prev)
+            }),
+        }
+    }
+}
+
+impl<Orig, T> Debug for ReadStoreField<Orig, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadStoreField")
+            .field("defined_at", &self.defined_at)
+            .field("signals", &self.signals)
+            .field("path", &self.path)
+            .field("data", &self.data)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<Orig, T> DefinedAt for ReadStoreField<Orig, T> {
+    #[inline(always)]
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        #[cfg(debug_assertions)]
+        {
+            Some(self.defined_at)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+}
+
+impl<Orig, T> Track for ReadStoreField<Orig, T> {
+    fn track(&self) {
+        if let Some(signals) = self.signals.upgrade() {
+            let mut signals = signals.write();
+            let signal = match signals.get_mut(&self.path) {
+                Some(signal) => signal.clone(),
+                None => {
+                    let signal = ArcRwSignal::new(());
+                    signals.insert(self.path.clone(), signal.clone());
+                    signal
+                }
+            };
+            signal.track();
+        }
+    }
+}
+
+impl<Orig, T> SignalWithUntracked for ReadStoreField<Orig, T> {
+    type Value = T;
+
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        let data = self.data.upgrade()?;
+        let data = data.read();
+        let data = (self.data_fn)(&data);
+        Some(fun(data))
+    }
+}
+
+pub struct WriteStoreField<Orig, T> {
+    #[cfg(debug_assertions)]
+    defined_at: &'static Location<'static>,
+    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+    path: Vec<StorePath>,
+    data: Weak<RwLock<Orig>>,
+    data_fn: Box<dyn Fn(&mut Orig) -> &mut T>,
+}
+
+impl<Orig, T> WriteStoreField<Orig, T> {
+    pub fn subfield<U>(
+        self,
+        subfield_id: usize,
+        transform: impl Fn(&mut T) -> &mut U + 'static,
+    ) -> WriteStoreField<Orig, U>
+    where
+        Orig: 'static,
+        T: 'static,
+    {
+        let Self {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            mut path,
+            data,
+            data_fn,
+        } = self;
+        path.push(subfield_id);
+        WriteStoreField {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            path,
+            data,
+            data_fn: Box::new(move |orig| {
+                let prev = data_fn(orig);
+                transform(prev)
+            }),
+        }
+    }
+}
+
+impl<Orig, T> Debug for WriteStoreField<Orig, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadStoreField")
+            .field("defined_at", &self.defined_at)
+            .field("signals", &self.signals)
+            .field("path", &self.path)
+            .field("data", &self.data)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<Orig, T> SignalUpdate for WriteStoreField<Orig, T> {
+    type Value = T;
+
+    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
+        self.try_update(fun);
+    }
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        if let Some(signals) = self.signals.upgrade() {
+            if let Some(value) = self.data.upgrade() {
+                // update value
+                let value = {
+                    let mut value = value.write();
+                    let data = (self.data_fn)(&mut *value);
+                    fun(data)
+                };
+
+                // notify signal
+                let mut signals = signals.write();
+                let signal = signals
+                    // TODO clone technically unnecessary if it does exist
+                    .entry(self.path.clone())
+                    .or_insert_with(|| ArcRwSignal::new(()));
+                signal.set(());
+
+                // return value
+                return Some(value);
+            }
+        }
+        None
+    }
+}
+
+impl<Orig, T> SignalIsDisposed for WriteStoreField<Orig, T> {
+    fn is_disposed(&self) -> bool {
+        self.data.strong_count() == 0
     }
 }
 
@@ -55,69 +337,7 @@ impl<T> DerefMut for StoreField<T> {
     }
 }
 
-impl<T> StoreField<&Vec<T>> {
-    pub fn at(&self, index: usize) -> StoreField<Option<&T>> {
-        Store::add_to_path(index);
-        StoreField(self.get(index))
-    }
-}
-
-impl<T> StoreField<&mut Vec<T>> {
-    pub fn at_mut(&mut self, index: usize) -> StoreField<Option<&mut T>> {
-        Store::add_to_path(index);
-        StoreField(self.get_mut(index))
-    }
-}
-
-#[derive(Debug)]
-struct StorePath {
-    segment: usize,
-    update: bool,
-}
-
-impl PartialEq for StorePath {
-    fn eq(&self, other: &Self) -> bool {
-        self.segment == other.segment
-    }
-}
-
-impl Eq for StorePath {}
-
-impl Hash for StorePath {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.segment.hash(state);
-    }
-}
-
-thread_local! {
-    static STORE_PATH_BUILDER: RefCell<Vec<StorePath>> = RefCell::new(Vec::new());
-}
-
-pub struct Store {}
-
-impl Store {
-    pub fn add_to_path(segment: usize) {
-        STORE_PATH_BUILDER.with(|path| {
-            path.borrow_mut().push(StorePath {
-                segment,
-                update: false,
-            });
-        });
-    }
-
-    pub fn update_at_path(segment: usize) {
-        STORE_PATH_BUILDER.with(|path| {
-            path.borrow_mut().push(StorePath {
-                segment,
-                update: true,
-            });
-        });
-    }
-
-    fn take_path() -> Vec<StorePath> {
-        STORE_PATH_BUILDER.with(|path| mem::take(&mut *path.borrow_mut()))
-    }
-}
+type StorePath = usize;
 
 impl<T> ArcStore<T> {
     #[cfg_attr(
@@ -134,28 +354,30 @@ impl<T> ArcStore<T> {
         }
     }
 
-    pub fn with<U>(&self, fun: impl FnOnce(&T) -> U) -> U {
-        let guard = self.value.read();
-        let value = fun(&*guard);
-        // get the path that was generated by touching all the nodes
-        let path = Store::take_path();
-        let mut signals = self.signals.write();
-        let signal =
-            signals.entry(path).or_insert_with(|| ArcRwSignal::new(()));
-        signal.track();
-        value
+    #[track_caller]
+    pub fn at(&self) -> ReadStoreField<T, T> {
+        ReadStoreField {
+            #[cfg(debug_assertions)]
+            defined_at: Location::caller(),
+            signals: Arc::downgrade(&self.signals),
+            // allocating capacity for a few usizes is way cheaper than reallocating as we build the path
+            path: Vec::with_capacity(4),
+            data: Arc::downgrade(&self.value),
+            data_fn: Box::new(|data| data),
+        }
     }
 
-    pub fn update<U>(&self, fun: impl FnOnce(&mut T) -> U) -> U {
-        let mut guard = self.value.write();
-        let value = fun(&mut *guard);
-        // get the path that was generated by touching all the nodes
-        let path = Store::take_path();
-        let mut signals = self.signals.write();
-        let signal =
-            signals.entry(path).or_insert_with(|| ArcRwSignal::new(()));
-        signal.set(());
-        value
+    #[track_caller]
+    pub fn at_mut(&self) -> WriteStoreField<T, T> {
+        WriteStoreField {
+            #[cfg(debug_assertions)]
+            defined_at: Location::caller(),
+            data: Arc::downgrade(&self.value),
+            data_fn: Box::new(|data| data),
+            signals: Arc::downgrade(&self.signals),
+            // allocating capacity for a few usizes is way cheaper than reallocating as we build the path
+            path: Vec::with_capacity(4),
+        }
     }
 
     pub fn at_value_untracked<U>(
@@ -177,8 +399,11 @@ impl<T> ArcStore<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ArcStore, Store, StoreField};
-    use crate::effect::Effect;
+    use super::{ArcStore, ReadStoreField, WriteStoreField};
+    use crate::{
+        effect::Effect,
+        prelude::{SignalSet, SignalUpdate, SignalWith},
+    };
     use parking_lot::RwLock;
     use std::{mem, sync::Arc};
 
@@ -192,84 +417,51 @@ mod tests {
         todos: Vec<Todo>,
     }
 
-    // macro expansion
-    impl Todos {
-        pub fn user(&self) -> StoreField<&String> {
-            Store::add_to_path(Todos::user as usize);
-            StoreField(&self.user)
+    // macro expansion 2
+    impl<Orig> ReadStoreField<Orig, Todos>
+    where
+        Orig: 'static,
+    {
+        pub fn user(self) -> ReadStoreField<Orig, String> {
+            self.subfield(
+                ReadStoreField::<Orig, Todos>::user as usize,
+                |prev| &prev.user,
+            )
         }
 
-        pub fn set_user(&mut self, value: impl Into<String>) {
-            Store::update_at_path(Todos::user as usize);
-            self.user = value.into();
-        }
-
-        pub fn update_user(&mut self) -> StoreField<&mut String> {
-            Store::update_at_path(Todos::user as usize);
-            StoreField(&mut self.user)
-        }
-
-        pub fn todos(&self) -> StoreField<&Vec<Todo>> {
-            Store::add_to_path(Todos::todos as usize);
-            StoreField(&self.todos)
-        }
-
-        pub fn todos_mut(&mut self) -> StoreField<&mut Vec<Todo>> {
-            Store::add_to_path(Todos::todos as usize);
-            StoreField(&mut self.todos)
-        }
-
-        pub fn set_todos(&mut self, value: impl Into<Vec<Todo>>) {
-            Store::update_at_path(Todos::todos as usize);
-            self.todos = value.into();
-        }
-
-        pub fn update_todos(&mut self) -> StoreField<&mut Vec<Todo>> {
-            Store::update_at_path(Todos::todos as usize);
-            StoreField(&mut self.todos)
+        pub fn todos(self) -> ReadStoreField<Orig, Vec<Todo>> {
+            self.subfield(
+                ReadStoreField::<Orig, Todos>::todos as usize,
+                |prev| &prev.todos,
+            )
         }
     }
-    // end macro expansion
+
+    impl<Orig> WriteStoreField<Orig, Todos>
+    where
+        Orig: 'static,
+    {
+        pub fn user(self) -> WriteStoreField<Orig, String> {
+            self.subfield(
+                ReadStoreField::<Orig, Todos>::user as usize,
+                |prev| &mut prev.user,
+            )
+        }
+
+        pub fn todos(self) -> WriteStoreField<Orig, Vec<Todo>> {
+            self.subfield(
+                ReadStoreField::<Orig, Todos>::todos as usize,
+                |prev| &mut prev.todos,
+            )
+        }
+    }
+    // end macro expansion 2
 
     #[derive(Debug)]
     struct Todo {
         label: String,
         completed: bool,
     }
-
-    // macro expansion
-    impl Todo {
-        pub fn label(&self) -> StoreField<&String> {
-            Store::add_to_path(Todo::label as usize);
-            StoreField(&self.label)
-        }
-
-        pub fn update_label(&mut self) -> &mut String {
-            Store::update_at_path(Todo::label as usize);
-            &mut self.label
-        }
-
-        pub fn set_label(&mut self, value: impl Into<String>) {
-            Store::update_at_path(Todo::label as usize);
-            self.label = value.into();
-        }
-
-        pub fn completed(&self) -> StoreField<&bool> {
-            Store::add_to_path(Todo::completed as usize);
-            StoreField(&self.completed)
-        }
-
-        pub fn update_completed(&mut self) -> StoreField<&mut bool> {
-            Store::update_at_path(Todo::completed as usize);
-            StoreField(&mut self.completed)
-        }
-
-        pub fn set_completed(&mut self, value: impl Into<bool>) {
-            Store::update_at_path(Todo::completed as usize);
-            self.completed = value.into();
-        }
-    }
-    // end macro expansion
 
     fn data() -> Todos {
         Todos {
@@ -292,7 +484,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mutating_store_field_triggers_effect() {
+    async fn mutating_field_triggers_effect() {
         let combined_count = Arc::new(RwLock::new(0));
 
         let store = ArcStore::new(data());
@@ -305,85 +497,17 @@ mod tests {
                 } else {
                     println!("next run");
                 }
-                store.with(|data| println!("{:?}", data.user()));
+                store.at().user().with(|user| println!("{user:?}"));
                 *combined_count.write() += 1;
             }
         }));
         tick().await;
-        store.update(|data| data.set_user("Tom"));
+        store.at_mut().user().set("Greg");
         tick().await;
-        store.update(|data| data.set_user("Carol"));
+        store.at_mut().user().set("Carol");
         tick().await;
-        store.update(|data| data.update_user().push_str("!!!"));
+        store.at_mut().user().update(|name| name.push_str("!!!"));
         tick().await;
         assert_eq!(*combined_count.read(), 4);
-    }
-
-    #[tokio::test]
-    async fn mutating_store_doesnt_trigger_other_fields() {
-        let combined_count = Arc::new(RwLock::new(0));
-
-        let store = ArcStore::new(data());
-        mem::forget(Effect::new_sync({
-            let store = store.clone();
-            let combined_count = Arc::clone(&combined_count);
-            move |prev| {
-                if prev.is_none() {
-                    println!("first run");
-                } else {
-                    panic!("shouldn't rerun")
-                }
-                store.with(|data| println!("{:?}", data.todos()));
-                *combined_count.write() += 1;
-            }
-        }));
-        tick().await;
-        store.update(|data| data.set_user("Tom"));
-        tick().await;
-        store.update(|data| data.update_user().push_str("!!!"));
-        tick().await;
-        assert_eq!(*combined_count.read(), 1);
-    }
-
-    #[tokio::test]
-    async fn mutating_vec_field_updates_inner_only() {
-        let combined_count = Arc::new(RwLock::new(0));
-
-        let store = ArcStore::new(data());
-        mem::forget(Effect::new_sync({
-            let store = store.clone();
-            let combined_count = Arc::clone(&combined_count);
-            move |prev| {
-                store.with(|data| {
-                    println!("{:?}", data.todos().at(1).map(|n| n.label()))
-                });
-                *combined_count.write() += 1;
-            }
-        }));
-        tick().await;
-        store.update(|data| data.set_user("Greg"));
-        tick().await;
-        store.update(|data| {
-            data.update_todos().push(Todo {
-                label: "Another one".into(),
-                completed: false,
-            });
-        });
-        tick().await;
-        store.update(|data| {
-            data.todos_mut()
-                .at_mut(1)
-                .as_mut()
-                .map(|n| n.set_label("Fine-grained updates!"))
-        });
-        tick().await;
-        store.update(|data| {
-            data.todos_mut()
-                .at_mut(2)
-                .as_mut()
-                .map(|n| n.set_label("Profit??"))
-        });
-        tick().await;
-        assert_eq!(*combined_count.read(), 2);
     }
 }

@@ -1,102 +1,49 @@
+use std::mem;
+use tachy_reaccy_macro::Store;
 use tachys::{
     prelude::*,
     show::Show,
-    tachy_reaccy::render_effect::RenderEffect,
+    tachy_reaccy::{
+        render_effect::RenderEffect,
+        store::{ArcStore, Store},
+    },
     tachydom::{
-        dom::{body, event_target_value},
+        dom::{body, event_target_value, log},
         html::{
             element::{p, HtmlElement, Input},
             event,
         },
-        log,
         node_ref::NodeRef,
         view::error_boundary::Try,
     },
 };
 use tracing_subscriber::prelude::*;
 
+#[derive(Store, Clone, Default)]
+struct SomeStoreStruct {
+    pub name: String,
+    pub count: usize,
+}
+
 pub fn app() -> impl Render<Dom> {
-    let value = RwSignal::new("123".to_string());
+    let store = Store::new(SomeStoreStruct {
+        name: "Bob".to_string(),
+        count: 37,
+    });
+
+    // effects are canceled on drop; TODO better API here
+    mem::forget(Effect::new(move |_| {
+        log(&format!("count is {:?}", store.at().count().get()));
+    }));
+
     view! {
-        <Show when=move || value.get() == "123">
-            <p>"Got it!"</p>
-        </Show>
+        <button on:click=move |_| {
+            store.at_mut().count().update(|n| *n += 1);
+        }>
+            {move || store.at().count().get()}
+        </button>
+        {move ||  store.at().name().get()}
     }
-    /* (
-        view! {
-            <math mathcolor="red">
-                <mrow>
-                    <msup>
-                    <mi>a</mi>
-                    <mn>2</mn>
-                    </msup>
-                    <mo>+</mo>
-                    <msup>
-                    <mi>b</mi>
-                    <mn>2</mn>
-                    </msup>
-                    <mo>=</mo>
-                    <msup>
-                    <mi>c</mi>
-                    <mn>2</mn>
-                    </msup>
-                </mrow>
-            </math>
-            <svg height="150" width="500">
-                <ellipse cx="240" cy="100" rx="220" ry="30" style="fill:purple" />
-                <ellipse cx="220" cy="70" rx="190" ry="20" style="fill:lime" />
-                <ellipse cx="210" cy="45" rx="170" ry="15" style="fill:yellow" />
-            </svg>
-            <custom-element custom-attribute=move || value.get()/>
-            <input
-                node_ref=&mut el
-                on:input=move |ev| {
-                    value.set(event_target_value(&ev))
-                }
-                prop:value=move || value.get()
-                data-something="test"
-                hx-get="bar"
-                id="test"
-            />
-        },
-        // this version uses a TryCatchError extension trait that lets us
-        // .catch() an Err on any view
-        move || {
-            view! {
-                <pre>
-                    "f32: " {value.get().parse::<f32>()} "\n"
-                    "u32: " {value.get().parse::<u32>()}
-                </pre>
-            }
-            .catch(|err| {
-                view! {
-                    <pre style="border: 1px solid red; color: red">
-                        "error"
-                        //{err.to_string()}
-                    </pre>
-                }
-            })
-        },
-        // however, note that it breaks if we make the errors more
-        // fine-grained
-        // the one above is doing a lightweight diff, but it's still a diff
-        move || {
-            view! {
-                <pre>
-                    "f32: " {move || value.get().parse::<f32>()} "\n"
-                    "u32: " {move || value.get().parse::<u32>()}
-                </pre>
-            }
-            .catch(|err| {
-                view! {
-                    <pre style="border: 1px solid red; color: red">
-                        "error"
-                        //{err.to_string()}
-                    </pre>
-                }
-            })
-        },
-    ) */
 }
 
 fn main() {

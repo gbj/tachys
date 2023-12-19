@@ -4,6 +4,7 @@ use crate::{
         ArcRwSignal, DefinedAt, SignalIsDisposed, SignalSet, SignalUpdate,
         SignalWithUntracked,
     },
+    signal::trigger::ArcTrigger,
     source::Track,
     unwrap_signal,
 };
@@ -88,7 +89,7 @@ pub struct ArcStore<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
     pub(crate) value: Arc<RwLock<T>>,
-    signals: Arc<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+    signals: Arc<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
 }
 
 impl<T: Debug> Debug for ArcStore<T> {
@@ -130,7 +131,7 @@ impl<T> DefinedAt for ArcStore<T> {
 pub struct ReadStoreField<Orig, T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
     path: Vec<StorePath>,
     data: Weak<RwLock<Orig>>,
     data_fn: Box<dyn Fn(&Orig) -> &T>,
@@ -224,7 +225,7 @@ where
             path,
             data,
             data_fn: Box::new(move |orig| {
-                let mut prev = data_fn(orig);
+                let prev = data_fn(orig);
                 &mut prev[index]
             }),
         }
@@ -264,7 +265,7 @@ impl<Orig, T> Track for ReadStoreField<Orig, T> {
             let signal = match signals.get_mut(&self.path) {
                 Some(signal) => signal.clone(),
                 None => {
-                    let signal = ArcRwSignal::new(());
+                    let signal = ArcTrigger::new();
                     signals.insert(self.path.clone(), signal.clone());
                     signal
                 }
@@ -291,7 +292,7 @@ impl<Orig, T> SignalWithUntracked for ReadStoreField<Orig, T> {
 pub struct WriteStoreField<Orig, T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
+    signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
     path: Vec<StorePath>,
     data: Weak<RwLock<Orig>>,
     data_fn: Box<dyn Fn(&mut Orig) -> &mut T>,
@@ -367,7 +368,7 @@ impl<Orig, T> SignalUpdate for WriteStoreField<Orig, T> {
                 let signal = signals
                     // TODO clone technically unnecessary if it does exist
                     .entry(self.path.clone())
-                    .or_insert_with(|| ArcRwSignal::new(()));
+                    .or_insert_with(ArcTrigger::new);
                 signal.set(());
 
                 // return value

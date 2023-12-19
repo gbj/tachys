@@ -8,6 +8,7 @@ use crate::{
 };
 pub use arc_signal::ArcRwSignal;
 pub use read::*;
+pub mod trigger;
 use std::{fmt::Debug, sync::Arc};
 pub use write::*;
 

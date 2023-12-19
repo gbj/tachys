@@ -14,7 +14,7 @@ use parking_lot::{
 use rustc_hash::FxHashMap;
 use std::{
     fmt::Debug,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
     panic::Location,
     sync::{Arc, Weak},
 };
@@ -88,15 +88,15 @@ pub struct ArcStore<T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
     pub(crate) value: Arc<RwLock<T>>,
-    //inner: Arc<RwLock<SubscriberSet>>,
     signals: Arc<RwLock<FxHashMap<Vec<StorePath>, ArcRwSignal<()>>>>,
 }
 
 impl<T: Debug> Debug for ArcStore<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ArcStore")
-            .field("defined_at", &self.defined_at)
-            .field("value", &self.value)
+        let mut f = f.debug_struct("ArcStore");
+        #[cfg(debug_assertions)]
+        let f = f.field("defined_at", &self.defined_at);
+        f.field("value", &self.value)
             .field("signals", &self.signals)
             .finish()
     }
@@ -169,11 +169,74 @@ impl<Orig, T> ReadStoreField<Orig, T> {
     }
 }
 
+impl<Orig, T> ReadStoreField<Orig, T>
+where
+    T: Index<usize>,
+    Orig: Sized + 'static,
+    T: Sized + 'static,
+    T::Output: Sized,
+{
+    pub fn index(self, index: usize) -> ReadStoreField<Orig, T::Output> {
+        let Self {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            mut path,
+            data,
+            data_fn,
+        } = self;
+        path.push(index);
+        ReadStoreField {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            path,
+            data,
+            data_fn: Box::new(move |orig| {
+                let prev = data_fn(orig);
+                &prev[index]
+            }),
+        }
+    }
+}
+
+impl<Orig, T> WriteStoreField<Orig, T>
+where
+    T: IndexMut<usize>,
+    Orig: Sized + 'static,
+    T: Sized + 'static,
+    T::Output: Sized,
+{
+    pub fn index(self, index: usize) -> WriteStoreField<Orig, T::Output> {
+        let Self {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            mut path,
+            data,
+            data_fn,
+        } = self;
+        path.push(index);
+        WriteStoreField {
+            #[cfg(debug_assertions)]
+            defined_at,
+            signals,
+            path,
+            data,
+            data_fn: Box::new(move |orig| {
+                let mut prev = data_fn(orig);
+                &mut prev[index]
+            }),
+        }
+    }
+}
+
 impl<Orig, T> Debug for ReadStoreField<Orig, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ReadStoreField")
-            .field("defined_at", &self.defined_at)
-            .field("signals", &self.signals)
+        let mut str = f.debug_struct("ReadStoreField");
+        #[cfg(debug_assertions)]
+        str.field("defined_at", &self.defined_at);
+        str.field("signals", &self.signals)
             .field("path", &self.path)
             .field("data", &self.data)
             .finish_non_exhaustive()
@@ -269,9 +332,10 @@ impl<Orig, T> WriteStoreField<Orig, T> {
 
 impl<Orig, T> Debug for WriteStoreField<Orig, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ReadStoreField")
-            .field("defined_at", &self.defined_at)
-            .field("signals", &self.signals)
+        let mut f = f.debug_struct("WriteStoreField");
+        #[cfg(debug_assertions)]
+        f.field("defined_at", &self.defined_at);
+        f.field("signals", &self.signals)
             .field("path", &self.path)
             .field("data", &self.data)
             .finish_non_exhaustive()

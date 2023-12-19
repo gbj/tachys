@@ -2,47 +2,79 @@ use std::mem;
 use tachy_reaccy_macro::Store;
 use tachys::{
     prelude::*,
-    show::Show,
-    tachy_reaccy::{
-        render_effect::RenderEffect,
-        store::{ArcStore, Store},
-    },
+    tachy_reaccy::store::Store,
     tachydom::{
         dom::{body, event_target_value, log},
-        html::{
-            element::{p, HtmlElement, Input},
-            event,
-        },
         node_ref::NodeRef,
-        view::error_boundary::Try,
     },
 };
-use tracing_subscriber::prelude::*;
 
 #[derive(Store, Clone, Default)]
-struct SomeStoreStruct {
+struct State {
     pub name: String,
-    pub count: usize,
+    pub todos: Vec<Todo>,
+}
+
+#[derive(Store, Clone, Default, Debug)]
+struct Todo {
+    pub title: String,
+    pub completed: bool,
 }
 
 pub fn app() -> impl Render<Dom> {
-    let store = Store::new(SomeStoreStruct {
-        name: "Bob".to_string(),
-        count: 37,
+    let store = Store::new(State {
+        name: "Greg".to_string(),
+        todos: vec![Todo {
+            title: "First task".to_string(),
+            completed: false,
+        }],
     });
-
-    // effects are canceled on drop; TODO better API here
-    mem::forget(Effect::new(move |_| {
-        log(&format!("count is {:?}", store.at().count().get()));
-    }));
+    let input_ref = NodeRef::new();
 
     view! {
-        <button on:click=move |_| {
-            store.at_mut().count().update(|n| *n += 1);
-        }>
-            {move || store.at().count().get()}
-        </button>
-        {move ||  store.at().name().get()}
+        <pre>{move || store.at().name().get()}</pre>
+        <input
+            type="text"
+            prop:value=move || store.at().name().get()
+            on:input=move |ev| store.at_mut().name().set(event_target_value(&ev))
+        />
+        <hr/>
+        <form
+            on:submit=move |ev| {
+                ev.prevent_default();
+                let input = input_ref.get().unwrap();
+                store.at_mut().todos().update(|n| n.push(Todo {
+                    title: input.value(),
+                    completed: false
+                }));
+            }
+        >
+            <input
+                type="text"
+                name="title"
+                node_ref=input_ref
+            />
+            <input type="submit" value="Add Todo"/>
+        </form>
+        <ul>
+            {move || {
+                store.at().todos().with(|todos| {
+                    todos.iter().enumerate().map(|(idx, todo)| {
+                        view! {
+                            <li style:text-decoration=move || store.at().todos().index(idx).completed().get().then_some("line-through").unwrap_or_default()>
+                                {move || store.at().todos().index(idx).title().get()}
+                                <input type="checkbox"
+                                    prop:checked=move || store.at().todos().index(idx).completed().get()
+                                    on:click=move |_| {
+                                        store.at_mut().todos().index(idx).completed().set(!store.at().todos().index(idx).completed().get())
+                                    }
+                                />
+                            </li>
+                        }
+                    }).collect::<Vec<_>>()
+                })
+            }}
+        </ul>
     }
 }
 

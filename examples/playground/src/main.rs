@@ -33,9 +33,9 @@ pub fn app() -> impl Render<Dom> {
 
     let todos = move || {
         store
-            .at()
+            .at_mut()
             .todos()
-            .iter()
+            .iter_mut()
             .map(|todo| {
                 view! {
                     <li style:text-decoration={

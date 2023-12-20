@@ -240,7 +240,7 @@ where
             signals,
             path,
             data,
-            data_fn: Box::new(move |orig| {
+            data_fn: Arc::new(move |orig| {
                 let prev = data_fn(orig);
                 &mut prev[index]
             }),
@@ -291,6 +291,23 @@ impl<Orig, T> Track for ReadStoreField<Orig, T> {
     }
 }
 
+impl<Orig, T> Track for WriteStoreField<Orig, T> {
+    fn track(&self) {
+        if let Some(signals) = self.signals.upgrade() {
+            let mut signals = signals.write();
+            let signal = match signals.get_mut(&self.path) {
+                Some(signal) => signal.clone(),
+                None => {
+                    let signal = ArcTrigger::new();
+                    signals.insert(self.path.clone(), signal.clone());
+                    signal
+                }
+            };
+            signal.track();
+        }
+    }
+}
+
 impl<Orig, T> SignalWithUntracked for ReadStoreField<Orig, T> {
     type Value = T;
 
@@ -311,7 +328,21 @@ pub struct WriteStoreField<Orig, T> {
     signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
     path: Vec<StorePath>,
     data: Weak<RwLock<Orig>>,
-    data_fn: Box<dyn Fn(&mut Orig) -> &mut T>,
+    // TODO this is kind of gross
+    data_fn: Arc<dyn Fn(&mut Orig) -> &mut T>,
+}
+
+impl<Orig, T> Clone for WriteStoreField<Orig, T> {
+    fn clone(&self) -> Self {
+        Self {
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            signals: Weak::clone(&self.signals),
+            path: self.path.clone(),
+            data: Weak::clone(&self.data),
+            data_fn: Arc::clone(&self.data_fn),
+        }
+    }
 }
 
 impl<Orig, T> WriteStoreField<Orig, T> {
@@ -339,7 +370,7 @@ impl<Orig, T> WriteStoreField<Orig, T> {
             signals,
             path,
             data,
-            data_fn: Box::new(move |orig| {
+            data_fn: Arc::new(move |orig| {
                 let prev = data_fn(orig);
                 transform(prev)
             }),
@@ -454,7 +485,7 @@ impl<T> ArcStore<T> {
             #[cfg(debug_assertions)]
             defined_at: Location::caller(),
             data: Arc::downgrade(&self.value),
-            data_fn: Box::new(|data| data),
+            data_fn: Arc::new(|data| data),
             signals: Arc::downgrade(&self.signals),
             // allocating capacity for a few usizes is way cheaper than reallocating as we build the path
             path: Vec::with_capacity(4),

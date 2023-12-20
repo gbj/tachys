@@ -31,6 +31,36 @@ pub fn app() -> impl Render<Dom> {
     });
     let input_ref = NodeRef::new();
 
+    let todos = move || {
+        store
+            .at()
+            .todos()
+            .iter()
+            .map(|todo| {
+                view! {
+                    <li style:text-decoration={
+                        let todo = todo.clone();
+                        move || todo.clone().completed().get().then_some("line-through").unwrap_or_default()
+                    }>
+                        {
+                            let todo = todo.clone();
+                            move || todo.clone().title().get()
+                        }
+                        <input type="checkbox"
+                            prop:checked={
+                                let todo = todo.clone();
+                                move || todo.clone().completed().get()
+                            }
+                            on:click=move |_| {
+                                //todo.completed().set(!store.at().todos().index(idx).completed().get())
+                            }
+                        />
+                    </li>
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+
     view! {
         <pre>{move || store.at().name().get()}</pre>
         <input
@@ -57,23 +87,7 @@ pub fn app() -> impl Render<Dom> {
             <input type="submit" value="Add Todo"/>
         </form>
         <ul>
-            {move || {
-                store.at().todos().with(|todos| {
-                    todos.iter().enumerate().map(|(idx, todo)| {
-                        view! {
-                            <li style:text-decoration=move || store.at().todos().index(idx).completed().get().then_some("line-through").unwrap_or_default()>
-                                {move || store.at().todos().index(idx).title().get()}
-                                <input type="checkbox"
-                                    prop:checked=move || store.at().todos().index(idx).completed().get()
-                                    on:click=move |_| {
-                                        store.at_mut().todos().index(idx).completed().set(!store.at().todos().index(idx).completed().get())
-                                    }
-                                />
-                            </li>
-                        }
-                    }).collect::<Vec<_>>()
-                })
-            }}
+            {todos}
         </ul>
     }
 }

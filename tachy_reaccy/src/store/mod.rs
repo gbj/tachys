@@ -19,8 +19,10 @@ use std::{
     panic::Location,
     sync::{Arc, Weak},
 };
-mod indexed;
-pub use indexed::*;
+//mod indexed;
+//pub use indexed::*;
+mod path;
+pub use path::*;
 
 pub struct Store<T: Send + Sync + 'static> {
     inner: Stored<ArcStore<T>>,
@@ -37,7 +39,7 @@ impl<T: Send + Sync + 'static> Store<T> {
         }
     }
 
-    #[track_caller]
+    /* #[track_caller]
     pub fn at(&self) -> ReadStoreField<T, T> {
         self.get_value()
             .map(|inner| inner.at())
@@ -49,7 +51,7 @@ impl<T: Send + Sync + 'static> Store<T> {
         self.get_value()
             .map(|inner| inner.at_mut())
             .unwrap_or_else(unwrap_signal!(self))
-    }
+    } */
 }
 
 impl<T: Send + Sync + 'static> Copy for Store<T> {}
@@ -94,6 +96,22 @@ pub struct ArcStore<T> {
     signals: Arc<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
 }
 
+impl<T> ArcStore<T> {
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip_all,)
+    )]
+    pub fn new(value: T) -> Self {
+        Self {
+            #[cfg(debug_assertions)]
+            defined_at: Location::caller(),
+            value: Arc::new(RwLock::new(value)),
+            signals: Default::default(),
+            /* inner: Arc::new(RwLock::new(SubscriberSet::new())), */
+        }
+    }
+}
+
 impl<T: Debug> Debug for ArcStore<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_struct("ArcStore");
@@ -130,7 +148,7 @@ impl<T> DefinedAt for ArcStore<T> {
     }
 }
 
-pub struct ReadStoreField<Orig, T> {
+/* pub struct ReadStoreField<Orig, T> {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
     signals: Weak<RwLock<FxHashMap<Vec<StorePath>, ArcTrigger>>>,
@@ -507,7 +525,7 @@ impl<T> ArcStore<T> {
         let guard = self.value.write();
         RwLockWriteGuard::map(guard, |value| fun(value))
     }
-}
+} */
 
 #[cfg(test)]
 mod tests {

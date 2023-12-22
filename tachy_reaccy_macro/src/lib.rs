@@ -68,20 +68,16 @@ impl ToTokens for Model {
             is_tuple_struct,
             fields,
         } = &self;
-        let orig = Ident::new("OriginTy", Span::call_site());
+        let any_store_field = Ident::new("AnyStoreField", Span::call_site());
         let field_names_struct_name =
             Ident::new(&format!("{struct_name}Fields"), struct_name.span());
-        let read_trait_name = Ident::new(
-            &format!("{struct_name}ReadStoreFields"),
-            struct_name.span(),
-        );
-        let write_trait_name = Ident::new(
-            &format!("{struct_name}WriteStoreFields"),
+        let trait_name = Ident::new(
+            &format!("{struct_name}StoreFields"),
             struct_name.span(),
         );
         let generics_with_orig = {
             let params = &generics.params;
-            quote! { <#orig, Path, Reader, Writer, #params> }
+            quote! { <#any_store_field, #params> }
         };
         let where_with_orig = {
             generics
@@ -93,122 +89,48 @@ impl ToTokens for Model {
                         predicates,
                     } = &w;
                     quote! {
-                        #where_token #orig: 'static,
-                        Path: Iterator<Item = #library_path::StorePathSegment>,
-                        Reader: for<'a> Fn(&'a #orig) -> &'a #struct_name #generics + 'static,
-                        Writer: for<'a> Fn(&'a mut #orig) -> &'a mut #struct_name #generics + 'static
-                        #predicates
+                        #where_token
+                            #any_store_field: #library_path::StoreField<#struct_name #generics>,
+                            #predicates
                     }
                 })
-                .unwrap_or_else(|| quote! { where #orig: 'static })
+                .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<#struct_name #generics> })
         };
 
         let field_names = fields.iter().map(|field| {
             let Field { vis, ident, ty, .. } = &field;
 
             quote! {
-                fn #ident() -> () {}
+                fn #ident() {}
             }
         });
 
         // define an extension trait that matches this struct
-        let read_trait_fields = fields.iter().map(|field| {
+        let trait_fields = fields.iter().map(|field| {
             let Field { vis, ident, ty, .. } = &field;
 
             quote! {
-                fn #ident(self) -> #library_path::StorePathBuilder<
-                    #orig,
-                    #ty,
-                    impl Iterator<Item = #library_path::StorePathSegment>,
-                    impl for<'a> Fn(&'a #orig) -> &'a #ty + 'static,
-                    impl for<'a> Fn(&'a mut #orig) -> &'a mut #ty + 'static
-                >
-                where
-                    #orig: 'static,
-                    Path: Iterator<Item = #library_path::StorePathSegment>,
-                    Reader: for<'a> Fn(&'a #orig) -> &'a #struct_name #generics + 'static,
-                    Writer: for<'a> Fn(&'a mut #orig) -> &'a mut #struct_name #generics + 'static;
+                #[inline(always)]
+                fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
             }
         });
 
-        /* let write_trait_fields = fields.iter().map(|field| {
-            let Field { vis, ident, ty, .. } = &field;
-
-            quote! {
-                fn #ident(self) -> #library_path::StorePathBuilder<
-                    #orig,
-                    #ty,
-                    impl Iterator<Item = #library_path::StorePathSegment>,
-                    impl Fn(&#orig) -> &#ty,
-                    impl Fn(&mut #orig) -> &mut #ty
-                >;
-            }
-        }); */
-
-        // implement that trait for ReadStoreField
+        // implement that trait for all StoreFields
         let read_fields = fields.iter().map(|field| {
             let Field { vis, ident, ty, .. } = &field;
 
             quote! {
                 #[inline(always)]
-                fn #ident(self) -> #library_path::StorePathBuilder<
-                    #orig,
-                    #ty,
-                    impl Iterator<Item = #library_path::StorePathSegment>,
-                    impl for<'a> Fn(&'a #orig) -> &'a #ty + 'static,
-                    impl for<'a> Fn(&'a mut #orig) -> &'a mut #ty + 'static
-                >
-                where
-                    #orig: 'static,
-                    Path: Iterator<Item = #library_path::StorePathSegment>,
-                    Reader: for<'a> Fn(&'a #orig) -> &'a #struct_name #generics + 'static,
-                    Writer: for<'a> Fn(&'a mut #orig) -> &'a mut #struct_name #generics + 'static,
-                {
-                    let #library_path::StorePathBuilder {
-                        data, path, reader, writer, ty
-                    } = self;
-                    #library_path::StorePathBuilder {
-                        data,
-                        path: path.chain(
-                            ::std::iter::once(
-                                 #library_path::StorePathSegment::from(
-                                    #field_names_struct_name #generics :: #ident as usize
-                                 )
-                            )
-                        ),
-                        reader: move |orig| &(reader(orig)).#ident,
-                        writer: move |orig| {
-                            let prev = writer(orig);
-                            &mut prev.#ident
-                        },
-                        ty: ::std::marker::PhantomData
-                    }
+                fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty> {
+                    #library_path::Subfield::new(
+                        self,
+                        (#field_names_struct_name::#ident as usize).into(),
+                        |prev| &prev.#ident,
+                        |prev| &mut prev.#ident,
+                    )
                 }
             }
         });
-
-        // implement that trait for WriteStoreField
-        /* let write_fields = fields.iter().map(|field| {
-            let Field { vis, ident, ty, .. } = &field;
-
-            quote! {
-                fn #ident(self) -> #library_path::WriteStoreField<
-                    #orig,
-                    #ty,
-                    impl Iterator<Item = #library_path::StorePathSegment>,
-                    impl Fn(&#orig) -> &#ty,
-                    impl Fn(&mut #orig) -> &mut #ty
-                > {
-                    let #library_path::StorePathBuilder {
-                        data: Arc::downgrade(&self.value),
-                        path: iter::empty(),
-                        reader: |val| val,
-                        writer: |val| val,
-                    } = self;
-                    todo!()
-                }
-            }
-        }); */
 
         // read access
         tokens.extend(quote! {
@@ -218,32 +140,17 @@ impl ToTokens for Model {
                 #(#field_names)*
             }
 
-            #vis trait #read_trait_name #generics_with_orig
+            #vis trait #trait_name <AnyStoreField>
+            #where_with_orig
             {
-                #(#read_trait_fields)*
+                #(#trait_fields)*
             }
 
-            impl #generics_with_orig #read_trait_name #generics_with_orig
-            for #library_path::StorePathBuilder<#orig, #struct_name #generics, Path, Reader, Writer>
+            impl #generics_with_orig #trait_name <AnyStoreField> for AnyStoreField
             #where_with_orig
             {
                #(#read_fields)*
             }
-
-            /* #vis trait #write_trait_name #generics_with_orig {
-                #(#write_trait_fields)*
-            }
-
-            impl #generics_with_orig #write_trait_name #generics_with_orig
-            for #library_path::WriteStoreField<#orig, #struct_name #generics>
-            #where_with_orig
-            {
-                #(#write_fields)*
-            } */
-
-            /* impl #generics #library_path::WriteStoreField {
-                #(#write_fields)*
-            } */
         });
     }
 }

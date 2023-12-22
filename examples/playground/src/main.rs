@@ -9,151 +9,78 @@ use tachys::{
     },
 };
 
-struct StateFields {}
-impl StateFields {
-    fn name() -> () {}
-}
-trait StateReadStoreFields<OriginTy, Path, Reader, Writer> {
-    fn name(
-        self,
-    ) -> ::tachys::tachy_reaccy::store::StorePathBuilder<
-        OriginTy,
-        String,
-        impl Iterator<Item = ::tachys::tachy_reaccy::store::StorePathSegment>,
-        Box<dyn Fn(&OriginTy) -> &String>,
-        impl Fn(&mut OriginTy) -> &mut String + 'static,
-    >
-    where
-        OriginTy: 'static,
-        Path: Iterator<Item = ::tachys::tachy_reaccy::store::StorePathSegment>,
-        Reader: Fn(&OriginTy) -> &State + 'static,
-        Writer: Fn(&mut OriginTy) -> &mut State + 'static;
-}
-impl<OriginTy, Path, Reader, Writer>
-    StateReadStoreFields<OriginTy, Path, Reader, Writer>
-    for ::tachys::tachy_reaccy::store::StorePathBuilder<
-        OriginTy,
-        State,
-        Path,
-        Reader,
-        Writer,
-    >
-where
-    OriginTy: 'static,
-{
-    #[inline(always)]
-    fn name(
-        self,
-    ) -> ::tachys::tachy_reaccy::store::StorePathBuilder<
-        OriginTy,
-        String,
-        impl Iterator<Item = ::tachys::tachy_reaccy::store::StorePathSegment>,
-        Box<dyn Fn(&OriginTy) -> &String>,
-        impl Fn(&mut OriginTy) -> &mut String + 'static,
-    >
-    where
-        OriginTy: 'static,
-        Path: Iterator<Item = ::tachys::tachy_reaccy::store::StorePathSegment>,
-        Reader: Fn(&OriginTy) -> &State + 'static,
-        Writer: Fn(&mut OriginTy) -> &mut State + 'static,
-    {
-        let ::tachys::tachy_reaccy::store::StorePathBuilder {
-            data,
-            path,
-            reader,
-            writer,
-            ty,
-        } = self;
-        let reader = Box::new(map_prev(reader, |prev| &prev.name));
-        let writer = map_prev_mut(writer, |prev| &mut prev.name);
-        ::tachys::tachy_reaccy::store::StorePathBuilder {
-            data,
-            path: path.chain(::std::iter::once(
-                ::tachys::tachy_reaccy::store::StorePathSegment::from(
-                    StateFields::name as usize,
-                ),
-            )),
-            reader, //move |orig| &(reader(orig)).name,
-            writer,
-            ty: ::std::marker::PhantomData,
-        }
-    }
-}
-
-fn map_prev<'a, Orig, Prev, PrevT, Next, T>(
-    prev: Prev,
-    next: Next,
-) -> impl Fn(&'a Orig) -> &'a T
-where
-    Orig: 'a,
-    PrevT: 'a,
-    T: 'a,
-    Prev: Fn(&'a Orig) -> &'a PrevT,
-    Next: Fn(&'a PrevT) -> &'a T,
-{
-    move |orig| {
-        let prev = prev(orig);
-        next(prev)
-    }
-}
-
-fn map_prev_mut<'a, Orig, Prev, PrevT, Next, T>(
-    prev: Prev,
-    next: Next,
-) -> impl Fn(&'a mut Orig) -> &'a mut T
-where
-    Orig: 'a,
-    PrevT: 'a,
-    T: 'a,
-    Prev: Fn(&'a mut Orig) -> &'a mut PrevT,
-    Next: Fn(&'a mut PrevT) -> &'a mut T,
-{
-    move |orig| {
-        let prev = prev(orig);
-        next(prev)
-    }
-}
-
-#[derive(/* Store, */ Clone, Default)]
+#[derive(Store, Clone, Default, Debug)]
 struct State {
     pub name: String,
-    //pub todos: Vec<Todo>,
-} /*
+    pub todos: Vec<Todo>,
+}
 
-  #[derive(Store, Clone, Default, Debug)]
-  struct Todo {
-      pub title: String,
-      pub completed: bool,
-  } */
+#[derive(Store, Clone, Default, Debug)]
+struct Todo {
+    pub title: String,
+    pub completed: bool,
+}
 
 pub fn app() -> impl Render<Dom> {
-    let store = ArcStore::new(State {
-        name: String::new(),
-    });
-    let name = store.at();
-    let name = name.name();
-    let name = name.end();
-    /* let store = ArcStore::new(State {
+    let store = Store::new(State {
         name: "Greg".to_string(),
         todos: vec![Todo {
             title: "First task".to_string(),
             completed: false,
         }],
     });
-    let name = store.at().name();
-    let name = name.end(); */
-    /*     let store = Store::new(State {
-        name: "Greg".to_string(),
-        todos: vec![Todo {
-            title: "First task".to_string(),
-            completed: false,
-        }],
-    });
+
     let input_ref = NodeRef::new();
 
-    let todos = move || {
+    view! {
+        <ul>
+            <form on:submit=move |ev| {
+                ev.prevent_default();
+                store.at().todos().write().update(|n| n.push(Todo {
+                    title: input_ref.get().unwrap().value(),
+                    completed: false
+                }));
+            }>
+                <label>
+                    "Add a Todo"
+                    <input type="text" node_ref=input_ref/>
+                </label>
+                <input type="submit"/>
+            </form>
+            {move || {
+                store
+                    .at()
+                    .todos()
+                    .iter()
+                    .map(|todo| {
+                        let completed = todo.clone().completed().rw();
+                        let title = todo.title().rw();
+                        view! {
+                            <li style:text-decoration={
+                                move || completed.get().then_some("line-through").unwrap_or_default()
+                            }>
+                                {move || title.get()}
+                                <input type="checkbox"
+                                    prop:checked={
+                                        move || completed.get()
+                                    }
+                                    on:click=move |_| {
+                                        completed.update(|n| *n = !*n)
+                                    }
+                                />
+                            </li>
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            }}
+        </ul>
+    }
+
+    //let input_ref = NodeRef::new();
+
+    /* let todos = move || {
         store
-            .at_mut()
+            .at()
             .todos()
             .iter_mut()
             .map(|todo| {
@@ -179,13 +106,19 @@ pub fn app() -> impl Render<Dom> {
                 }
             })
             .collect::<Vec<_>>()
-    };
+    }; */
 
-    view! {
-        <pre>{move || store.at().name().get()}</pre>
+    /*view! {
         <input
             type="text"
-            prop:value=move || store.at().name().get()
+            on:input=move |ev| name.set(event_target_value(&ev))
+        />
+        <pre>{move || name.get()}</pre>
+        <pre>"second: " {move || second.get()}</pre>
+        //<pre>{move || store.at().name().rw().get()}</pre>
+        <input
+            type="text"
+            prop:value=move || store.at().name().read().get()
             on:input=move |ev| store.at_mut().name().set(event_target_value(&ev))
         />
         <hr/>
@@ -193,7 +126,7 @@ pub fn app() -> impl Render<Dom> {
             on:submit=move |ev| {
                 ev.prevent_default();
                 let input = input_ref.get().unwrap();
-                store.at_mut().todos().update(|n| n.push(Todo {
+                store.at().todos().update(|n| n.push(Todo {
                     title: input.value(),
                     completed: false
                 }));
@@ -207,13 +140,13 @@ pub fn app() -> impl Render<Dom> {
             <input type="submit" value="Add Todo"/>
         </form>
         <ul>
-            {todos}
+            //{todos}
         </ul>
-    } */
+    }*/
 }
 
 fn main() {
-    //console_error_panic_hook::set_once();
+    console_error_panic_hook::set_once();
 
     /* tracing_subscriber::fmt()
         // this level can be adjusted to filter out messages of different levels of importance

@@ -15,7 +15,17 @@ use std::{
 pub struct ArcTrigger {
     #[cfg(debug_assertions)]
     defined_at: &'static Location<'static>,
-    inner: Arc<RwLock<SubscriberSet>>,
+    pub(crate) inner: Arc<RwLock<SubscriberSet>>,
+}
+
+impl ArcTrigger {
+    pub(crate) fn downgrade(&self) -> WeakTrigger {
+        WeakTrigger {
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
 }
 
 impl Clone for ArcTrigger {
@@ -161,5 +171,38 @@ impl SignalIsDisposed for ArcTrigger {
     #[inline(always)]
     fn is_disposed(&self) -> bool {
         false
+    }
+}
+
+pub(crate) struct WeakTrigger {
+    #[cfg(debug_assertions)]
+    defined_at: &'static Location<'static>,
+    inner: Weak<RwLock<SubscriberSet>>,
+}
+
+impl Clone for WeakTrigger {
+    #[track_caller]
+    fn clone(&self) -> Self {
+        Self {
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            inner: Weak::clone(&self.inner),
+        }
+    }
+}
+
+impl Debug for WeakTrigger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WeakTrigger").finish_non_exhaustive()
+    }
+}
+
+impl WeakTrigger {
+    pub fn upgrade(&self) -> Option<ArcTrigger> {
+        self.inner.upgrade().map(|inner| ArcTrigger {
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            inner,
+        })
     }
 }

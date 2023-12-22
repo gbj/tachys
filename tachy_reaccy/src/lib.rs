@@ -28,7 +28,7 @@ pub mod prelude {
         memo::{ArcMemo, Memo},
         signal::{signal, ArcRwSignal, ReadSignal, RwSignal},
         signal_traits::*,
-        store::StoreAt,
+        store::{StoreAt, StoreField, StoreFieldIndex, StoreFieldIterator},
         Root,
     };
 }

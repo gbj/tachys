@@ -5,7 +5,7 @@ use crate::{
     shared_context::{SharedContext, SsrSharedContext},
     source::{
         AnySource, AnySubscriber, ReactiveNode, Source, Subscriber,
-        ToAnySource, ToAnySubscriber, Track,
+        ToAnySource, ToAnySubscriber,
     },
     unwrap_signal,
 };
@@ -110,6 +110,7 @@ impl Owner {
                 parent,
                 nodes: Default::default(),
                 contexts: Default::default(),
+                cleanups: Default::default(),
             })),
             shared_context: shared_context.flatten(),
         }
@@ -142,6 +143,12 @@ impl Owner {
         }
     }
 
+    pub fn on_cleanup(fun: impl FnOnce() + Send + Sync + 'static) {
+        if let Some(owner) = Owner::get() {
+            owner.inner.write().cleanups.push(Box::new(fun));
+        }
+    }
+
     fn register(&self, node: NodeId) {
         self.inner.write().nodes.push(node);
     }
@@ -151,16 +158,31 @@ impl Owner {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub(crate) struct OwnerInner {
     pub parent: Option<Weak<RwLock<OwnerInner>>>,
     nodes: Vec<NodeId>,
     pub contexts: FxHashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    pub cleanups: Vec<Box<dyn FnOnce() + Send + Sync>>,
+}
+
+impl Debug for OwnerInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OwnerInner")
+            .field("parent", &self.parent)
+            .field("nodes", &self.nodes)
+            .field("contexts", &self.contexts)
+            .field("cleanups", &self.cleanups.len())
+            .finish()
+    }
 }
 
 impl Drop for OwnerInner {
     fn drop(&mut self) {
-        for node in std::mem::take(&mut self.nodes) {
+        for cleanup in mem::take(&mut self.cleanups) {
+            cleanup();
+        }
+        for node in mem::take(&mut self.nodes) {
             _ = MAP.write().remove(node);
         }
     }

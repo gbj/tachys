@@ -60,10 +60,9 @@ impl<Fut: Future> Future for ScopedFuture<Fut> {
         match (this.owner, this.observer) {
             (None, None) => this.fut.poll(cx),
             (None, Some(obs)) => obs.with_observer(|| this.fut.poll(cx)),
-            (Some(owner), None) => owner.with(|| this.fut.poll(cx)),
-            (Some(owner), Some(observer)) => {
-                owner.with(|| observer.with_observer(|| this.fut.poll(cx)))
-            }
+            (Some(owner), None) => owner.with_cleanup(|| this.fut.poll(cx)),
+            (Some(owner), Some(observer)) => owner
+                .with_cleanup(|| observer.with_observer(|| this.fut.poll(cx))),
         }
     }
 }

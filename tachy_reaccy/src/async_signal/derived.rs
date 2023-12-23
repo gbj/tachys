@@ -101,7 +101,7 @@ macro_rules! spawn_derived {
         // b) it was hydrated, and we want to access any reactivity
         if is_ready {
             let owner = this.inner.read().owner.clone();
-            let fut = owner.with(|| {
+            let fut = owner.with_cleanup(|| {
                 any_subscriber
                     .with_observer(|| ScopedFuture::new($fun()))
             });
@@ -118,7 +118,7 @@ macro_rules! spawn_derived {
                         (Some(value), Some(inner), Some(wakers)) => {
                             // generate new Future
                             let owner = inner.read().owner.clone();
-                            let fut = owner.with(|| {
+                            let fut = owner.with_cleanup(|| {
                                 any_subscriber
                                     .with_observer(|| ScopedFuture::new($fun()))
                             });

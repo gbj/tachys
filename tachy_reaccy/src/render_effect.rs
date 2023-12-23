@@ -27,11 +27,12 @@ where
     pub fn new(mut fun: impl FnMut(Option<T>) -> T + 'static) -> Self {
         let (observer, mut rx) = NotificationSender::channel();
         let value = Arc::new(RwLock::new(None));
+        let owner = Owner::new();
         let inner = Arc::new(RwLock::new(EffectInner {
+            owner: owner.clone(),
             observer,
             sources: SourceSet::new(),
         }));
-        let owner = Owner::new();
 
         let initial_value =
             Some(owner.with(|| {
@@ -48,8 +49,9 @@ where
                     subscriber.clear_sources(&subscriber);
 
                     let old_value = mem::take(&mut *value.write());
-                    let new_value = owner
-                        .with(|| subscriber.with_observer(|| fun(old_value)));
+                    let new_value = owner.with_cleanup(|| {
+                        subscriber.with_observer(|| fun(old_value))
+                    });
                     *value.write() = Some(new_value);
                 }
             }
@@ -62,6 +64,17 @@ where
         fun: impl FnOnce(&mut T) -> U,
     ) -> Option<U> {
         self.value.write().as_mut().map(fun)
+    }
+
+    pub fn with_value_mut_and_as_owner<U>(
+        &self,
+        fun: impl FnOnce(&mut T) -> U,
+    ) -> Option<U> {
+        let subscriber = self.inner.to_any_subscriber();
+        let owner = { self.inner.read().owner.clone() };
+        owner.with(|| {
+            subscriber.with_observer(|| self.value.write().as_mut().map(fun))
+        })
     }
 }
 

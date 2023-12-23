@@ -23,6 +23,7 @@ where
 }
 
 pub(crate) struct EffectInner {
+    pub owner: Owner,
     pub observer: NotificationSender,
     pub sources: SourceSet,
 }
@@ -48,11 +49,12 @@ macro_rules! spawn_effect {
         observer.notify();
 
         let value = Arc::new(RwLock::new(None));
+        let owner = Owner::new();
         let inner = Arc::new(RwLock::new(EffectInner {
+            owner: owner.clone(),
             observer,
             sources: SourceSet::new(),
         }));
-        let owner = Owner::new();
 
         $spawner({
             let value = Arc::clone(&value);
@@ -63,8 +65,9 @@ macro_rules! spawn_effect {
                     subscriber.clear_sources(&subscriber);
 
                     let old_value = mem::take(&mut *value.write());
-                    let new_value = owner
-                        .with(|| subscriber.with_observer(|| $fun(old_value)));
+                    let new_value = owner.with_cleanup(|| {
+                        subscriber.with_observer(|| $fun(old_value))
+                    });
                     *value.write() = Some(new_value);
                 }
             }

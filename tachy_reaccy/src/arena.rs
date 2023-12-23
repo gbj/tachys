@@ -129,6 +129,21 @@ impl Owner {
         val
     }
 
+    pub fn with_cleanup<T>(&self, fun: impl FnOnce() -> T) -> T {
+        let (cleanups, nodes) = {
+            let mut lock = self.inner.write();
+            (mem::take(&mut lock.cleanups), mem::take(&mut lock.nodes))
+        };
+        for cleanup in cleanups {
+            cleanup();
+        }
+        for node in nodes {
+            _ = MAP.write().remove(node);
+        }
+
+        self.with(fun)
+    }
+
     #[inline(always)]
     pub fn shared_context() -> Option<Arc<dyn SharedContext + Send + Sync>> {
         #[cfg(feature = "hydration")]

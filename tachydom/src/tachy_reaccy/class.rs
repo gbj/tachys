@@ -44,9 +44,11 @@ where
         })
     }
 
-    fn rebuild(self, _state: &mut Self::State) {
-        // TODO: consider whether dropping and rebuilding RenderEffects
-        // makes sense in some context?
+    fn rebuild(self, state: &mut Self::State) {
+        state.with_value_mut_and_as_owner(|state| {
+            let value = self();
+            value.rebuild(state);
+        });
     }
 }
 

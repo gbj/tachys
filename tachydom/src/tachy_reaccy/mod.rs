@@ -43,6 +43,7 @@ where
 {
     type State = RenderEffect<V::State>;
 
+    #[track_caller]
     fn build(self) -> Self::State {
         RenderEffect::new(move |prev| {
             let value = self();
@@ -57,11 +58,10 @@ where
 
     #[track_caller]
     fn rebuild(self, state: &mut Self::State) {
-        /* crate::log(&format!(
-            "[REBUILDING EFFECT] Is this a mistake? {}",
-            std::panic::Location::caller(),
-        )); */
-        let old_effect = std::mem::replace(state, self.build());
+        state.with_value_mut_and_as_owner(|state| {
+            let value = self();
+            value.rebuild(state);
+        });
     }
 }
 
@@ -225,7 +225,12 @@ where
         })
     }
 
-    fn rebuild(self, key: &str, state: &mut Self::State) {}
+    fn rebuild(self, key: &str, state: &mut Self::State) {
+        state.with_value_mut_and_as_owner(|state| {
+            let value = self();
+            value.rebuild(key, state);
+        });
+    }
 
     /*     fn build(self) -> Self::State {
         RenderEffect::new(move |prev| {
@@ -293,7 +298,12 @@ where
         })
     }
 
-    fn rebuild(self, _state: &mut Self::State, _key: &str) {}
+    fn rebuild(self, state: &mut Self::State, key: &str) {
+        state.with_value_mut_and_as_owner(|state| {
+            let value = self();
+            value.rebuild(state, key);
+        });
+    }
 }
 
 /*

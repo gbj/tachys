@@ -70,8 +70,13 @@ where
         })
     }
 
-    fn rebuild(self, _state: &mut Self::State) {
-        // TODO should this drop and rebuild the effect?
+    fn rebuild(self, state: &mut Self::State) {
+        let (name, f) = self;
+        state.with_value_mut_and_as_owner(|(style, prev)| {
+            let value = f().into();
+            R::set_css_property(style, name, &value);
+            *prev = value;
+        });
     }
 }
 

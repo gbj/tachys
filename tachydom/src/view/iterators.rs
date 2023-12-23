@@ -188,6 +188,7 @@ where
             old.clear();
         } else {
             let mut adds = vec![];
+            let mut removes_at_end = 0;
             for item in self.into_iter().zip_longest(old.iter_mut()) {
                 match item {
                     itertools::EitherOrBoth::Both(new, old) => {
@@ -200,9 +201,13 @@ where
                         }
                         adds.push(new_state);
                     }
-                    itertools::EitherOrBoth::Right(old) => old.unmount(),
+                    itertools::EitherOrBoth::Right(old) => {
+                        removes_at_end += 1;
+                        old.unmount()
+                    }
                 }
             }
+            old.truncate(old.len() - removes_at_end);
             old.append(&mut adds);
         }
     }

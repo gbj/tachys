@@ -1,5 +1,7 @@
-use super::{RwStoreField, StoreField, StorePath, StorePathSegment};
-use crate::{signal::trigger::ArcTrigger, source::Track};
+use super::{
+    RwStoreField, StoreField, StorePath, StorePathSegment, TriggerMap,
+};
+use crate::{signal::trigger::ArcTrigger, source::Track, Owner};
 use parking_lot::{MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock};
 use std::{
     iter,
@@ -48,6 +50,16 @@ where
     }
 
     fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+        // track this index and its parent too
+        // TODO clean this up
+        let my_path = self.path().collect::<StorePath>();
+        let mut parent_path = my_path.clone();
+        parent_path.pop();
+        let my_trigger = self.inner.get_trigger(my_path);
+        my_trigger.track();
+        let parent_trigger = self.inner.get_trigger(parent_path);
+        parent_trigger.track();
+
         self.inner.get_trigger(path)
     }
 

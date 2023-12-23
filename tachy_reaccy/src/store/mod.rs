@@ -90,6 +90,10 @@ impl TriggerMap {
             new
         }
     }
+
+    fn remove(&mut self, key: &StorePath) -> Option<ArcTrigger> {
+        self.0.remove(key)
+    }
 }
 
 impl<T> ArcStore<T> {

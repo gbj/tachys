@@ -2,12 +2,15 @@ use proc_macro2::Span;
 use proc_macro_error::{abort, abort_call_site, proc_macro_error};
 use quote::{quote, ToTokens};
 use syn::{
-    parse::{Parse, ParseStream},
-    Data, Field, Fields, Generics, Ident, Result, Visibility, WhereClause,
+    parse::{Parse, ParseStream, Parser},
+    punctuated::Punctuated,
+    token::Comma,
+    Data, Field, Fields, Generics, Ident, Meta, MetaList, Result, Visibility,
+    WhereClause, Type,
 };
 
 #[proc_macro_error]
-#[proc_macro_derive(Store, attributes(bundle))]
+#[proc_macro_derive(Store, attributes(store))]
 pub fn derive_store(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     syn::parse_macro_input!(input as Model)
         .into_token_stream()
@@ -27,17 +30,16 @@ impl Parse for Model {
         let input = syn::DeriveInput::parse(input)?;
 
         let syn::Data::Struct(s) = input.data else {
-            abort_call_site!("only structs can be used with `SignalBundle`");
+            abort_call_site!("only structs can be used with `Store`");
         };
 
         let (is_tuple_struct, fields) = match s.fields {
             syn::Fields::Unit => {
                 abort!(s.semi_token, "unit structs are not supported");
             }
-            syn::Fields::Named(fields) => (
-                false,
-                fields.named.into_iter().map(Into::into).collect::<Vec<_>>(),
-            ),
+            syn::Fields::Named(fields) => {
+                (false, fields.named.into_iter().collect::<Vec<_>>())
+            }
             syn::Fields::Unnamed(fields) => (
                 true,
                 fields
@@ -55,6 +57,43 @@ impl Parse for Model {
             is_tuple_struct,
             fields,
         })
+    }
+}
+
+#[derive(Clone)]
+enum SubfieldMode {
+    Subfield,
+    Keyed(Ident),
+}
+
+impl Parse for SubfieldMode {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let ident: Ident = input.parse()?;
+        if ident == "keyed" {
+            Ok(SubfieldMode::Keyed(ident))
+        } else {
+            Err(input.error("expected `keyed`"))
+        }
+    }
+}
+
+fn modes_to_tokens(include_body: bool, modes: Option<&[SubfieldMode]>, library_path: &proc_macro2::TokenStream, ident: Option<&Ident>, generics: &Generics, any_store_field: &Ident, struct_name: &Ident, ty: &Type) -> proc_macro2::TokenStream {
+    if let Some(modes) = modes {
+        if modes.len() == 1 {
+            let mode = &modes[0];
+            match mode {
+                SubfieldMode::Keyed(ident) => return quote! {
+                    #[inline(always)]
+                    fn #ident(self) ->  #library_path::Keyed<#any_store_field, #struct_name #generics, #ty>;
+                },
+                _ => {}
+            }
+        }
+    }
+
+    quote! {
+        #[inline(always)]
+        fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
     }
 }
 
@@ -107,12 +146,22 @@ impl ToTokens for Model {
 
         // define an extension trait that matches this struct
         let trait_fields = fields.iter().map(|field| {
-            let Field { vis, ident, ty, .. } = &field;
+            let Field { vis, ident, ty, attrs, .. } = &field;
+            let modes = attrs.iter().find_map(|attr| {
+                attr.meta.path().is_ident("store").then(|| {
+                    match &attr.meta {
+                        Meta::List(list) => {
+                            match Punctuated::<SubfieldMode, Comma>::parse_terminated.parse2(list.tokens.clone()) {
+                                Ok(modes) => Some(modes.iter().cloned().collect::<Vec<_>>()),
+                                Err(e) => abort!(list, e)
+                            }
+                        },
+                        _ => None
+                    }
+                })
+            }).flatten();
 
-            quote! {
-                #[inline(always)]
-                fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
-            }
+            modes_to_tokens(false, modes.as_deref(), &library_path, ident.as_ref(), generics, &any_store_field, struct_name, ty)            
         });
 
         // implement that trait for all StoreFields

@@ -4,23 +4,37 @@ use super::{
 };
 use crate::{
     arena::Stored, signal::trigger::ArcTrigger, signal_traits::DefinedAt,
-    source::Track, unwrap_signal,
+    unwrap_signal,
 };
 use parking_lot::{
-    MappedRwLockReadGuard, MappedRwLockWriteGuard, RawRwLock, RwLock,
-    RwLockReadGuard, RwLockWriteGuard,
+    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard,
 };
-use rustc_hash::FxHashMap;
 use std::{
-    iter::{self, Empty},
+    iter::{self},
     marker::PhantomData,
     panic::Location,
-    sync::{Arc, Weak},
-    vec,
+    sync::Arc,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StorePath(Vec<StorePathSegment>);
+
+impl From<Vec<StorePathSegment>> for StorePath {
+    fn from(value: Vec<StorePathSegment>) -> Self {
+        Self(value)
+    }
+}
+
+impl StorePath {
+    pub fn push(&mut self, segment: impl Into<StorePathSegment>) {
+        self.0.push(segment.into());
+    }
+
+    pub fn pop(&mut self) -> Option<StorePathSegment> {
+        self.0.pop()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StorePathSegment(usize);
@@ -189,7 +203,9 @@ impl<T> StoreField<T> for At<T> {
     type Orig = T;
 
     fn get_trigger(&self, path: StorePath) -> ArcTrigger {
-        self.trigger_map.write().get_or_insert(path)
+        let triggers = &self.trigger_map;
+        let trigger = triggers.write().get_or_insert(path.clone());
+        trigger
     }
 
     fn data(&self) -> Arc<RwLock<Self::Orig>> {

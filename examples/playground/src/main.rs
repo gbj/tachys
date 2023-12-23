@@ -34,16 +34,24 @@ pub fn app() -> impl Render<Dom> {
                 title: "???".to_string(),
                 completed: false,
             },
-            Todo {
+            /* Todo {
                 title: "Profit!!!".to_string(),
                 completed: false,
-            },
+            }, */
         ],
     });
 
     let input_ref = NodeRef::new();
+    let todos = store.at().todos().write();
+    let count = RwSignal::new(0);
 
     view! {
+        <p
+            on:click=move |_| count.update(|n| *n += 1)
+        >{move || {
+            log("running `sum`");
+            store.at().todos().iter().map(|_| 1).sum::<usize>()
+        }}</p>
         <form on:submit=move |ev| {
             ev.prevent_default();
             store.at().todos().arc_write().update(|n| n.push(Todo {
@@ -59,54 +67,52 @@ pub fn app() -> impl Render<Dom> {
         </form>
         <ol>
             {move || {
+                log("rerendering list");
                 store
                     .at()
                     .todos()
                     .iter()
                     .enumerate()
                     .map(|(idx, todo)| {
-                        let completed = todo.clone().completed().arc_rw();
-                        let title = todo.title().arc_rw();
+                        let completed = todo.clone().completed().rw();
+                        let title = todo.title().rw();
 
-                        let (editing, set_editing) = signal(false);
+                        let editing = RwSignal::new(false);
 
                         view! {
                             <li style:text-decoration={
-                                let completed = completed.clone();
                                 move || completed.get().then_some("line-through").unwrap_or_default()
                             }
                                 class:foo=move || completed.get()
                             >
+                                {move || editing.get()}
                                 <p class:hidden=move || editing.get()
-                                    on:click=move |_| set_editing.set(true)
+                                    on:click=move |_| {
+                                        log(&format!("editing = {editing:?}"));
+                                        editing.update(|n| *n = !*n);
+                                    }
                                 >
-                                    {let title = title.clone();  move || title.get()}
+                                    {move || title.get()}
                                 </p>
                                 <input
                                     class:hidden=move || !(editing.get())
                                     type="text"
-                                    prop:disabled=move || !(editing.get())
-                                    prop:value={let title = title.clone(); move || title.get()}
-                                    on:change={
-                                        let title = title.clone();
-                                        move |ev| {
-                                            title.set(event_target_value(&ev));
-                                            set_editing.set(false);
-                                        }
+                                    prop:value=move || title.get()
+                                    on:change=move |ev| {
+                                        title.set(event_target_value(&ev));
+                                        editing.set(false);
                                     }
-                                    on:blur=move |_| set_editing.set(false)
+                                    on:blur=move |_| editing.set(false)
+                                    autofocus
                                 />
                                 <input type="checkbox"
-                                    prop:checked={
-                                        let completed = completed.clone();
-                                        move || completed.get()
-                                    }
-                                    on:click={let completed = completed.clone(); move |_| {
+                                    prop:checked=move || completed.get()
+                                    on:click=move |_| {
                                         completed.update(|n| *n = !*n)
-                                    }}
+                                    }
                                 />
                                 <button on:click=move |_| {
-                                    store.at().todos().arc_write().update(|n| {
+                                    todos.update(|n| {
                                         n.remove(idx);
                                     });
                                 }>

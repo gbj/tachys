@@ -171,8 +171,8 @@ impl DomRenderer for Dom {
         el: &Self::Element,
         name: &str,
         cb: Box<dyn FnMut(Self::Event)>,
-    ) {
-        let cb = wasm_bindgen::closure::Closure::wrap(cb).into_js_value();
+    ) -> Box<dyn FnOnce(&Self::Element)> {
+        let cb = wasm_bindgen::closure::Closure::wrap(cb);
         let name = intern(name);
         or_debug!(
             el.add_event_listener_with_callback(
@@ -182,6 +182,21 @@ impl DomRenderer for Dom {
             el,
             "addEventListener"
         );
+
+        // return the remover
+        Box::new({
+            let name = name.to_owned();
+            move |el| {
+                or_debug!(
+                    el.remove_event_listener_with_callback(
+                        intern(&name),
+                        cb.as_ref().unchecked_ref()
+                    ),
+                    el,
+                    "removeEventListener"
+                )
+            }
+        })
     }
 
     fn add_event_listener_delegated(
@@ -189,7 +204,7 @@ impl DomRenderer for Dom {
         name: Cow<'static, str>,
         delegation_key: Cow<'static, str>,
         cb: Box<dyn FnMut(Self::Event)>,
-    ) {
+    ) -> Box<dyn FnOnce(&Self::Element)> {
         let cb = Closure::wrap(cb).into_js_value();
         let key = intern(&delegation_key);
         or_debug!(
@@ -264,6 +279,18 @@ impl DomRenderer for Dom {
                 // register that we've created handler
                 events.insert(name);
             }
+        });
+
+        // return the remover
+        Box::new(move |el| {
+            or_debug!(
+                js_sys::Reflect::delete_property(
+                    el,
+                    &JsValue::from_str(intern(&delegation_key))
+                ),
+                el,
+                "delete property"
+            );
         })
     }
 

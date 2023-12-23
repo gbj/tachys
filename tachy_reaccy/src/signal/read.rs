@@ -4,10 +4,18 @@ use crate::{
     prelude::{DefinedAt, SignalWithUntracked},
     source::{AnySource, AnySubscriber, ReactiveNode, Source, ToAnySource},
 };
-use std::panic::Location;
+use std::{fmt::Debug, panic::Location};
 
 pub struct ReadSignal<T: Send + Sync + 'static> {
     pub(crate) inner: Stored<ArcReadSignal<T>>,
+}
+
+impl<T: Send + Sync + 'static> Debug for ReadSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadSignal")
+            .field("inner", &self.inner)
+            .finish()
+    }
 }
 
 impl<T: Send + Sync + 'static> StoredData for ReadSignal<T> {
@@ -31,6 +39,12 @@ impl<T: Send + Sync + 'static> Clone for ReadSignal<T> {
 impl<T: Send + Sync + 'static> Copy for ReadSignal<T> {}
 
 pub struct ArcReadSignal<T>(pub(crate) ArcRwSignal<T>);
+
+impl<T> Debug for ArcReadSignal<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ArcReadSignal").field(&self.0).finish()
+    }
+}
 
 impl<T> Clone for ArcReadSignal<T> {
     fn clone(&self) -> Self {

@@ -222,7 +222,7 @@ impl DomRenderer for MockDom {
         el: &Self::Element,
         name: &str,
         cb: Box<dyn FnMut(Self::Event)>,
-    ) {
+    ) -> Box<dyn FnOnce(&Self::Element)> {
         todo!()
     }
 
@@ -231,7 +231,7 @@ impl DomRenderer for MockDom {
         name: Cow<'static, str>,
         delegation_key: Cow<'static, str>,
         cb: Box<dyn FnMut(Self::Event)>,
-    ) {
+    ) -> Box<dyn FnOnce(&Self::Element)> {
         todo!()
     }
 

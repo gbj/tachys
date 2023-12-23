@@ -104,19 +104,23 @@ pub trait DomRenderer: Renderer {
     fn set_property(el: &Self::Element, key: &str, value: &JsValue);
 
     /// Adds an event listener to an element.
+    ///
+    /// Returns a function to remove the listener.
     fn add_event_listener(
         el: &Self::Element,
         name: &str,
         cb: Box<dyn FnMut(Self::Event)>,
-    );
+    ) -> Box<dyn FnOnce(&Self::Element)>;
 
     /// Adds an event listener to an element, delegated to the window if possible.
+    ///
+    /// Returns a function to remove the listener.
     fn add_event_listener_delegated(
         el: &Self::Element,
         name: Cow<'static, str>,
         delegation_key: Cow<'static, str>,
         cb: Box<dyn FnMut(Self::Event)>,
-    );
+    ) -> Box<dyn FnOnce(&Self::Element)>;
 
     /// The list of CSS classes for an element.
     fn class_list(el: &Self::Element) -> Self::ClassList;

@@ -83,7 +83,6 @@ fn modes_to_tokens(include_body: bool, modes: Option<&[SubfieldMode]>, library_p
             let mode = &modes[0];
             match mode {
                 SubfieldMode::Keyed(ident) => return quote! {
-                    #[inline(always)]
                     fn #ident(self) ->  #library_path::Keyed<#any_store_field, #struct_name #generics, #ty>;
                 },
                 _ => {}
@@ -92,7 +91,6 @@ fn modes_to_tokens(include_body: bool, modes: Option<&[SubfieldMode]>, library_p
     }
 
     quote! {
-        #[inline(always)]
         fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
     }
 }

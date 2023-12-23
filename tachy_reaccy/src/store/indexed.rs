@@ -49,18 +49,22 @@ where
         self.inner.data()
     }
 
-    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+    fn get_track(&self, path: StorePath) -> ArcTrigger {
         // track this index and its parent too
         // TODO clean this up
         let my_path = self.path().collect::<StorePath>();
         let mut parent_path = my_path.clone();
         parent_path.pop();
-        let my_trigger = self.inner.get_trigger(my_path);
+        let my_trigger = self.inner.get_track(my_path);
         my_trigger.track();
-        let parent_trigger = self.inner.get_trigger(parent_path);
+        let parent_trigger = self.inner.get_track(parent_path);
         parent_trigger.track();
 
-        self.inner.get_trigger(path)
+        self.inner.get_track(path)
+    }
+
+    fn get_notify(&self, path: StorePath) -> ArcTrigger {
+        self.inner.get_notify(path)
     }
 
     fn path(&self) -> impl Iterator<Item = StorePathSegment> {
@@ -113,7 +117,7 @@ where
 {
     fn iter(self) -> StoreFieldIter<Inner, Prev> {
         // reactively track changes to this field
-        let trigger = self.get_trigger(self.path().collect());
+        let trigger = self.get_track(self.path().collect());
         trigger.track();
 
         // get the current length of the field by accessing slice

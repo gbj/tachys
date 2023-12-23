@@ -1,3 +1,4 @@
+use super::RenderEffectState;
 use crate::{html::class::IntoClass, renderer::DomRenderer};
 use tachy_reaccy::render_effect::RenderEffect;
 
@@ -10,7 +11,7 @@ where
     R::ClassList: 'static,
     R::Element: Clone + 'static,
 {
-    type State = RenderEffect<C::State>;
+    type State = RenderEffectState<C::State>;
 
     fn to_html(self, class: &mut String) {
         let value = self();
@@ -29,6 +30,7 @@ where
                 value.hydrate::<FROM_SERVER>(&el)
             }
         })
+        .into()
     }
 
     fn build(self, el: &R::Element) -> Self::State {
@@ -42,13 +44,30 @@ where
                 value.build(&el)
             }
         })
+        .into()
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        state.with_value_mut_and_as_owner(|state| {
-            let value = self();
-            value.rebuild(state);
-        });
+        crate::log("rebuilt class starting...");
+        let prev_effect = std::mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                crate::log("rebuilt class");
+                let value = self();
+                if let Some(mut state) = prev {
+                    crate::log("  rebuilt it");
+                    value.rebuild(&mut state);
+                    state
+                } else {
+                    crate::log("  oh no!");
+                    todo!()
+                }
+            },
+            prev_value,
+        )
+        .into();
     }
 }
 
@@ -56,10 +75,10 @@ impl<F, R> IntoClass<R> for (&'static str, F)
 where
     F: Fn() -> bool + 'static,
     R: DomRenderer,
-    R::ClassList: 'static,
+    R::ClassList: Clone + 'static,
     R::Element: Clone,
 {
-    type State = RenderEffect<bool>;
+    type State = RenderEffectState<(R::ClassList, bool)>;
 
     fn to_html(self, class: &mut String) {
         let (name, f) = self;
@@ -73,34 +92,72 @@ where
         // TODO FROM_SERVER vs template
         let (name, f) = self;
         let class_list = R::class_list(el);
-        RenderEffect::new(move |prev| {
+        RenderEffect::new(move |prev: Option<(R::ClassList, bool)>| {
             let include = f();
-            if Some(include) != prev {
+            if let Some((class_list, prev)) = prev {
                 if include {
-                    R::add_class(&class_list, name);
-                } else {
+                    if !prev {
+                        R::add_class(&class_list, name);
+                    }
+                } else if prev {
                     R::remove_class(&class_list, name);
                 }
             }
-            include
+            (class_list.clone(), include)
         })
+        .into()
     }
 
     fn build(self, el: &R::Element) -> Self::State {
         let (name, f) = self;
         let class_list = R::class_list(el);
-        RenderEffect::new(move |prev| {
+        RenderEffect::new(move |prev: Option<(R::ClassList, bool)>| {
             let include = f();
-            if Some(include) != prev {
-                if include {
-                    R::add_class(&class_list, name);
-                } else {
-                    R::remove_class(&class_list, name);
+            match prev {
+                Some((class_list, prev)) => {
+                    if include {
+                        if !prev {
+                            R::add_class(&class_list, name);
+                        }
+                    } else if prev {
+                        R::remove_class(&class_list, name);
+                    }
+                }
+                None => {
+                    if include {
+                        R::add_class(&class_list, name);
+                    }
                 }
             }
-            include
+            (class_list.clone(), include)
         })
+        .into()
     }
 
-    fn rebuild(self, state: &mut Self::State) {}
+    fn rebuild(self, state: &mut Self::State) {
+        let (name, f) = self;
+        let prev_effect = std::mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                let include = f();
+                match prev {
+                    Some((class_list, prev)) => {
+                        if include {
+                            if !prev {
+                                R::add_class(&class_list, name);
+                            }
+                        } else if prev {
+                            R::remove_class(&class_list, name);
+                        }
+                        (class_list.clone(), include)
+                    }
+                    None => unreachable!(),
+                }
+            },
+            prev_value,
+        )
+        .into();
+    }
 }

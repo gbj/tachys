@@ -38,7 +38,7 @@ where
 pub struct On<R: DomRenderer> {
     name: Cow<'static, str>,
     #[allow(clippy::type_complexity)]
-    setup: Box<dyn FnOnce(&R::Element)>,
+    setup: Box<dyn FnOnce(&R::Element) -> Box<dyn FnOnce(&R::Element)>>,
     ty: PhantomData<R>,
 }
 
@@ -54,9 +54,11 @@ where
 impl<R> Attribute<R> for On<R>
 where
     R: DomRenderer,
+    R::Element: Clone,
 {
     const MIN_LENGTH: usize = 0;
-    type State = ();
+    // a function that can be called once to remove the event listener
+    type State = (R::Element, Option<Box<dyn FnOnce(&R::Element)>>);
 
     #[inline(always)]
     fn to_html(
@@ -69,19 +71,25 @@ where
     }
 
     #[inline(always)]
-    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) {
-        #[cfg(target_arch = "wasm32")]
-        (self.setup)(el);
+    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+        let cleanup = (self.setup)(el);
+        (el.clone(), Some(cleanup))
     }
 
     #[inline(always)]
-    fn build(self, el: &R::Element) {
-        #[cfg(target_arch = "wasm32")]
-        (self.setup)(el);
+    fn build(self, el: &R::Element) -> Self::State {
+        let cleanup = (self.setup)(el);
+        (el.clone(), Some(cleanup))
     }
 
     #[inline(always)]
-    fn rebuild(self, _state: &mut Self::State) {}
+    fn rebuild(self, state: &mut Self::State) {
+        let (el, prev_cleanup) = state;
+        if let Some(prev) = prev_cleanup.take() {
+            prev(el);
+        }
+        *prev_cleanup = Some((self.setup)(el));
+    }
 }
 
 impl<R> ToTemplate for On<R>

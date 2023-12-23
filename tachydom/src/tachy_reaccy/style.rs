@@ -1,3 +1,4 @@
+use super::RenderEffectState;
 use crate::{html::style::IntoStyle, renderer::DomRenderer};
 use std::borrow::Cow;
 use tachy_reaccy::render_effect::RenderEffect;
@@ -9,7 +10,7 @@ where
     R: DomRenderer,
     R::CssStyleDeclaration: Clone + 'static,
 {
-    type State = RenderEffect<(R::CssStyleDeclaration, Cow<'static, str>)>;
+    type State = RenderEffectState<(R::CssStyleDeclaration, Cow<'static, str>)>;
 
     fn to_html(self, style: &mut String) {
         let (name, f) = self;
@@ -45,6 +46,7 @@ where
                 (style.clone(), value)
             }
         })
+        .into()
     }
 
     fn build(self, el: &R::Element) -> Self::State {
@@ -68,15 +70,31 @@ where
                 (style.clone(), value)
             }
         })
+        .into()
     }
 
     fn rebuild(self, state: &mut Self::State) {
         let (name, f) = self;
-        state.with_value_mut_and_as_owner(|(style, prev)| {
-            let value = f().into();
-            R::set_css_property(style, name, &value);
-            *prev = value;
-        });
+        let prev_effect = std::mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                let value = f().into();
+                if let Some(mut state) = prev {
+                    let (style, prev) = &mut state;
+                    if &value != prev {
+                        R::set_css_property(&style, name, &value);
+                    }
+                    *prev = value;
+                    state
+                } else {
+                    todo!()
+                }
+            },
+            prev_value,
+        )
+        .into();
     }
 }
 

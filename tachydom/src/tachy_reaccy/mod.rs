@@ -9,6 +9,7 @@ use crate::{
         Render, RenderHtml, ToTemplate,
     },
 };
+use std::mem;
 use tachy_reaccy::{async_signal::ScopedFuture, render_effect::RenderEffect};
 
 mod class;
@@ -41,7 +42,7 @@ where
     V::State: 'static,
     R: Renderer,
 {
-    type State = RenderEffect<V::State>;
+    type State = RenderEffectState<V::State>;
 
     #[track_caller]
     fn build(self) -> Self::State {
@@ -54,14 +55,65 @@ where
                 value.build()
             }
         })
+        .into()
     }
 
     #[track_caller]
     fn rebuild(self, state: &mut Self::State) {
-        state.with_value_mut_and_as_owner(|state| {
-            let value = self();
-            value.rebuild(state);
-        });
+        let prev_effect = mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                let value = self();
+                if let Some(mut state) = prev {
+                    value.rebuild(&mut state);
+                    state
+                } else {
+                    value.build()
+                }
+            },
+            prev_value,
+        )
+        .into();
+    }
+}
+
+pub struct RenderEffectState<T: 'static>(Option<RenderEffect<T>>);
+
+impl<T> From<RenderEffect<T>> for RenderEffectState<T> {
+    fn from(value: RenderEffect<T>) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl<T, R> Mountable<R> for RenderEffectState<T>
+where
+    T: Mountable<R>,
+    R: Renderer,
+{
+    fn unmount(&mut self) {
+        if let Some(ref mut inner) = self.0 {
+            inner.unmount();
+        }
+    }
+
+    fn mount(&mut self, parent: &R::Element, marker: Option<&R::Node>) {
+        if let Some(ref mut inner) = self.0 {
+            inner.mount(parent, marker);
+        }
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &R::Element,
+        child: &mut dyn Mountable<R>,
+    ) -> bool {
+        if let Some(inner) = &self.0 {
+            inner.insert_before_this(parent, child)
+        } else {
+            false
+        }
     }
 }
 
@@ -132,6 +184,7 @@ where
                 value.hydrate::<FROM_SERVER>(&cursor, &position)
             }
         })
+        .into()
     }
 }
 
@@ -184,7 +237,7 @@ where
     R: Renderer,
     R::Element: Clone + 'static,
 {
-    type State = RenderEffect<V::State>;
+    type State = RenderEffectState<V::State>;
 
     fn to_html(self, key: &str, buf: &mut String) {
         let value = self();
@@ -209,6 +262,7 @@ where
                 value.hydrate::<FROM_SERVER>(&key, &el)
             }
         })
+        .into()
     }
 
     fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
@@ -223,13 +277,27 @@ where
                 value.build(&el, &key)
             }
         })
+        .into()
     }
 
     fn rebuild(self, key: &str, state: &mut Self::State) {
-        state.with_value_mut_and_as_owner(|state| {
-            let value = self();
-            value.rebuild(key, state);
-        });
+        let prev_effect = mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        let key = key.to_owned();
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                let value = self();
+                if let Some(mut state) = prev {
+                    value.rebuild(&key, &mut state);
+                    state
+                } else {
+                    unreachable!()
+                }
+            },
+            prev_value,
+        )
+        .into();
     }
 
     /*     fn build(self) -> Self::State {
@@ -264,7 +332,7 @@ where
     R: DomRenderer,
     R::Element: Clone + 'static,
 {
-    type State = RenderEffect<V::State>;
+    type State = RenderEffectState<V::State>;
 
     fn hydrate<const FROM_SERVER: bool>(
         self,
@@ -282,6 +350,7 @@ where
                 value.hydrate::<FROM_SERVER>(&el, &key)
             }
         })
+        .into()
     }
 
     fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
@@ -296,13 +365,27 @@ where
                 value.build(&el, &key)
             }
         })
+        .into()
     }
 
     fn rebuild(self, state: &mut Self::State, key: &str) {
-        state.with_value_mut_and_as_owner(|state| {
-            let value = self();
-            value.rebuild(state, key);
-        });
+        let prev_effect = mem::take(&mut state.0);
+        let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
+        drop(prev_effect);
+        let key = key.to_owned();
+        *state = RenderEffect::new_with_value(
+            move |prev| {
+                let value = self();
+                if let Some(mut state) = prev {
+                    value.rebuild(&mut state, &key);
+                    state
+                } else {
+                    unreachable!()
+                }
+            },
+            prev_value,
+        )
+        .into();
     }
 }
 

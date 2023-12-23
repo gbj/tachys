@@ -24,7 +24,14 @@ impl<T> RenderEffect<T>
 where
     T: 'static,
 {
-    pub fn new(mut fun: impl FnMut(Option<T>) -> T + 'static) -> Self {
+    pub fn new(fun: impl FnMut(Option<T>) -> T + 'static) -> Self {
+        Self::new_with_value(fun, None)
+    }
+
+    pub fn new_with_value(
+        mut fun: impl FnMut(Option<T>) -> T + 'static,
+        initial_value: Option<T>,
+    ) -> Self {
         let (observer, mut rx) = NotificationSender::channel();
         let value = Arc::new(RwLock::new(None));
         let owner = Owner::new();
@@ -34,10 +41,11 @@ where
             sources: SourceSet::new(),
         }));
 
-        let initial_value =
-            Some(owner.with(|| {
-                inner.to_any_subscriber().with_observer(|| fun(None))
-            }));
+        let initial_value = Some(owner.with(|| {
+            inner
+                .to_any_subscriber()
+                .with_observer(|| fun(initial_value))
+        }));
         *value.write() = initial_value;
 
         spawn_local({
@@ -66,15 +74,8 @@ where
         self.value.write().as_mut().map(fun)
     }
 
-    pub fn with_value_mut_and_as_owner<U>(
-        &self,
-        fun: impl FnOnce(&mut T) -> U,
-    ) -> Option<U> {
-        let subscriber = self.inner.to_any_subscriber();
-        let owner = { self.inner.read().owner.clone() };
-        owner.with(|| {
-            subscriber.with_observer(|| self.value.write().as_mut().map(fun))
-        })
+    pub fn take_value(&self) -> Option<T> {
+        self.value.write().take()
     }
 }
 

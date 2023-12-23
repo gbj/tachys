@@ -62,7 +62,9 @@ pub trait StoreField<T>: Sized {
 
     fn data(&self) -> Arc<RwLock<Self::Orig>>;
 
-    fn get_trigger(&self, path: StorePath) -> ArcTrigger;
+    fn get_track(&self, path: StorePath) -> ArcTrigger;
+
+    fn get_notify(&self, path: StorePath) -> ArcTrigger;
 
     fn path(&self) -> impl Iterator<Item = StorePathSegment>;
 
@@ -122,7 +124,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_trigger(self.path().collect()),
+            trigger: self.get_track(self.path().collect()),
             read: Arc::new({
                 let read = self.reader();
                 move |orig| read(orig)
@@ -136,7 +138,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_trigger(self.path().collect()),
+            trigger: self.get_notify(self.path().collect()),
             write: Arc::new({
                 let write = self.writer();
                 move |orig| write(orig)
@@ -153,7 +155,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_trigger(self.path().collect()),
+            trigger: self.get_notify(self.path().collect()),
             read: Arc::new({
                 let read = self.clone().reader();
                 move |orig| read(orig)
@@ -202,10 +204,14 @@ impl<Orig> Clone for At<Orig> {
 impl<T> StoreField<T> for At<T> {
     type Orig = T;
 
-    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+    fn get_track(&self, path: StorePath) -> ArcTrigger {
         let triggers = &self.trigger_map;
         let trigger = triggers.write().get_or_insert(path.clone());
         trigger
+    }
+
+    fn get_notify(&self, path: StorePath) -> ArcTrigger {
+        self.get_track(path)
     }
 
     fn data(&self) -> Arc<RwLock<Self::Orig>> {
@@ -332,8 +338,12 @@ where
         self.inner.data()
     }
 
-    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
-        self.inner.get_trigger(path)
+    fn get_track(&self, path: StorePath) -> ArcTrigger {
+        self.inner.get_track(path)
+    }
+
+    fn get_notify(&self, path: StorePath) -> ArcTrigger {
+        self.inner.get_notify(path)
     }
 
     fn reader(

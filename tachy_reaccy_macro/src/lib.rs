@@ -106,8 +106,6 @@ impl ToTokens for Model {
             fields,
         } = &self;
         let any_store_field = Ident::new("AnyStoreField", Span::call_site());
-        let field_names_struct_name =
-            Ident::new(&format!("{struct_name}Fields"), struct_name.span());
         let trait_name = Ident::new(
             &format!("{struct_name}StoreFields"),
             struct_name.span(),
@@ -134,14 +132,6 @@ impl ToTokens for Model {
                 .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<#struct_name #generics> })
         };
 
-        let field_names = fields.iter().map(|field| {
-            let Field { vis, ident, ty, .. } = &field;
-
-            quote! {
-                fn #ident() {}
-            }
-        });
-
         // define an extension trait that matches this struct
         let trait_fields = fields.iter().map(|field| {
             let Field { vis, ident, ty, attrs, .. } = &field;
@@ -163,7 +153,7 @@ impl ToTokens for Model {
         });
 
         // implement that trait for all StoreFields
-        let read_fields = fields.iter().map(|field| {
+        let read_fields = fields.iter().enumerate().map(|(idx, field)| {
             let Field { vis, ident, ty, .. } = &field;
 
             quote! {
@@ -171,7 +161,7 @@ impl ToTokens for Model {
                 fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty> {
                     #library_path::Subfield::new(
                         self,
-                        (#field_names_struct_name::#ident as usize).into(),
+                        #idx.into(),
                         |prev| &prev.#ident,
                         |prev| &mut prev.#ident,
                     )
@@ -181,12 +171,6 @@ impl ToTokens for Model {
 
         // read access
         tokens.extend(quote! {
-            struct #field_names_struct_name #generics {}
-
-            impl #generics #field_names_struct_name #generics {
-                #(#field_names)*
-            }
-
             #vis trait #trait_name <AnyStoreField>
             #where_with_orig
             {

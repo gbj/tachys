@@ -1,12 +1,18 @@
 use super::{
     RwStoreField, StoreField, StorePath, StorePathSegment, TriggerMap,
 };
-use crate::{signal::trigger::ArcTrigger, source::Track, Owner};
+use crate::{
+    prelude::{DefinedAt, SignalIsDisposed, SignalUpdate, SignalWithUntracked},
+    signal::trigger::ArcTrigger,
+    source::Track,
+    Owner,
+};
 use parking_lot::{MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock};
 use std::{
     iter,
     marker::PhantomData,
     ops::{Index, IndexMut},
+    panic::Location,
     sync::Arc,
 };
 
@@ -19,8 +25,11 @@ where
     Inner: StoreField<Prev> + Send + Sync + Clone + 'static,
     Prev: Index<Idx> + IndexMut<Idx>,
 {
+    #[track_caller]
     fn index(self, index: Idx) -> AtIndex<Inner, Prev, Idx> {
         AtIndex {
+            #[cfg(debug_assertions)]
+            defined_at: Location::caller(),
             inner: self,
             idx: index,
             prev: PhantomData,
@@ -28,11 +37,36 @@ where
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub struct AtIndex<Inner, Prev, Idx> {
+    #[cfg(debug_assertions)]
+    defined_at: &'static Location<'static>,
     inner: Inner,
     idx: Idx,
     prev: PhantomData<Prev>,
+}
+
+impl<Inner, Prev, Idx> Clone for AtIndex<Inner, Prev, Idx>
+where
+    Inner: Clone,
+    Idx: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            inner: self.inner.clone(),
+            idx: self.idx.clone(),
+            prev: PhantomData,
+        }
+    }
+}
+
+impl<Inner, Prev, Idx> Copy for AtIndex<Inner, Prev, Idx>
+where
+    Inner: Copy,
+    Idx: Copy,
+{
 }
 
 impl<Inner, Prev, Idx> StoreField<Prev::Output> for AtIndex<Inner, Prev, Idx>
@@ -45,28 +79,17 @@ where
 {
     type Orig = Inner::Orig;
 
+    #[inline(always)]
     fn data(&self) -> Arc<RwLock<Self::Orig>> {
         self.inner.data()
     }
 
-    fn get_track(&self, path: StorePath) -> ArcTrigger {
-        // track this index and its parent too
-        // TODO clean this up
-        let my_path = self.path().collect::<StorePath>();
-        let mut parent_path = my_path.clone();
-        parent_path.pop();
-        let my_trigger = self.inner.get_track(my_path);
-        my_trigger.track();
-        let parent_trigger = self.inner.get_track(parent_path);
-        parent_trigger.track();
-
-        self.inner.get_track(path)
+    #[inline(always)]
+    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+        self.inner.get_trigger(path)
     }
 
-    fn get_notify(&self, path: StorePath) -> ArcTrigger {
-        self.inner.get_notify(path)
-    }
-
+    #[inline(always)]
     fn path(&self) -> impl Iterator<Item = StorePathSegment> {
         self.inner.path().chain(iter::once((&self.idx).into()))
     }
@@ -104,6 +127,77 @@ where
     }
 }
 
+impl<Inner, Prev, Idx> DefinedAt for AtIndex<Inner, Prev, Idx> {
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        #[cfg(debug_assertions)]
+        {
+            Some(self.defined_at)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+}
+
+impl<Inner, Prev, Idx> Track for AtIndex<Inner, Prev, Idx>
+where
+    Inner: StoreField<Prev> + Send + Sync + Clone + 'static,
+    Prev: Index<Idx> + IndexMut<Idx> + 'static,
+    Prev::Output: Sized,
+    for<'a> &'a Idx: Into<StorePathSegment>,
+    Idx: Clone + Send + Sync + 'static,
+{
+    fn track(&self) {
+        let trigger = self.get_trigger(self.path().collect());
+        trigger.track();
+    }
+}
+
+impl<Inner, Prev, Idx> SignalWithUntracked for AtIndex<Inner, Prev, Idx>
+where
+    Inner: StoreField<Prev> + SignalWithUntracked<Value = Prev>,
+    Prev: Index<Idx> + IndexMut<Idx> + 'static,
+    Prev::Output: Sized,
+    Idx: Clone + 'static,
+{
+    type Value = Prev::Output;
+
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        self.inner
+            .try_with_untracked(|prev| fun(&prev[self.idx.clone()]))
+    }
+}
+
+impl<Inner, Prev, Idx> SignalIsDisposed for AtIndex<Inner, Prev, Idx> {
+    fn is_disposed(&self) -> bool {
+        false
+    }
+}
+
+impl<Inner, Prev, Idx> SignalUpdate for AtIndex<Inner, Prev, Idx>
+where
+    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+    Prev: Index<Idx> + IndexMut<Idx> + 'static,
+    Prev::Output: Sized,
+    Idx: Clone,
+{
+    type Value = Prev::Output;
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        self.inner.try_update(|prev: &mut Prev| {
+            let this = &mut prev[self.idx.clone()];
+            fun(this)
+        })
+    }
+}
+
 pub trait StoreFieldIterator<Prev>: Sized {
     fn iter(self) -> StoreFieldIter<Self, Prev>;
 }
@@ -117,7 +211,7 @@ where
 {
     fn iter(self) -> StoreFieldIter<Inner, Prev> {
         // reactively track changes to this field
-        let trigger = self.get_track(self.path().collect());
+        let trigger = self.get_trigger(self.path().collect());
         trigger.track();
 
         // get the current length of the field by accessing slice

@@ -134,17 +134,31 @@ impl<T> Clone for ArcStore<T> {
     }
 }
 
-impl<T> DefinedAt for ArcStore<T> {
-    #[inline(always)]
-    fn defined_at(&self) -> Option<&'static Location<'static>> {
-        #[cfg(debug_assertions)]
-        {
-            Some(self.defined_at)
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            None
-        }
+impl<T> SignalWithUntracked for ArcStore<T> {
+    type Value = T;
+
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        Some(fun(&self.value.read()))
+    }
+}
+
+impl<T> SignalUpdate for ArcStore<T> {
+    type Value = T;
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        Some(fun(&mut self.value.write()))
+    }
+}
+
+impl<T> SignalIsDisposed for ArcStore<T> {
+    fn is_disposed(&self) -> bool {
+        false
     }
 }
 

@@ -34,27 +34,21 @@ pub fn app() -> impl Render<Dom> {
                 title: "???".to_string(),
                 completed: false,
             },
-            /* Todo {
+            Todo {
                 title: "Profit!!!".to_string(),
                 completed: false,
-            }, */
+            },
         ],
     });
 
     let input_ref = NodeRef::new();
-    let todos = store.at().todos().write();
+    let todos = store.todos().write();
     let count = RwSignal::new(0);
 
     view! {
-        <p
-            on:click=move |_| count.update(|n| *n += 1)
-        >{move || {
-            log("running `sum`");
-            store.at().todos().iter().map(|_| 1).sum::<usize>()
-        }}</p>
         <form on:submit=move |ev| {
             ev.prevent_default();
-            store.at().todos().arc_write().update(|n| n.push(Todo {
+            store.todos().update(|n| n.push(Todo {
                 title: input_ref.get().unwrap().value(),
                 completed: false
             }));
@@ -67,15 +61,13 @@ pub fn app() -> impl Render<Dom> {
         </form>
         <ol>
             {move || {
-                log("rerendering list");
                 store
-                    .at()
                     .todos()
                     .iter()
                     .enumerate()
                     .map(|(idx, todo)| {
-                        let completed = todo.clone().completed().rw();
-                        let title = todo.title().rw();
+                        let completed = todo.completed();
+                        let title = todo.title();
 
                         let editing = RwSignal::new(false);
 
@@ -88,7 +80,6 @@ pub fn app() -> impl Render<Dom> {
                                 {move || editing.get()}
                                 <p class:hidden=move || editing.get()
                                     on:click=move |_| {
-                                        log(&format!("editing = {editing:?}"));
                                         editing.update(|n| *n = !*n);
                                     }
                                 >
@@ -124,14 +115,11 @@ pub fn app() -> impl Render<Dom> {
                     .collect::<Vec<_>>()
             }}
         </ol>
-        <pre>
-            {move || format!("{:#?}", store.at().todos().arc_read().get())}
-        </pre>
     }
 }
 
 fn main() {
-    console_error_panic_hook::set_once();
+    //console_error_panic_hook::set_once();
 
     /* tracing_subscriber::fmt()
         // this level can be adjusted to filter out messages of different levels of importance

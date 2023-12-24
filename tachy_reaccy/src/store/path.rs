@@ -1,9 +1,12 @@
 use super::{
     ArcReadStoreField, ArcRwStoreField, ArcStore, ArcWriteStoreField,
-    ReadStoreField, RwStoreField, Store, TriggerMap, WriteStoreField,
+    ReadStoreField, RwStoreField, Store, WriteStoreField,
 };
 use crate::{
-    arena::Stored, signal::trigger::ArcTrigger, signal_traits::DefinedAt,
+    arena::Stored,
+    prelude::{DefinedAt, SignalIsDisposed, SignalUpdate, SignalWithUntracked},
+    signal::trigger::ArcTrigger,
+    source::Track,
     unwrap_signal,
 };
 use parking_lot::{
@@ -36,7 +39,7 @@ impl StorePath {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StorePathSegment(usize);
 
 impl From<usize> for StorePathSegment {
@@ -62,9 +65,7 @@ pub trait StoreField<T>: Sized {
 
     fn data(&self) -> Arc<RwLock<Self::Orig>>;
 
-    fn get_track(&self, path: StorePath) -> ArcTrigger;
-
-    fn get_notify(&self, path: StorePath) -> ArcTrigger;
+    fn get_trigger(&self, path: StorePath) -> ArcTrigger;
 
     fn path(&self) -> impl Iterator<Item = StorePathSegment>;
 
@@ -124,7 +125,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_track(self.path().collect()),
+            trigger: self.get_trigger(self.path().collect()),
             read: Arc::new({
                 let read = self.reader();
                 move |orig| read(orig)
@@ -138,7 +139,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_notify(self.path().collect()),
+            trigger: self.get_trigger(self.path().collect()),
             write: Arc::new({
                 let write = self.writer();
                 move |orig| write(orig)
@@ -155,7 +156,7 @@ pub trait StoreField<T>: Sized {
             #[cfg(debug_assertions)]
             defined_at: std::panic::Location::caller(),
             data: self.data(),
-            trigger: self.get_notify(self.path().collect()),
+            trigger: self.get_trigger(self.path().collect()),
             read: Arc::new({
                 let read = self.clone().reader();
                 move |orig| read(orig)
@@ -168,16 +169,49 @@ pub trait StoreField<T>: Sized {
     }
 }
 
-#[derive(Debug)]
-pub struct At<Orig> {
-    #[cfg(debug_assertions)]
-    defined_at: &'static Location<'static>,
-    trigger_map: Arc<RwLock<TriggerMap>>,
-    data: Arc<RwLock<Orig>>,
+impl<T> StoreField<T> for ArcStore<T> {
+    type Orig = T;
+
+    fn data(&self) -> Arc<RwLock<Self::Orig>> {
+        Arc::clone(&self.value)
+    }
+
+    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+        let triggers = &self.signals;
+        let trigger = triggers.write().get_or_insert(path);
+        trigger
+    }
+
+    fn path(&self) -> impl Iterator<Item = StorePathSegment> {
+        iter::empty()
+    }
+
+    fn reader(
+        self,
+    ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
+           + Send
+           + Sync
+           + 'static {
+        |lock| {
+            let guard = lock.read();
+            RwLockReadGuard::map(guard, |n| n)
+        }
+    }
+
+    fn writer(
+        self,
+    ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockWriteGuard<'a, T>
+           + Send
+           + Sync
+           + 'static {
+        |lock| {
+            let guard = lock.write();
+            RwLockWriteGuard::map(guard, |n| n)
+        }
+    }
 }
 
-impl<Orig> DefinedAt for At<Orig> {
-    #[inline(always)]
+impl<T> DefinedAt for ArcStore<T> {
     fn defined_at(&self) -> Option<&'static Location<'static>> {
         #[cfg(debug_assertions)]
         {
@@ -190,32 +224,21 @@ impl<Orig> DefinedAt for At<Orig> {
     }
 }
 
-impl<Orig> Clone for At<Orig> {
-    fn clone(&self) -> Self {
-        Self {
-            #[cfg(debug_assertions)]
-            defined_at: self.defined_at,
-            trigger_map: Arc::clone(&self.trigger_map),
-            data: Arc::clone(&self.data),
-        }
-    }
-}
-
-impl<T> StoreField<T> for At<T> {
+impl<T: Send + Sync + 'static> StoreField<T> for Store<T> {
     type Orig = T;
 
-    fn get_track(&self, path: StorePath) -> ArcTrigger {
-        let triggers = &self.trigger_map;
-        let trigger = triggers.write().get_or_insert(path.clone());
-        trigger
-    }
-
-    fn get_notify(&self, path: StorePath) -> ArcTrigger {
-        self.get_track(path)
-    }
-
     fn data(&self) -> Arc<RwLock<Self::Orig>> {
-        Arc::clone(&self.data)
+        self.inner
+            .get()
+            .map(|inner| inner.data())
+            .unwrap_or_else(unwrap_signal!(self))
+    }
+
+    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+        self.inner
+            .get()
+            .map(|inner| inner.get_trigger(path))
+            .unwrap_or_else(unwrap_signal!(self))
     }
 
     fn path(&self) -> impl Iterator<Item = StorePathSegment> {
@@ -225,6 +248,8 @@ impl<T> StoreField<T> for At<T> {
     fn reader(
         self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
+           + Send
+           + Sync
            + 'static {
         |lock| {
             let guard = lock.read();
@@ -235,6 +260,8 @@ impl<T> StoreField<T> for At<T> {
     fn writer(
         self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockWriteGuard<'a, T>
+           + Send
+           + Sync
            + 'static {
         |lock| {
             let guard = lock.write();
@@ -243,41 +270,13 @@ impl<T> StoreField<T> for At<T> {
     }
 }
 
-pub trait StoreAt: Sized {
-    type Value;
-
-    fn at(&self) -> At<Self::Value>;
-}
-
-impl<T> StoreAt for ArcStore<T> {
-    type Value = T;
-
-    fn at(&self) -> At<Self::Value> {
-        At {
-            #[cfg(debug_assertions)]
-            defined_at: self.defined_at,
-            trigger_map: Arc::clone(&self.signals),
-            data: Arc::clone(&self.value),
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> StoreAt for Store<T> {
-    type Value = T;
-
-    fn at(&self) -> At<Self::Value> {
-        self.inner
-            .get()
-            .map(|inner| inner.at())
-            .unwrap_or_else(unwrap_signal!(self))
-    }
-}
-
 #[derive(Debug)]
 pub struct Subfield<Inner, Prev, T>
 where
     Inner: StoreField<Prev>,
 {
+    #[cfg(debug_assertions)]
+    defined_at: &'static Location<'static>,
     path_segment: StorePathSegment,
     inner: Inner,
     read: fn(&Prev) -> &T,
@@ -291,7 +290,9 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            path_segment: self.path_segment.clone(),
+            #[cfg(debug_assertions)]
+            defined_at: self.defined_at,
+            path_segment: self.path_segment,
             inner: self.inner.clone(),
             read: self.read,
             write: self.write,
@@ -300,10 +301,16 @@ where
     }
 }
 
+impl<Inner, Prev, T> Copy for Subfield<Inner, Prev, T> where
+    Inner: StoreField<Prev> + Copy
+{
+}
+
 impl<Inner, Prev, T> Subfield<Inner, Prev, T>
 where
     Inner: StoreField<Prev>,
 {
+    #[track_caller]
     pub fn new(
         inner: Inner,
         path_segment: StorePathSegment,
@@ -311,6 +318,8 @@ where
         write: fn(&mut Prev) -> &mut T,
     ) -> Self {
         Self {
+            #[cfg(debug_assertions)]
+            defined_at: Location::caller(),
             inner,
             path_segment,
             read,
@@ -329,21 +338,15 @@ where
     type Orig = Inner::Orig;
 
     fn path(&self) -> impl Iterator<Item = StorePathSegment> {
-        self.inner
-            .path()
-            .chain(iter::once(self.path_segment.clone()))
+        self.inner.path().chain(iter::once(self.path_segment))
     }
 
     fn data(&self) -> Arc<RwLock<Self::Orig>> {
         self.inner.data()
     }
 
-    fn get_track(&self, path: StorePath) -> ArcTrigger {
-        self.inner.get_track(path)
-    }
-
-    fn get_notify(&self, path: StorePath) -> ArcTrigger {
-        self.inner.get_notify(path)
+    fn get_trigger(&self, path: StorePath) -> ArcTrigger {
+        self.inner.get_trigger(path)
     }
 
     fn reader(
@@ -370,5 +373,73 @@ where
             let lock = inner(lock);
             MappedRwLockWriteGuard::map(lock, |inner| (self.write)(inner))
         }
+    }
+}
+
+impl<Inner, Prev, T> DefinedAt for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev>,
+{
+    fn defined_at(&self) -> Option<&'static Location<'static>> {
+        #[cfg(debug_assertions)]
+        {
+            Some(self.defined_at)
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            None
+        }
+    }
+}
+
+impl<Inner, Prev, T> Track for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev> + Send + Sync + Clone + 'static,
+    Prev: 'static,
+    T: 'static,
+{
+    fn track(&self) {
+        let trigger = self.get_trigger(self.path().collect());
+        trigger.track();
+    }
+}
+
+impl<Inner, Prev, T> SignalWithUntracked for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev> + SignalWithUntracked<Value = Prev>,
+{
+    type Value = T;
+
+    fn try_with_untracked<U>(
+        &self,
+        fun: impl FnOnce(&Self::Value) -> U,
+    ) -> Option<U> {
+        self.inner.try_with_untracked(|prev| fun((self.read)(prev)))
+    }
+}
+
+impl<Inner, Prev, T> SignalIsDisposed for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+{
+    fn is_disposed(&self) -> bool {
+        false
+    }
+}
+
+impl<Inner, Prev, T> SignalUpdate for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+{
+    type Value = T;
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        self.inner.try_update(|prev| {
+            let this = (self.write)(prev);
+            fun(this)
+        })
     }
 }

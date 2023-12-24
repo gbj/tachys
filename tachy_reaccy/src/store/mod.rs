@@ -1,17 +1,13 @@
 use crate::{
     arena::{Stored, StoredData},
-    prelude::{SignalUpdate, SignalWithUntracked},
-    signal::trigger::{ArcTrigger, WeakTrigger},
+    prelude::{SignalUpdateUntracked, SignalWithUntracked, Trigger},
+    signal::trigger::ArcTrigger,
     signal_traits::{DefinedAt, SignalIsDisposed},
     source::Track,
 };
 use parking_lot::{MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock};
 use rustc_hash::FxHashMap;
-use std::{
-    fmt::Debug,
-    panic::Location,
-    sync::{Arc, Weak},
-};
+use std::{fmt::Debug, panic::Location, sync::Arc};
 mod indexed;
 pub use indexed::*;
 mod path;
@@ -145,10 +141,16 @@ impl<T> SignalWithUntracked for ArcStore<T> {
     }
 }
 
-impl<T> SignalUpdate for ArcStore<T> {
+impl<T> Trigger for ArcStore<T> {
+    fn trigger(&self) {
+        self.get_trigger(self.path().collect()).notify();
+    }
+}
+
+impl<T> SignalUpdateUntracked for ArcStore<T> {
     type Value = T;
 
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
@@ -285,16 +287,20 @@ impl<Orig, T> SignalWithUntracked for ArcRwStoreField<Orig, T> {
     }
 }
 
-impl<Orig, T> SignalUpdate for ArcRwStoreField<Orig, T> {
+impl<Orig, T> Trigger for ArcRwStoreField<Orig, T> {
+    fn trigger(&self) {
+        self.trigger.notify();
+    }
+}
+
+impl<Orig, T> SignalUpdateUntracked for ArcRwStoreField<Orig, T> {
     type Value = T;
 
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        let new_value = fun(&mut *(self.write)(&self.data));
-        self.trigger.notify();
-        Some(new_value)
+        Some(fun(&mut *(self.write)(&self.data)))
     }
 }
 
@@ -401,16 +407,20 @@ impl<Orig, T> DefinedAt for ArcWriteStoreField<Orig, T> {
     }
 }
 
-impl<Orig, T> SignalUpdate for ArcWriteStoreField<Orig, T> {
+impl<Orig, T> Trigger for ArcWriteStoreField<Orig, T> {
+    fn trigger(&self) {
+        self.trigger.notify();
+    }
+}
+
+impl<Orig, T> SignalUpdateUntracked for ArcWriteStoreField<Orig, T> {
     type Value = T;
 
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        let new_value = fun(&mut *(self.write)(&self.data));
-        self.trigger.notify();
-        Some(new_value)
+        Some(fun(&mut *(self.write)(&self.data)))
     }
 }
 

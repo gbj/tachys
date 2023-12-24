@@ -4,7 +4,10 @@ use super::{
 };
 use crate::{
     arena::Stored,
-    prelude::{DefinedAt, SignalIsDisposed, SignalUpdate, SignalWithUntracked},
+    prelude::{
+        DefinedAt, SignalIsDisposed, SignalUpdate, SignalUpdateUntracked,
+        SignalWithUntracked, Trigger,
+    },
     signal::trigger::ArcTrigger,
     source::Track,
     unwrap_signal,
@@ -420,24 +423,35 @@ where
 
 impl<Inner, Prev, T> SignalIsDisposed for Subfield<Inner, Prev, T>
 where
-    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+    Inner: StoreField<Prev>,
 {
     fn is_disposed(&self) -> bool {
         false
     }
 }
 
-impl<Inner, Prev, T> SignalUpdate for Subfield<Inner, Prev, T>
+impl<Inner, Prev, T> Trigger for Subfield<Inner, Prev, T>
 where
-    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+    Inner: StoreField<Prev> + Send + Sync + Clone + 'static,
+    Prev: 'static,
+    T: 'static,
+{
+    fn trigger(&self) {
+        self.get_trigger(self.path().collect()).notify();
+    }
+}
+
+impl<Inner, Prev, T> SignalUpdateUntracked for Subfield<Inner, Prev, T>
+where
+    Inner: StoreField<Prev> + SignalUpdateUntracked<Value = Prev>,
 {
     type Value = T;
 
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        self.inner.try_update(|prev| {
+        self.inner.try_update_untracked(|prev| {
             let this = (self.write)(prev);
             fun(this)
         })

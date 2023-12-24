@@ -1,8 +1,10 @@
 #[cfg(feature = "web")]
 use crate::shared_context::HydrateSharedContext;
 use crate::{
-    prelude::{DefinedAt, SignalUpdate, SignalWithUntracked},
     shared_context::{SharedContext, SsrSharedContext},
+    signal_traits::{
+        DefinedAt, SignalUpdateUntracked, SignalWithUntracked, Trigger,
+    },
     source::{
         AnySource, AnySubscriber, ReactiveNode, Source, Subscriber,
         ToAnySource, ToAnySubscriber,
@@ -398,23 +400,30 @@ where
     }
 }
 
-impl<T> SignalUpdate for T
+impl<T> Trigger for T
 where
     T: StoredData,
-    T::Data: SignalUpdate,
+    T::Data: Trigger,
 {
-    type Value = <<T as StoredData>::Data as SignalUpdate>::Value;
-
-    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
+    fn trigger(&self) {
         if let Some(inner) = self.get_value() {
-            inner.update(fun)
+            inner.trigger();
         }
     }
+}
 
-    fn try_update<U>(
+impl<T> SignalUpdateUntracked for T
+where
+    T: StoredData,
+    T::Data: SignalUpdateUntracked,
+{
+    type Value = <<T as StoredData>::Data as SignalUpdateUntracked>::Value;
+
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        self.get_value().and_then(|inner| inner.try_update(fun))
+        self.get_value()
+            .and_then(|inner| inner.try_update_untracked(fun))
     }
 }

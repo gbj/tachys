@@ -1,7 +1,7 @@
 use super::ArcRwSignal;
 use crate::{
     arena::{Stored, StoredData},
-    prelude::{SignalIsDisposed, SignalUpdate},
+    prelude::{SignalIsDisposed, SignalUpdate, SignalUpdateUntracked, Trigger},
 };
 
 pub struct WriteSignal<T: Send + Sync + 'static> {
@@ -42,14 +42,16 @@ impl<T> Clone for ArcWriteSignal<T> {
     }
 }
 
-impl<T> SignalUpdate for ArcWriteSignal<T> {
+impl<T> Trigger for ArcWriteSignal<T> {
+    fn trigger(&self) {
+        self.0.trigger();
+    }
+}
+
+impl<T> SignalUpdateUntracked for ArcWriteSignal<T> {
     type Value = T;
 
-    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        self.0.update(fun)
-    }
-
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {

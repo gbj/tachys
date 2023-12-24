@@ -1,11 +1,11 @@
-use super::{
-    RwStoreField, StoreField, StorePath, StorePathSegment, TriggerMap,
-};
+use super::{StoreField, StorePath, StorePathSegment};
 use crate::{
-    prelude::{DefinedAt, SignalIsDisposed, SignalUpdate, SignalWithUntracked},
+    prelude::{
+        DefinedAt, SignalIsDisposed, SignalUpdateUntracked,
+        SignalWithUntracked, Trigger,
+    },
     signal::trigger::ArcTrigger,
     source::Track,
-    Owner,
 };
 use parking_lot::{MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock};
 use std::{
@@ -178,20 +178,33 @@ impl<Inner, Prev, Idx> SignalIsDisposed for AtIndex<Inner, Prev, Idx> {
     }
 }
 
-impl<Inner, Prev, Idx> SignalUpdate for AtIndex<Inner, Prev, Idx>
+impl<Inner, Prev, Idx> Trigger for AtIndex<Inner, Prev, Idx>
 where
-    Inner: StoreField<Prev> + SignalUpdate<Value = Prev>,
+    Inner: StoreField<Prev> + Send + Sync + Clone + 'static,
+    Prev: Index<Idx> + IndexMut<Idx> + 'static,
+    Prev::Output: Sized,
+    for<'a> &'a Idx: Into<StorePathSegment>,
+    Idx: Clone + Send + Sync + 'static,
+{
+    fn trigger(&self) {
+        self.get_trigger(self.path().collect()).notify();
+    }
+}
+
+impl<Inner, Prev, Idx> SignalUpdateUntracked for AtIndex<Inner, Prev, Idx>
+where
+    Inner: StoreField<Prev> + SignalUpdateUntracked<Value = Prev>,
     Prev: Index<Idx> + IndexMut<Idx> + 'static,
     Prev::Output: Sized,
     Idx: Clone,
 {
     type Value = Prev::Output;
 
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
-        self.inner.try_update(|prev: &mut Prev| {
+        self.inner.try_update_untracked(|prev: &mut Prev| {
             let this = &mut prev[self.idx.clone()];
             fun(this)
         })

@@ -184,26 +184,20 @@ impl<T> SignalWithUntracked for ArcRwSignal<T> {
     }
 }
 
-impl<T> SignalUpdate for ArcRwSignal<T> {
+impl<T> Trigger for ArcRwSignal<T> {
+    fn trigger(&self) {
+        self.mark_dirty();
+    }
+}
+
+impl<T> SignalUpdateUntracked for ArcRwSignal<T> {
     type Value = T;
 
     #[cfg_attr(
         feature = "tracing",
         tracing::instrument(level = "trace", skip_all,)
     )]
-    fn update(&self, fun: impl FnOnce(&mut Self::Value)) {
-        {
-            let mut value = self.value.write();
-            fun(&mut value);
-        }
-        self.mark_dirty();
-    }
-
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "trace", skip_all,)
-    )]
-    fn try_update<U>(
+    fn try_update_untracked<U>(
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U> {
@@ -211,7 +205,6 @@ impl<T> SignalUpdate for ArcRwSignal<T> {
             let mut value = self.value.write();
             fun(&mut value)
         };
-        self.mark_dirty();
         Some(value)
     }
 }

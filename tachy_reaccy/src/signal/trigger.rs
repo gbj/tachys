@@ -141,6 +141,12 @@ impl SignalWithUntracked for ArcTrigger {
     }
 }
 
+impl Trigger for ArcTrigger {
+    fn trigger(&self) {
+        self.notify();
+    }
+}
+
 impl SignalUpdate for ArcTrigger {
     type Value = ();
 

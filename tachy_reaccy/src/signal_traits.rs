@@ -102,6 +102,19 @@ where
 {
 }
 
+pub trait Trigger {
+    fn trigger(&self);
+}
+
+pub trait SignalUpdateUntracked {
+    type Value;
+
+    fn try_update_untracked<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U>;
+}
+
 pub trait SignalUpdate {
     type Value;
 
@@ -113,6 +126,22 @@ pub trait SignalUpdate {
         &self,
         fun: impl FnOnce(&mut Self::Value) -> U,
     ) -> Option<U>;
+}
+
+impl<T> SignalUpdate for T
+where
+    T: Trigger + SignalUpdateUntracked,
+{
+    type Value = T::Value;
+
+    fn try_update<U>(
+        &self,
+        fun: impl FnOnce(&mut Self::Value) -> U,
+    ) -> Option<U> {
+        let value = self.try_update_untracked(fun);
+        self.trigger();
+        value
+    }
 }
 
 pub trait SignalSet: SignalUpdate + SignalIsDisposed {

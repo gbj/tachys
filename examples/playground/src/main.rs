@@ -42,8 +42,6 @@ pub fn app() -> impl Render<Dom> {
     });
 
     let input_ref = NodeRef::new();
-    let todos = store.todos().write();
-    let count = RwSignal::new(0);
 
     view! {
         <form on:submit=move |ev| {
@@ -77,7 +75,6 @@ pub fn app() -> impl Render<Dom> {
                             }
                                 class:foo=move || completed.get()
                             >
-                                {move || editing.get()}
                                 <p class:hidden=move || editing.get()
                                     on:click=move |_| {
                                         editing.update(|n| *n = !*n);
@@ -103,7 +100,7 @@ pub fn app() -> impl Render<Dom> {
                                     }
                                 />
                                 <button on:click=move |_| {
-                                    todos.update(|n| {
+                                    store.todos().update(|n| {
                                         n.remove(idx);
                                     });
                                 }>

@@ -4,7 +4,7 @@ use tachy_reaccy::render_effect::RenderEffect;
 
 impl<F, C, R> IntoClass<R> for F
 where
-    F: Fn() -> C + 'static,
+    F: FnMut() -> C + 'static,
     C: IntoClass<R> + 'static,
     C::State: 'static,
     R: DomRenderer,
@@ -13,12 +13,15 @@ where
 {
     type State = RenderEffectState<C::State>;
 
-    fn to_html(self, class: &mut String) {
+    fn to_html(mut self, class: &mut String) {
         let value = self();
         value.to_html(class);
     }
 
-    fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
+    fn hydrate<const FROM_SERVER: bool>(
+        mut self,
+        el: &R::Element,
+    ) -> Self::State {
         // TODO FROM_SERVER vs template
         let el = el.clone();
         RenderEffect::new(move |prev| {
@@ -33,7 +36,7 @@ where
         .into()
     }
 
-    fn build(self, el: &R::Element) -> Self::State {
+    fn build(mut self, el: &R::Element) -> Self::State {
         let el = el.to_owned();
         RenderEffect::new(move |prev| {
             let value = self();
@@ -47,8 +50,7 @@ where
         .into()
     }
 
-    fn rebuild(self, state: &mut Self::State) {
-        crate::log("rebuilt class starting...");
+    fn rebuild(mut self, state: &mut Self::State) {
         let prev_effect = std::mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
@@ -73,7 +75,7 @@ where
 
 impl<F, R> IntoClass<R> for (&'static str, F)
 where
-    F: Fn() -> bool + 'static,
+    F: FnMut() -> bool + 'static,
     R: DomRenderer,
     R::ClassList: Clone + 'static,
     R::Element: Clone,
@@ -81,7 +83,7 @@ where
     type State = RenderEffectState<(R::ClassList, bool)>;
 
     fn to_html(self, class: &mut String) {
-        let (name, f) = self;
+        let (name, mut f) = self;
         let include = f();
         if include {
             <&str as IntoClass<R>>::to_html(name, class);
@@ -90,7 +92,7 @@ where
 
     fn hydrate<const FROM_SERVER: bool>(self, el: &R::Element) -> Self::State {
         // TODO FROM_SERVER vs template
-        let (name, f) = self;
+        let (name, mut f) = self;
         let class_list = R::class_list(el);
         RenderEffect::new(move |prev: Option<(R::ClassList, bool)>| {
             let include = f();
@@ -109,7 +111,7 @@ where
     }
 
     fn build(self, el: &R::Element) -> Self::State {
-        let (name, f) = self;
+        let (name, mut f) = self;
         let class_list = R::class_list(el);
         RenderEffect::new(move |prev: Option<(R::ClassList, bool)>| {
             let include = f();
@@ -135,7 +137,7 @@ where
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        let (name, f) = self;
+        let (name, mut f) = self;
         let prev_effect = std::mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);

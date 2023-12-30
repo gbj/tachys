@@ -18,7 +18,7 @@ mod style;
 
 impl<F, V> ToTemplate for F
 where
-    F: Fn() -> V,
+    F: FnMut() -> V,
     V: ToTemplate,
 {
     const TEMPLATE: &'static str = V::TEMPLATE;
@@ -37,7 +37,7 @@ where
 
 impl<F, V, R> Render<R> for F
 where
-    F: Fn() -> V + 'static,
+    F: FnMut() -> V + 'static,
     V: Render<R>,
     V::State: 'static,
     R: Renderer,
@@ -45,7 +45,7 @@ where
     type State = RenderEffectState<V::State>;
 
     #[track_caller]
-    fn build(self) -> Self::State {
+    fn build(mut self) -> Self::State {
         RenderEffect::new(move |prev| {
             let value = self();
             if let Some(mut state) = prev {
@@ -59,7 +59,7 @@ where
     }
 
     #[track_caller]
-    fn rebuild(self, state: &mut Self::State) {
+    fn rebuild(mut self, state: &mut Self::State) {
         let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
@@ -117,11 +117,11 @@ where
     }
 }
 
-impl<F, V> InfallibleRender for F where F: Fn() -> V + 'static {}
+impl<F, V> InfallibleRender for F where F: FnMut() -> V + 'static {}
 
 /* impl<F, V, R> FallibleRender<R> for F
 where
-    F: Fn() -> V + 'static,
+    F: FnMut() -> V + 'static,
     V: FallibleRender<R>,
     V::State: 'static,
     R: Renderer,
@@ -143,7 +143,7 @@ where
 
 impl<F, V, R> RenderHtml<R> for F
 where
-    F: Fn() -> V + 'static,
+    F: FnMut() -> V + 'static,
     V: RenderHtml<R>,
     V::State: 'static,
     R: Renderer + 'static,
@@ -152,13 +152,13 @@ where
 {
     const MIN_LENGTH: usize = 0;
 
-    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
+    fn to_html_with_buf(mut self, buf: &mut String, position: &mut Position) {
         let value = self();
         value.to_html_with_buf(buf, position)
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
-        self,
+        mut self,
         buf: &mut StreamBuilder,
         position: &mut Position,
     ) where
@@ -169,7 +169,7 @@ where
     }
 
     fn hydrate<const FROM_SERVER: bool>(
-        self,
+        mut self,
         cursor: &Cursor<R>,
         position: &PositionState,
     ) -> Self::State {
@@ -231,7 +231,7 @@ impl<const TRANSITION: bool, Fal, Fut> Suspend<TRANSITION, Fal, Fut> {
 // Dynamic attributes
 impl<F, V, R> AttributeValue<R> for F
 where
-    F: Fn() -> V + 'static,
+    F: FnMut() -> V + 'static,
     V: AttributeValue<R>,
     V::State: 'static,
     R: Renderer,
@@ -239,7 +239,7 @@ where
 {
     type State = RenderEffectState<V::State>;
 
-    fn to_html(self, key: &str, buf: &mut String) {
+    fn to_html(mut self, key: &str, buf: &mut String) {
         let value = self();
         value.to_html(key, buf);
     }
@@ -247,7 +247,7 @@ where
     fn to_template(_key: &str, _buf: &mut String) {}
 
     fn hydrate<const FROM_SERVER: bool>(
-        self,
+        mut self,
         key: &str,
         el: &<R as Renderer>::Element,
     ) -> Self::State {
@@ -265,7 +265,11 @@ where
         .into()
     }
 
-    fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
+    fn build(
+        mut self,
+        el: &<R as Renderer>::Element,
+        key: &str,
+    ) -> Self::State {
         let key = key.to_owned();
         let el = el.to_owned();
         RenderEffect::new(move |prev| {
@@ -280,7 +284,7 @@ where
         .into()
     }
 
-    fn rebuild(self, key: &str, state: &mut Self::State) {
+    fn rebuild(mut self, key: &str, state: &mut Self::State) {
         let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
@@ -326,7 +330,7 @@ where
 // These do update during hydration because properties don't exist in the DOM
 impl<F, V, R> IntoProperty<R> for F
 where
-    F: Fn() -> V + 'static,
+    F: FnMut() -> V + 'static,
     V: IntoProperty<R>,
     V::State: 'static,
     R: DomRenderer,
@@ -335,7 +339,7 @@ where
     type State = RenderEffectState<V::State>;
 
     fn hydrate<const FROM_SERVER: bool>(
-        self,
+        mut self,
         el: &<R as Renderer>::Element,
         key: &str,
     ) -> Self::State {
@@ -353,7 +357,11 @@ where
         .into()
     }
 
-    fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
+    fn build(
+        mut self,
+        el: &<R as Renderer>::Element,
+        key: &str,
+    ) -> Self::State {
         let key = key.to_owned();
         let el = el.to_owned();
         RenderEffect::new(move |prev| {
@@ -368,7 +376,7 @@ where
         .into()
     }
 
-    fn rebuild(self, state: &mut Self::State, key: &str) {
+    fn rebuild(mut self, state: &mut Self::State, key: &str) {
         let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);

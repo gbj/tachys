@@ -10,6 +10,8 @@ use rustc_hash::FxHashMap;
 use std::{fmt::Debug, panic::Location, sync::Arc};
 mod indexed;
 pub use indexed::*;
+mod keyed;
+pub use keyed::*;
 mod path;
 pub use path::*;
 mod stored;

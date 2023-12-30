@@ -46,6 +46,7 @@ pub trait Track {
 }
 
 impl<T: Source + ToAnySource> Track for T {
+    #[track_caller]
     fn track(&self) {
         if let Some(subscriber) = Observer::get() {
             subscriber.add_source(self.to_any_source());

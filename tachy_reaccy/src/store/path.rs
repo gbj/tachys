@@ -73,7 +73,7 @@ pub trait StoreField<T>: Sized {
     fn path(&self) -> impl Iterator<Item = StorePathSegment>;
 
     fn reader(
-        self,
+        &self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
            + Send
            + Sync
@@ -190,7 +190,7 @@ impl<T> StoreField<T> for ArcStore<T> {
     }
 
     fn reader(
-        self,
+        &self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
            + Send
            + Sync
@@ -249,7 +249,7 @@ impl<T: Send + Sync + 'static> StoreField<T> for Store<T> {
     }
 
     fn reader(
-        self,
+        &self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
            + Send
            + Sync
@@ -353,15 +353,17 @@ where
     }
 
     fn reader(
-        self,
+        &self,
     ) -> impl for<'a> Fn(&'a RwLock<Self::Orig>) -> MappedRwLockReadGuard<'a, T>
            + Send
            + Sync
            + 'static {
+        let inner = self.inner.clone();
+        let read = self.read;
         move |lock| {
-            let inner = self.inner.clone().reader();
+            let inner = inner.reader();
             let lock = inner(lock);
-            MappedRwLockReadGuard::map(lock, |inner| (self.read)(inner))
+            MappedRwLockReadGuard::map(lock, |inner| (read)(inner))
         }
     }
 

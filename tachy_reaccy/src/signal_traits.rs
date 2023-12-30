@@ -45,6 +45,7 @@ pub trait SignalWithUntracked: DefinedAt {
 }
 
 pub trait SignalWith: SignalWithUntracked + Track {
+    #[track_caller]
     fn try_with<U>(&self, fun: impl FnOnce(&Self::Value) -> U) -> Option<U> {
         self.track();
         self.try_with_untracked(fun)

@@ -365,6 +365,7 @@ where
     T: StoredData,
     T::Data: ToAnySource + DefinedAt,
 {
+    #[track_caller]
     fn to_any_source(&self) -> AnySource {
         self.get_value()
             .map(|inner| inner.to_any_source())
@@ -377,6 +378,7 @@ where
     T: StoredData,
     T::Data: ToAnySubscriber + DefinedAt,
 {
+    #[track_caller]
     fn to_any_subscriber(&self) -> AnySubscriber {
         self.get_value()
             .map(|inner| inner.to_any_subscriber())

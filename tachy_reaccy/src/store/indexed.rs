@@ -95,17 +95,19 @@ where
     }
 
     fn reader(
-        self,
+        &self,
     ) -> impl for<'a> Fn(
         &'a RwLock<Self::Orig>,
     ) -> MappedRwLockReadGuard<'a, Prev::Output>
            + Send
            + Sync
            + 'static {
+        let inner = self.inner.clone();
+        let idx = self.idx.clone();
         move |lock| {
-            let inner = self.inner.clone().reader();
+            let inner = inner.reader();
             let lock = inner(lock);
-            let idx = self.idx.clone();
+            let idx = idx.clone();
             MappedRwLockReadGuard::map(lock, |prev| &prev[idx])
         }
     }
@@ -217,7 +219,6 @@ pub trait StoreFieldIterator<Prev>: Sized {
 
 impl<Inner, Prev> StoreFieldIterator<Prev> for Inner
 where
-    Self: Clone,
     Inner: StoreField<Prev>,
     Prev::Output: Sized,
     Prev: Index<usize> + AsRef<[Prev::Output]>,
@@ -228,7 +229,7 @@ where
         trigger.track();
 
         // get the current length of the field by accessing slice
-        let reader = self.clone().reader();
+        let reader = self.reader();
         let len = reader(&self.data()).as_ref().len();
 
         // return the iterator

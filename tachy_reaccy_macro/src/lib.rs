@@ -6,7 +6,7 @@ use syn::{
     punctuated::Punctuated,
     token::Comma,
     Data, Field, Fields, Generics, Ident, Meta, MetaList, Result, Visibility,
-    WhereClause, Type,
+    WhereClause, Type, Token, Index,
 };
 
 #[proc_macro_error]
@@ -21,7 +21,6 @@ struct Model {
     pub vis: Visibility,
     pub struct_name: Ident,
     pub generics: Generics,
-    pub is_tuple_struct: bool,
     pub fields: Vec<Field>,
 }
 
@@ -33,28 +32,23 @@ impl Parse for Model {
             abort_call_site!("only structs can be used with `Store`");
         };
 
-        let (is_tuple_struct, fields) = match s.fields {
+        let (fields) = match s.fields {
             syn::Fields::Unit => {
                 abort!(s.semi_token, "unit structs are not supported");
             }
             syn::Fields::Named(fields) => {
-                (false, fields.named.into_iter().collect::<Vec<_>>())
+                fields.named.into_iter().collect::<Vec<_>>()
             }
-            syn::Fields::Unnamed(fields) => (
-                true,
-                fields
+            syn::Fields::Unnamed(fields) => fields
                     .unnamed
                     .into_iter()
-                    .map(Into::into)
                     .collect::<Vec<_>>(),
-            ),
         };
 
         Ok(Self {
             vis: input.vis,
             struct_name: input.ident,
             generics: input.generics,
-            is_tuple_struct,
             fields,
         })
     }
@@ -62,36 +56,77 @@ impl Parse for Model {
 
 #[derive(Clone)]
 enum SubfieldMode {
-    Subfield,
-    Keyed(Ident),
+    Keyed(Ident, Type),
 }
 
 impl Parse for SubfieldMode {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let ident: Ident = input.parse()?;
-        if ident == "keyed" {
-            Ok(SubfieldMode::Keyed(ident))
+        let mode: Ident = input.parse()?;
+        if mode == "key" {
+            let _eq: Token!(=) = input.parse()?;
+            let ident: Ident = input.parse()?;
+            let _col: Token!(:) = input.parse()?;
+            let ty: Type = input.parse()?;
+            Ok(SubfieldMode::Keyed(ident, ty))
         } else {
-            Err(input.error("expected `keyed`"))
+            Err(input.error("expected `key = <ident>: <Type>`"))
         }
     }
 }
 
-fn modes_to_tokens(include_body: bool, modes: Option<&[SubfieldMode]>, library_path: &proc_macro2::TokenStream, ident: Option<&Ident>, generics: &Generics, any_store_field: &Ident, struct_name: &Ident, ty: &Type) -> proc_macro2::TokenStream {
+#[allow(clippy::too_many_arguments)]
+fn field_to_tokens(idx: usize, include_body: bool, modes: Option<&[SubfieldMode]>, library_path: &proc_macro2::TokenStream, orig_ident: Option<&Ident>, generics: &Generics, any_store_field: &Ident, struct_name: &Ident, ty: &Type) -> proc_macro2::TokenStream {
+    let ident = if orig_ident.is_none() {
+        let idx = Ident::new(&format!("field{idx}"), Span::call_site());
+        quote! { #idx }
+    } else {
+        quote! { #orig_ident }
+    };
+    let locator = if orig_ident.is_none() {
+        let idx = Index::from(idx);
+        quote! { #idx }
+    } else {
+        quote! { #ident }
+    };
+
     if let Some(modes) = modes {
         if modes.len() == 1 {
             let mode = &modes[0];
-            match mode {
-                SubfieldMode::Keyed(ident) => return quote! {
-                    fn #ident(self) ->  #library_path::Keyed<#any_store_field, #struct_name #generics, #ty>;
-                },
-                _ => {}
+            // Can replace with a match if additional modes added
+            let SubfieldMode::Keyed(keyed_by, key_ty) = mode;
+            let signature = quote! {
+                fn #ident(self) ->  #library_path::KeyedField<#any_store_field, #struct_name #generics, #ty, #key_ty>
+            };
+            return if include_body {
+                quote! {
+                    #signature {
+                        todo!()
+                    }
+                }
+            } else {
+                quote! { #signature; }
             }
+        } else {
+            abort!(orig_ident.map(|ident| ident.span()).unwrap_or_else(Span::call_site), "multiple modes not currently supported");
         }
     }
 
-    quote! {
-        fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
+    // default subfield
+    if include_body {
+        quote! {
+            fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty> {
+                #library_path::Subfield::new(
+                    self,
+                    #idx.into(),
+                    |prev| &prev.#locator,
+                    |prev| &mut prev.#locator,
+                )
+            }
+        }
+    } else {
+        quote! {
+            fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty>;
+        }
     }
 }
 
@@ -102,7 +137,6 @@ impl ToTokens for Model {
             vis,
             struct_name,
             generics,
-            is_tuple_struct,
             fields,
         } = &self;
         let any_store_field = Ident::new("AnyStoreField", Span::call_site());
@@ -133,8 +167,8 @@ impl ToTokens for Model {
         };
 
         // define an extension trait that matches this struct
-        let trait_fields = fields.iter().map(|field| {
-            let Field { vis, ident, ty, attrs, .. } = &field;
+        let all_field_data = fields.iter().enumerate().map(|(idx, field)| {
+            let Field { ident, ty, attrs, .. } = &field;
             let modes = attrs.iter().find_map(|attr| {
                 attr.meta.path().is_ident("store").then(|| {
                     match &attr.meta {
@@ -149,25 +183,15 @@ impl ToTokens for Model {
                 })
             }).flatten();
 
-            modes_to_tokens(false, modes.as_deref(), &library_path, ident.as_ref(), generics, &any_store_field, struct_name, ty)            
+            (
+                field_to_tokens(idx, false, modes.as_deref(), &library_path, ident.as_ref(), generics, &any_store_field, struct_name, ty),
+                field_to_tokens(idx, true, modes.as_deref(), &library_path, ident.as_ref(), generics, &any_store_field, struct_name, ty),
+            )
+                       
         });
 
         // implement that trait for all StoreFields
-        let read_fields = fields.iter().enumerate().map(|(idx, field)| {
-            let Field { vis, ident, ty, .. } = &field;
-
-            quote! {
-                #[inline(always)]
-                fn #ident(self) ->  #library_path::Subfield<#any_store_field, #struct_name #generics, #ty> {
-                    #library_path::Subfield::new(
-                        self,
-                        #idx.into(),
-                        |prev| &prev.#ident,
-                        |prev| &mut prev.#ident,
-                    )
-                }
-            }
-        });
+        let (trait_fields, read_fields) = all_field_data.unzip();
 
         // read access
         tokens.extend(quote! {

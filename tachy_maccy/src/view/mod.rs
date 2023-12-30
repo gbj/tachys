@@ -64,7 +64,10 @@ fn element_children_to_tokens(
     .into_iter()
     .map(|child| {
         quote! {
-            .child(#child)
+            .child(
+                #[allow(unused_braces)]
+                { #child }
+            )
         }
     });
     Some(quote! {

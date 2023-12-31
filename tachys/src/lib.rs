@@ -9,8 +9,10 @@ pub extern crate self as tachys;
 pub mod children; // TODO fix children
 pub mod component;
 mod for_loop;
+mod hydration_scripts;
 mod show;
 pub use for_loop::*;
+pub use hydration_scripts::*;
 pub use show::*;
 pub use tachy_maccy::*;
 pub use tachy_reaccy;

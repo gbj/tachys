@@ -1,7 +1,6 @@
 - hackernews example
   - finish implementation
   - TODOs
-  - doubling up on requests?
   - Suspense/Transition/Await components
   - Show component
   - For component
@@ -12,7 +11,6 @@
 - unnecessary bracket warnings
 - escaping HTML correctly (attributes + text nodes)
 - nested routes
-- server functions
 - Signal wrappers
 - SignalDispose implementations on all Copy types
 - untracked access warnings

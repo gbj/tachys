@@ -7,7 +7,11 @@ pub struct NotificationSender(Sender<()>);
 
 impl NotificationSender {
     pub fn channel() -> (NotificationSender, Receiver<()>) {
-        let (tx, rx) = channel::<()>(1);
+        // buffer of 0 means we can only send N messages at once
+        // where N is the number of NotificationSenders
+        // we don't implement Clone on that type, so it can only hold 1 message
+        // this means we can't double-notify in a single tick
+        let (tx, rx) = channel::<()>(0);
         (NotificationSender(tx), rx)
     }
 

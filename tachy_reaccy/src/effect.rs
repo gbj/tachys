@@ -1,6 +1,6 @@
 use crate::{
     arena::Owner,
-    notify::NotificationSender,
+    notify::{channel, Sender},
     source::{
         AnySource, AnySubscriber, ReactiveNode, SourceSet, Subscriber,
         ToAnySubscriber,
@@ -24,7 +24,7 @@ where
 
 pub(crate) struct EffectInner {
     pub owner: Owner,
-    pub observer: NotificationSender,
+    pub observer: Sender,
     pub sources: SourceSet,
 }
 
@@ -41,7 +41,7 @@ impl<T> Clone for Effect<T> {
 // spawn (for Send + Sync) and spawn_local (for !Send) but do it generically
 macro_rules! spawn_effect {
     ($fun:ident, $spawner:ident) => {{
-        let (mut observer, mut rx) = NotificationSender::channel();
+        let (mut observer, mut rx) = channel();
 
         // spawn the effect asynchronously
         // we'll notify once so it runs on the next tick,

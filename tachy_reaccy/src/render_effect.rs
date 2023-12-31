@@ -1,7 +1,7 @@
 use crate::{
     arena::Owner,
     effect::EffectInner,
-    notify::NotificationSender,
+    notify::channel,
     source::{AnySubscriber, SourceSet, Subscriber, ToAnySubscriber},
     spawn::spawn_local,
 };
@@ -41,7 +41,7 @@ where
         mut fun: impl FnMut(Option<T>) -> T + 'static,
         initial_value: Option<T>,
     ) -> Self {
-        let (observer, mut rx) = NotificationSender::channel();
+        let (observer, mut rx) = channel();
         let value = Arc::new(RwLock::new(None));
         let owner = Owner::new();
         let inner = Arc::new(RwLock::new(EffectInner {

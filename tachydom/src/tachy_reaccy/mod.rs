@@ -60,7 +60,8 @@ where
 
     #[track_caller]
     fn rebuild(mut self, state: &mut Self::State) {
-        let prev_effect = mem::take(&mut state.0);
+        // TODO
+        /* let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
         *state = RenderEffect::new_with_value(
@@ -75,7 +76,7 @@ where
             },
             prev_value,
         )
-        .into();
+        .into(); */
     }
 }
 
@@ -285,12 +286,17 @@ where
     }
 
     fn rebuild(mut self, key: &str, state: &mut Self::State) {
-        let prev_effect = mem::take(&mut state.0);
+        // TODO
+        /* let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
         let key = key.to_owned();
         *state = RenderEffect::new_with_value(
             move |prev| {
+                crate::log(&format!(
+                    "inside here, prev is some? {}",
+                    prev.is_some()
+                ));
                 let value = self();
                 if let Some(mut state) = prev {
                     value.rebuild(&key, &mut state);
@@ -301,7 +307,7 @@ where
             },
             prev_value,
         )
-        .into();
+        .into(); */
     }
 
     /*     fn build(self) -> Self::State {
@@ -377,7 +383,8 @@ where
     }
 
     fn rebuild(mut self, state: &mut Self::State, key: &str) {
-        let prev_effect = mem::take(&mut state.0);
+        // TODO
+        /* let prev_effect = mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
         let key = key.to_owned();
@@ -393,7 +400,7 @@ where
             },
             prev_value,
         )
-        .into();
+        .into(); */
     }
 }
 

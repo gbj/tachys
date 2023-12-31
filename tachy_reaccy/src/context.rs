@@ -36,11 +36,11 @@ impl Owner {
 }
 
 pub fn provide_context<T: Send + Sync + 'static>(value: T) {
-    if let Some(owner) = Owner::get() {
+    if let Some(owner) = Owner::current() {
         owner.provide_context(value);
     }
 }
 
 pub fn use_context<T: Clone + 'static>() -> Option<T> {
-    Owner::get().and_then(|owner| owner.use_context())
+    Owner::current().and_then(|owner| owner.use_context())
 }

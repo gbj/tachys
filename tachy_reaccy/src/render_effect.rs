@@ -8,6 +8,7 @@ use crate::{
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::{
+    fmt::Debug,
     mem,
     sync::{Arc, Weak},
 };
@@ -18,6 +19,14 @@ where
 {
     value: Arc<RwLock<Option<T>>>,
     inner: Arc<RwLock<EffectInner>>,
+}
+
+impl<T> Debug for RenderEffect<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderEffect")
+            .field("inner", &Arc::as_ptr(&self.inner))
+            .finish()
+    }
 }
 
 impl<T> RenderEffect<T>

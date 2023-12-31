@@ -57,9 +57,6 @@ pub trait Location {
 
     fn set_navigation_hook(&mut self, cb: impl Fn(Url) + 'static);
 
-    /// Registers a callback that will be called whenever the URL changes.
-    fn on_url_change(&self, cb: impl FnMut(Url) + 'static);
-
     /// Navigate to a new location.
     fn navigate(&self, loc: &LocationChange);
 }
@@ -103,8 +100,6 @@ impl Location for RequestUrl {
 
     fn set_navigation_hook(&mut self, _cb: impl FnMut(Url) + 'static) {}
 
-    fn on_url_change(&self, _cb: impl FnMut(Url) + 'static) {}
-
     fn navigate(&self, _loc: &LocationChange) {}
 }
 
@@ -122,6 +117,23 @@ impl Debug for BrowserUrl {
 impl BrowserUrl {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn try_current() -> Result<Url, JsValue> {
+        let location = window().location();
+        Ok(Url {
+            origin: location.origin()?,
+            pathname: location.pathname()?,
+            search: location
+                .search()?
+                .strip_prefix('?')
+                .map(String::from)
+                .unwrap_or_default(),
+            search_params: search_params_from_web_url(
+                &UrlSearchParams::new_with_str(&location.search()?)?,
+            )?,
+            hash: location.hash()?,
+        })
     }
 
     fn try_url_from(href: &str) -> Result<Url, JsValue> {
@@ -315,46 +327,34 @@ impl Location for BrowserUrl {
                 "couldn't add `click` listener to `window` to handle `<a>` \
                  clicks",
             );
+
+        // handle popstate event (forward/back navigation)
+        if let Some(navigation_hook) = self.navigation_hook.clone() {
+            let cb = move || match Self::try_current() {
+                Ok(url) => navigation_hook(url),
+                Err(e) => {
+                    #[cfg(debug_assertions)]
+                    web_sys::console::error_1(&e);
+                    _ = e;
+                }
+            };
+            let closure =
+                Closure::wrap(Box::new(cb) as Box<dyn Fn()>).into_js_value();
+            window()
+                .add_event_listener_with_callback(
+                    "popstate",
+                    closure.as_ref().unchecked_ref(),
+                )
+                .expect("couldn't add `popstate` listener to `window`");
+        }
     }
 
     fn try_to_url(&self) -> Result<Url, Self::Error> {
-        let location = window().location();
-        Ok(Url {
-            origin: location.origin()?,
-            pathname: location.pathname()?,
-            search: location
-                .search()?
-                .strip_prefix('?')
-                .map(String::from)
-                .unwrap_or_default(),
-            search_params: search_params_from_web_url(
-                &UrlSearchParams::new_with_str(&location.search()?)?,
-            )?,
-            hash: location.hash()?,
-        })
+        Self::try_current()
     }
 
     fn set_navigation_hook(&mut self, cb: impl Fn(Url) + 'static) {
         self.navigation_hook = Some(Rc::new(cb));
-    }
-
-    fn on_url_change(&self, mut cb: impl FnMut(Url) + 'static) {
-        let loc = self.clone();
-        let cb = move || match loc.try_to_url() {
-            Ok(url) => cb(url),
-            Err(e) => {
-                #[cfg(all(debug_assertions, feature = "tracing"))]
-                tracing::error!("Error encountered during routing: {e:?}");
-                _ = e;
-            }
-        };
-        let closure = Closure::new(cb).into_js_value();
-        window()
-            .add_event_listener_with_callback(
-                "popstate",
-                closure.as_ref().unchecked_ref(),
-            )
-            .expect("couldn't add `popstate` listener to `window`");
     }
 
     fn navigate(&self, loc: &LocationChange) {

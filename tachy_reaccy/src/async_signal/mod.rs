@@ -42,7 +42,7 @@ pin_project! {
 
 impl<Fut> ScopedFuture<Fut> {
     pub fn new(fut: Fut) -> Self {
-        let owner = Owner::get();
+        let owner = Owner::current();
         let observer = Observer::get();
         Self {
             owner,

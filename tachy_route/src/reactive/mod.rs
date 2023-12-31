@@ -1,12 +1,18 @@
 use crate::{
-    location::Location, matching::Params, route::MatchedRoute, router::Router,
+    location::Location,
+    matching::Params,
+    route::MatchedRoute,
+    router::{FallbackOrView, Router},
 };
 use std::{marker::PhantomData, mem};
 use tachy_reaccy::{
-    memo::Memo,
+    effect::Effect,
+    memo::{ArcMemo, Memo},
     signal::ArcRwSignal,
-    signal_traits::{SignalSet, SignalWith, Track},
-    untrack, Owner,
+    signal_traits::{
+        SignalGet, SignalGetUntracked, SignalSet, SignalWith, Track,
+    },
+    untrack, Owner, Root,
 };
 use tachydom::{
     log,
@@ -15,38 +21,134 @@ use tachydom::{
 };
 
 #[allow(non_snake_case)]
-pub fn ReactiveRouter<R, Loc, DefFn, Defs, FallbackFn, Fallback>(
+pub fn ReactiveRouter<Rndr, Loc, DefFn, Defs, FallbackFn, Fallback>(
     mut location: Loc,
     routes: DefFn,
     fallback: FallbackFn,
-) -> impl Render<R>
+) -> impl Render<Rndr>
 where
     DefFn: Fn() -> Defs + 'static,
     Defs: 'static,
     Loc: Location + Clone + 'static,
-    R: Renderer + 'static,
-    R::Element: Clone,
-    R::Node: Clone,
+    Rndr: Renderer + 'static,
+    Rndr::Element: Clone,
+    Rndr::Node: Clone,
     FallbackFn: Fn() -> Fallback + Clone + 'static,
-    Fallback: Render<R> + 'static,
-    Router<R, Loc, Defs, FallbackFn>: Render<R>,
+    Fallback: Render<Rndr> + 'static,
+    Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
+    <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
+        Render<Rndr>,
 {
     // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
 
-    // initial the location service with a router hook that will update
+    // initialize the location service with a router hook that will update
     // this URL signal
     location.set_navigation_hook({
         let url = url.clone();
-        move |new_url| url.set(new_url)
+        move |new_url| {
+            tachydom::log(&format!("setting url to {new_url:?}"));
+            url.set(new_url)
+        }
     });
     location.init();
 
     // return a reactive router that will update if and only if the URL signal changes
+    let owner = Owner::current().unwrap();
     move || {
         url.track();
+        ReactiveRouterInner {
+            owner: owner.clone(),
+            inner: Router::new(location.clone(), routes(), fallback.clone()),
+            fal: PhantomData,
+        }
+    }
+}
 
-        Router::new(location.clone(), routes(), fallback.clone())
+struct ReactiveRouterInner<Rndr, Loc, Defs, FallbackFn, Fallback>
+where
+    Rndr: Renderer,
+{
+    owner: Owner,
+    inner: Router<Rndr, Loc, Defs, FallbackFn>,
+    fal: PhantomData<Fallback>,
+}
+
+impl<Rndr, Loc, Defs, FallbackFn, Fallback> Render<Rndr>
+    for ReactiveRouterInner<Rndr, Loc, Defs, FallbackFn, Fallback>
+where
+    Loc: Location,
+    Rndr: Renderer,
+    Rndr::Element: Clone,
+    Rndr::Node: Clone,
+    FallbackFn: Fn() -> Fallback,
+    Fallback: Render<Rndr>,
+    Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
+    <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
+        Render<Rndr>,
+{
+    type State =
+        ReactiveRouterInnerState<Rndr, Loc, Defs, FallbackFn, Fallback>;
+
+    fn build(self) -> Self::State {
+        let (prev_id, inner) = self.inner.fallback_or_view();
+        let owner = self.owner.with(|| Owner::new());
+        ReactiveRouterInnerState {
+            inner: owner.with(|| inner.build()),
+            owner,
+            prev_id,
+            fal: PhantomData,
+        }
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        let (new_id, view) = self.inner.fallback_or_view();
+        if new_id != state.prev_id {
+            state.owner = self.owner.with(|| Owner::new())
+            // previous root is dropped here -- TODO check if that's correct or should wait
+        };
+        state.owner.with(|| view.rebuild(&mut state.inner));
+    }
+}
+
+struct ReactiveRouterInnerState<Rndr, Loc, Defs, FallbackFn, Fallback>
+where
+    Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
+    <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output: Render<Rndr>,
+    Rndr: Renderer,
+{
+    owner: Owner,
+    prev_id: &'static str,
+    inner: <<Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output as Render<Rndr>>::State,
+    fal: PhantomData<Fallback>,
+}
+
+impl<Rndr, Loc, Defs, FallbackFn, Fallback> Mountable<Rndr>
+    for ReactiveRouterInnerState<Rndr, Loc, Defs, FallbackFn, Fallback>
+where
+    Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
+    <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
+        Render<Rndr>,
+    Rndr: Renderer,
+{
+    fn unmount(&mut self) {
+        self.inner.unmount();
+    }
+
+    fn mount(
+        &mut self,
+        parent: &<Rndr as Renderer>::Element,
+        marker: Option<&<Rndr as Renderer>::Node>,
+    ) {
+        self.inner.mount(parent, marker);
+    }
+
+    fn insert_before_this(
+        &self,
+        parent: &<Rndr as Renderer>::Element,
+        child: &mut dyn Mountable<Rndr>,
+    ) -> bool {
+        self.inner.insert_before_this(parent, child)
     }
 }
 

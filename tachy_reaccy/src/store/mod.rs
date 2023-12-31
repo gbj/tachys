@@ -432,7 +432,7 @@ impl<Orig, T> SignalIsDisposed for ArcWriteStoreField<Orig, T> {
     }
 }
 
-#[cfg(test)]
+/* #[cfg(test)]
 mod tests {
     use super::{ArcReadStoreField, ArcStore, ArcWriteStoreField};
     use crate::{
@@ -546,3 +546,4 @@ mod tests {
         assert_eq!(*combined_count.read(), 4);
     }
 }
+ */

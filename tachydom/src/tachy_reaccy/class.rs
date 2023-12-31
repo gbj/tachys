@@ -137,7 +137,8 @@ where
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        let (name, mut f) = self;
+        // TODO
+        /* let (name, mut f) = self;
         let prev_effect = std::mem::take(&mut state.0);
         let prev_value = prev_effect.as_ref().and_then(|e| e.take_value());
         drop(prev_effect);
@@ -160,6 +161,6 @@ where
             },
             prev_value,
         )
-        .into();
+        .into(); */
     }
 }

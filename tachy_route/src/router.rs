@@ -68,11 +68,11 @@ where
     type State = <<Self as FallbackOrView>::Output as Render<Rndr>>::State;
 
     fn build(self) -> Self::State {
-        self.fallback_or_view().build()
+        self.fallback_or_view().build().1
     }
 
     fn rebuild(self, state: &mut Self::State) {
-        self.fallback_or_view().rebuild(state);
+        self.fallback_or_view().1.rebuild(state);
     }
 }
 
@@ -97,6 +97,7 @@ where
         position: &PositionState,
     ) -> Self::State {
         self.fallback_or_view()
+            .1
             .hydrate::<FROM_SERVER>(cursor, position)
     }
 }
@@ -104,7 +105,7 @@ where
 pub trait FallbackOrView {
     type Output;
 
-    fn fallback_or_view(&self) -> Self::Output;
+    fn fallback_or_view(&self) -> (&'static str, Self::Output);
 }
 
 pub trait FallbackOrViewHtml: FallbackOrView {
@@ -121,8 +122,8 @@ where
 {
     type Output = Fal;
 
-    fn fallback_or_view(&self) -> Self::Output {
-        (self.fallback)()
+    fn fallback_or_view(&self) -> (&'static str, Self::Output) {
+        ("Fal", (self.fallback)())
     }
 }
 
@@ -157,7 +158,7 @@ where
 {
     type Output = Either<Fal, AView>;
 
-    fn fallback_or_view(&self) -> Self::Output {
+    fn fallback_or_view(&self) -> (&'static str, Self::Output) {
         match self.location.try_to_url() {
             Ok(url) => {
                 if self.routes.path.matches(&url.pathname) {
@@ -172,10 +173,13 @@ where
                             matched,
                             search_params: url.search_params.clone(),
                         };
-                        return Either::Right(self.routes.view(matched));
+                        return (
+                            "Route",
+                            Either::Right(self.routes.view(matched)),
+                        );
                     }
                 }
-                Either::Left(self.fallback())
+                ("Fal", Either::Left(self.fallback()))
             }
             Err(e) => {
                 #[cfg(feature = "tracing")]
@@ -184,7 +188,7 @@ where
                         "Error converting location into URL: {e:?}"
                     );
                 }
-                Either::Left(self.fallback())
+                ("Fal", Either::Left(self.fallback()))
             }
         }
     }
@@ -246,7 +250,7 @@ macro_rules! tuples {
             {
                 type Output = [<EitherOf$num>]<$([<$ty View>],)* $last>;
 
-                fn fallback_or_view(&self) -> Self::Output {
+                fn fallback_or_view(&self) -> (&'static str, Self::Output) {
                     let ($([<$ty:lower>],)*) = &self.routes;
                     match self.location.try_to_url() {
                         Ok(url) => {
@@ -259,11 +263,11 @@ macro_rules! tuples {
                                     } = [<$ty:lower>].path.test(&url.pathname).unwrap();
                                     if remaining.is_empty() {
                                         let matched = MatchedRoute { params, matched, search_params: url.search_params.clone() };
-                                        return [<EitherOf$num>]::$ty([<$ty:lower>].view(matched))
+                                        return (stringify!($ty), [<EitherOf$num>]::$ty([<$ty:lower>].view(matched)))
                                     }
                                 }
                             )*
-                            [<EitherOf$num>]::$last(self.fallback())
+                            ("Fal", [<EitherOf$num>]::$last(self.fallback()))
                         }
                         Err(e) => {
                             #[cfg(feature = "tracing")]
@@ -272,7 +276,7 @@ macro_rules! tuples {
                                     "Error converting location into URL: {e:?}"
                                 );
                             }
-                            [<EitherOf$num>]::$last(self.fallback())
+                            ("Fal", [<EitherOf$num>]::$last(self.fallback()))
                         }
                     }
                 }

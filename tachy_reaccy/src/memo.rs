@@ -187,7 +187,6 @@ impl<T: Send + Sync + 'static> ReactiveNode for RwLock<MemoInner<T>> {
                 )
             };
 
-            // TODO clear sources
             let any_subscriber = { self.read().any_subscriber.clone() };
             any_subscriber.clear_sources(&any_subscriber);
             let new_value = owner.with_cleanup(|| {

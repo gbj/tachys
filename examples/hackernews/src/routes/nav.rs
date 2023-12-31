@@ -1,4 +1,4 @@
-use tachys::{prelude::*, tachydom::view::template::ViewTemplate};
+use tachys::prelude::*;
 
 #[component]
 pub fn Nav() -> impl RenderHtml<Dom> {

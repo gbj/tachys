@@ -1,4 +1,5 @@
 use crate::api;
+use tachy_reaccy::async_signal::AsyncState;
 use tachy_route::reactive::ReactiveMatchedRoute;
 use tachys::{prelude::*, show::Show, tachydom::view::either::Either};
 
@@ -30,12 +31,17 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
             api::fetch_api::<Vec<api::Story>>(&api::story(&path)).await
         }
     });
-    //let (pending, set_pending) = create_signal(false); // TODO
+    let pending = move || stories.with(AsyncState::loading);
 
-    /* let hide_more_link = move || {
-        stories.get().unwrap_or(None).unwrap_or_default().len() < 28
+    let hide_more_link = move || {
+        stories
+            .get()
+            .current_value()
+            .and_then(|value| value.as_ref().map(|value| value.len()))
+            .unwrap_or_default()
+            < 28
             || pending()
-    }; */
+    };
 
     let stories = move || {
         async move {
@@ -56,6 +62,10 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
         .with_fallback("Loading...")
     };
 
+    std::mem::forget(Effect::new(move |_| {
+        tachys::tachydom::log(&format!("page is {:?}", page()));
+    }));
+
     view! {
         <div class="news-view">
             <div class="news-list-nav">
@@ -68,17 +78,17 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
                         }
                     >
                         <a class="page-link"
-                                href=move || format!("/{}?page={}", story_type(), page() - 1)
-                                aria-label="Previous Page"
-                            >
-                                "< prev"
-                            </a>
+                            href=move || format!("/{}?page={}", story_type(), page() - 1)
+                            aria-label="Previous Page"
+                        >
+                            "< prev"
+                        </a>
                     </Show>
                 </span>
                 <span>"page " {page}</span>
                 <span class="page-link"
-                    //class:disabled=hide_more_link // TODO
-                    //aria-hidden=hide_more_link
+                    class:disabled=hide_more_link
+                    aria-hidden=hide_more_link
                 >
                     <a href=move || format!("/{}?page={}", story_type(), page() + 1)
                         aria-label="Next Page"

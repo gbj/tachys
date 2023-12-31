@@ -161,7 +161,7 @@ impl Owner {
     }
 
     pub fn on_cleanup(fun: impl FnOnce() + Send + Sync + 'static) {
-        if let Some(owner) = Owner::get() {
+        if let Some(owner) = Owner::current() {
             owner.inner.write().cleanups.push(Box::new(fun));
         }
     }
@@ -170,7 +170,7 @@ impl Owner {
         self.inner.write().nodes.push(node);
     }
 
-    pub(crate) fn get() -> Option<Owner> {
+    pub fn current() -> Option<Owner> {
         OWNER.with(|o| o.borrow().clone())
     }
 }

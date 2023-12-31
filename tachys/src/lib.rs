@@ -8,8 +8,10 @@ pub extern crate self as tachys;
 
 pub mod children; // TODO fix children
 pub mod component;
-pub mod show;
-
+mod for_loop;
+mod show;
+pub use for_loop::*;
+pub use show::*;
 pub use tachy_maccy::*;
 pub use tachy_reaccy;
 pub use tachydom;

@@ -1,12 +1,12 @@
 - hackernews example
   - TODOs
   - Suspense/Transition/Await components
-  - For component
   - nicer routing components
   - async routing (waiting for data to load before navigation)
   - metadata
   - `<A>` component
   - figure out rebuilding issues: list (needs new signal IDs) vs. regular rebuild
+  - SSR
 - escaping HTML correctly (attributes + text nodes)
 - nested routes
 - Signal wrappers

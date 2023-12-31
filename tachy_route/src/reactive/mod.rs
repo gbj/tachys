@@ -6,18 +6,17 @@ use crate::{
 };
 use std::{marker::PhantomData, mem};
 use tachy_reaccy::{
-    effect::Effect,
-    memo::{ArcMemo, Memo},
+    memo::Memo,
     signal::ArcRwSignal,
-    signal_traits::{
-        SignalGet, SignalGetUntracked, SignalSet, SignalWith, Track,
-    },
-    untrack, Owner, Root,
+    signal_traits::{SignalSet, SignalWith, Track},
+    untrack, Owner,
 };
 use tachydom::{
+    hydration::Cursor,
     log,
     renderer::Renderer,
-    view::{Mountable, Render},
+    ssr::StreamBuilder,
+    view::{Mountable, Position, PositionState, Render, RenderHtml},
 };
 
 #[allow(non_snake_case)]
@@ -25,7 +24,7 @@ pub fn ReactiveRouter<Rndr, Loc, DefFn, Defs, FallbackFn, Fallback>(
     mut location: Loc,
     routes: DefFn,
     fallback: FallbackFn,
-) -> impl Render<Rndr>
+) -> impl RenderHtml<Rndr>
 where
     DefFn: Fn() -> Defs + 'static,
     Defs: 'static,
@@ -37,7 +36,7 @@ where
     Fallback: Render<Rndr> + 'static,
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
-        Render<Rndr>,
+        RenderHtml<Rndr>,
 {
     // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
@@ -92,7 +91,7 @@ where
 
     fn build(self) -> Self::State {
         let (prev_id, inner) = self.inner.fallback_or_view();
-        let owner = self.owner.with(|| Owner::new());
+        let owner = self.owner.with(Owner::new);
         ReactiveRouterInnerState {
             inner: owner.with(|| inner.build()),
             owner,
@@ -104,10 +103,52 @@ where
     fn rebuild(self, state: &mut Self::State) {
         let (new_id, view) = self.inner.fallback_or_view();
         if new_id != state.prev_id {
-            state.owner = self.owner.with(|| Owner::new())
+            state.owner = self.owner.with(Owner::new)
             // previous root is dropped here -- TODO check if that's correct or should wait
         };
         state.owner.with(|| view.rebuild(&mut state.inner));
+    }
+}
+
+impl<Rndr, Loc, Defs, FallbackFn, Fallback> RenderHtml<Rndr>
+    for ReactiveRouterInner<Rndr, Loc, Defs, FallbackFn, Fallback>
+where
+    Loc: Location,
+    Rndr: Renderer,
+    Rndr::Element: Clone,
+    Rndr::Node: Clone,
+    FallbackFn: Fn() -> Fallback,
+    Fallback: Render<Rndr>,
+    Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
+    <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
+        RenderHtml<Rndr>,
+{
+    const MIN_LENGTH: usize = <<Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output as RenderHtml<Rndr>>::MIN_LENGTH;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
+        self.inner
+            .fallback_or_view()
+            .to_html_with_buf(buf, position)
+    }
+
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &mut Position,
+    ) where
+        Self: Sized,
+    {
+        self.inner
+            .fallback_or_view()
+            .to_html_async_with_buf::<OUT_OF_ORDER>(buf, position)
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<Rndr>,
+        position: &PositionState,
+    ) -> Self::State {
+        todo!()
     }
 }
 

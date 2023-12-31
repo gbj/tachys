@@ -10,7 +10,7 @@ mod routes;
 use routes::{nav::Nav, stories::Stories, story::Story, users::User};
 
 #[component]
-pub fn App() -> impl Render<Dom> {
+pub fn App() -> impl RenderHtml<Dom> {
     //provide_meta_context();
     let (is_routing, set_is_routing) = signal(false);
 

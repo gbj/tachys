@@ -1,7 +1,7 @@
 use crate::api;
 use tachy_reaccy::async_signal::AsyncState;
 use tachy_route::reactive::ReactiveMatchedRoute;
-use tachys::{prelude::*, show::Show, tachydom::view::either::Either};
+use tachys::{prelude::*, tachydom::view::either::Either, Show};
 
 fn category(from: &str) -> &'static str {
     match from {

@@ -294,7 +294,9 @@ impl SubscriberSet {
     }
 
     pub fn subscribe(&mut self, subscriber: AnySubscriber) {
-        self.0.push(subscriber);
+        if !self.0.contains(&subscriber) {
+            self.0.push(subscriber);
+        }
     }
 
     pub fn unsubscribe(&mut self, subscriber: &AnySubscriber) {

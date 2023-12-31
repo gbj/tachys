@@ -156,6 +156,12 @@ pub fn app() -> impl Render<Dom> {
     }
 }
 
+extern crate wee_alloc;
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 fn main() {
     console_error_panic_hook::set_once();
 

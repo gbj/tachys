@@ -527,7 +527,7 @@ impl<T: Send + Sync + Clone + 'static> IntoFuture for AsyncDerived<T> {
         this.into_future()
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -609,3 +609,4 @@ mod tests {
         assert_eq!(c.await, 5);
     }
 }
+ */

@@ -22,12 +22,15 @@ struct Inner {
 }
 
 pub fn channel() -> (Sender, Receiver) {
-    let inner = Arc::new(Inner::default());
+    let inner = Arc::new(Inner {
+        waker: AtomicWaker::new(),
+        set: AtomicBool::new(false),
+    });
     (Sender(Arc::clone(&inner)), Receiver(inner))
 }
 
 impl Sender {
-    pub fn notify(&self) {
+    pub fn notify(&mut self) {
         self.0.set.store(true, Relaxed);
         self.0.waker.wake();
     }
@@ -40,17 +43,9 @@ impl Stream for Receiver {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        panic!("notified!");
-        // quick check to avoid registration if already done.
-        if self.0.set.load(Relaxed) {
-            return Poll::Ready(Some(()));
-        }
-
         self.0.waker.register(cx.waker());
 
-        // Need to check condition **after** `register` to avoid a race
-        // condition that would result in lost notifications.
-        if self.0.set.load(Relaxed) {
+        if self.0.set.swap(false, Relaxed) {
             Poll::Ready(Some(()))
         } else {
             Poll::Pending

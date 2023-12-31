@@ -1,5 +1,5 @@
 use std::{mem, sync::atomic::AtomicUsize};
-use tachy_reaccy_macro::Store;
+//use tachy_reaccy_macro::Store;
 use tachys::{
     prelude::*,
     show::Show,
@@ -13,7 +13,7 @@ use tachys::{
     },
 };
 
-static NEXT_ID: AtomicUsize = AtomicUsize::new(3);
+/*static NEXT_ID: AtomicUsize = AtomicUsize::new(3);
 
 fn next_id() -> usize {
     NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -34,9 +34,9 @@ struct Todo {
     pub id: usize,
     pub title: String,
     pub completed: bool,
-}
+} */
 
-pub fn app() -> impl Render<Dom> {
+/* pub fn app() -> impl Render<Dom> {
     let store = Store::new(State {
         name: "Greg".to_string(),
         todos: vec![
@@ -142,6 +142,17 @@ fn TodoRow(
                 "X"
             </button>
         </li>
+    }
+} */
+
+pub fn app() -> impl Render<Dom> {
+    let text = ArcRwSignal::new(String::from("Hi"));
+    view! {
+        <button on:click={
+            move |_| text.update(|n| n.push_str("!!!"))
+        }>
+            {let text = text.clone(); move || text.get()}
+        </button>
     }
 }
 

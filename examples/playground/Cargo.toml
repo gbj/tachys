@@ -9,7 +9,7 @@ tachys = { version = "0.1.0", path = "../../tachys", features = [
 	"web",
 	"nightly",
 ] }
-tachy_reaccy_macro = { version = "0.1.0", path = "../../tachy_reaccy_macro" }
+#tachy_reaccy_macro = { version = "0.1.0", path = "../../tachy_reaccy_macro" }
 tachy_route = { version = "0.1.0", path = "../../tachy_route", default-features = false, features = [
 	"reaccy",
 ] }

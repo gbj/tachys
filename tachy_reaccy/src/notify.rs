@@ -1,37 +1,87 @@
 //use browser_only_send::BrowserOnly;
-use futures::channel::mpsc::{channel, Receiver, Sender};
-use std::{fmt::Debug, hash::Hash};
+use core::sync::atomic::Ordering::Relaxed;
+use futures::{task::AtomicWaker, Stream};
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    pin::Pin,
+    sync::{atomic::AtomicBool, Arc},
+    task::{Context, Poll},
+};
 
 #[derive(Debug)]
-pub struct NotificationSender(Sender<()>);
+pub(crate) struct Sender(Arc<Inner>);
 
-impl NotificationSender {
-    pub fn channel() -> (NotificationSender, Receiver<()>) {
-        // buffer of 0 means we can only send N messages at once
-        // where N is the number of NotificationSenders
-        // we don't implement Clone on that type, so it can only hold 1 message
-        // this means we can't double-notify in a single tick
-        let (tx, rx) = channel::<()>(0);
-        (NotificationSender(tx), rx)
-    }
+#[derive(Debug)]
+pub(crate) struct Receiver(Arc<Inner>);
 
-    pub fn notify(&mut self) {
-        // if this fails, it's because there's already a message
-        // in the buffer. but we're just sending () to wake it up;
-        // we really don't care if multiple signals try to notify it synchronously
-        // and it fails to send, as long as it's sent the one time
-        _ = self.0.try_send(());
+#[derive(Debug, Default)]
+struct Inner {
+    waker: AtomicWaker,
+    set: AtomicBool,
+}
+
+pub fn channel() -> (Sender, Receiver) {
+    let inner = Arc::new(Inner::default());
+    (Sender(Arc::clone(&inner)), Receiver(inner))
+}
+
+impl Sender {
+    pub fn notify(&self) {
+        self.0.set.store(true, Relaxed);
+        self.0.waker.wake();
     }
 }
 
-impl Hash for NotificationSender {
+impl Stream for Receiver {
+    type Item = ();
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        panic!("notified!");
+        // quick check to avoid registration if already done.
+        if self.0.set.load(Relaxed) {
+            return Poll::Ready(Some(()));
+        }
+
+        self.0.waker.register(cx.waker());
+
+        // Need to check condition **after** `register` to avoid a race
+        // condition that would result in lost notifications.
+        if self.0.set.load(Relaxed) {
+            Poll::Ready(Some(()))
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl Hash for Sender {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash_receiver(state);
+        Arc::as_ptr(&self.0).hash(state)
     }
 }
 
-impl PartialEq for NotificationSender {
+impl PartialEq for Sender {
     fn eq(&self, other: &Self) -> bool {
-        self.0.same_receiver(&other.0)
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
+
+impl Eq for Sender {}
+
+impl Hash for Receiver {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).hash(state)
+    }
+}
+
+impl PartialEq for Receiver {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for Receiver {}

@@ -1,7 +1,7 @@
 use super::{AsyncState, ScopedFuture};
 use crate::{
     arena::{Owner, Stored, StoredData},
-    notify::NotificationSender,
+    notify::{channel, Sender},
     prelude::{DefinedAt, SignalWithUntracked},
     source::{
         AnySource, AnySubscriber, ReactiveNode, Source, SourceSet, Subscriber,
@@ -60,7 +60,7 @@ struct ArcAsyncDerivedInner {
     // when the new async value is ready
     subscribers: SubscriberSet,
     // when a source changes, notifying this will cause the async work to rerun
-    notifier: NotificationSender,
+    notifier: Sender,
 }
 
 // This implemented creating a derived async signal.
@@ -69,7 +69,7 @@ struct ArcAsyncDerivedInner {
 // as far as I can tell, require repeating most of the function body.
 macro_rules! spawn_derived {
     ($spawner:ident, $initial:ident, $fun:ident) => {{
-        let (mut notifier, mut rx) = NotificationSender::channel();
+        let (mut notifier, mut rx) = channel();
 
         // begin loading eagerly but asynchronously, if not already loaded
         if matches!($initial, AsyncState::Loading) {

@@ -3,7 +3,7 @@ use super::{
 };
 use crate::{
     hydration::Cursor,
-    renderer::{CastFrom, Renderer},
+    renderer::{CastFrom, Renderer, StringRenderer},
     view::ToTemplate,
 };
 use std::{
@@ -20,9 +20,9 @@ macro_rules! render_primitive {
   ($($child_type:ty),* $(,)?) => {
     $(
 		paste::paste! {
-			pub struct [<$child_type:camel State>]<R>(R::Text, $child_type) where R: Renderer;
+			pub struct [<$child_type:camel State>]<R>(R::Text, $child_type) where R: StringRenderer;
 
-			impl<'a, R: Renderer> Mountable<R> for [<$child_type:camel State>]<R> {
+			impl<'a, R: StringRenderer> Mountable<R> for [<$child_type:camel State>]<R> {
 					fn unmount(&mut self) {
 						self.0.unmount()
 					}
@@ -45,7 +45,7 @@ macro_rules! render_primitive {
 					}
 			}
 
-			impl<'a, R: Renderer> Render<R> for $child_type {
+			impl<'a, R: StringRenderer> Render<R> for $child_type {
 				type State = [<$child_type:camel State>]<R>;
 
 				fn build(self) -> Self::State {
@@ -66,7 +66,7 @@ macro_rules! render_primitive {
 
 			impl<'a, R> RenderHtml<R> for $child_type
 			where
-				R: Renderer,
+				R: StringRenderer,
 				R::Node: Clone,
 				R::Element: Clone,
 			{

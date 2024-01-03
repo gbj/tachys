@@ -4,7 +4,7 @@
 //!
 //! Do not use this for anything real.
 
-use super::{CastFrom, DomRenderer, Renderer};
+use super::{CastFrom, DomRenderer, Renderer, StringRenderer};
 use crate::{
     html::element::{CreateElement, ElementType},
     view::Mountable,
@@ -373,24 +373,11 @@ impl<E: ElementType> CreateElement<MockDom> for E {
 
 impl Renderer for MockDom {
     type Node = Node;
-    type Text = Text;
     type Element = Element;
     type Placeholder = Placeholder;
 
-    fn create_text_node(data: &str) -> Self::Text {
-        document().create_text_node(data)
-    }
-
     fn create_placeholder() -> Self::Placeholder {
         document().create_placeholder()
-    }
-
-    fn set_text(node: &Self::Text, text: &str) {
-        Document::with_node_mut(node.0 .0, |node| {
-            if let NodeType::Text(ref mut node) = node.ty {
-                *node = text.to_string();
-            }
-        });
     }
 
     fn set_attribute(node: &Self::Element, name: &str, value: &str) {
@@ -535,6 +522,22 @@ impl Renderer for MockDom {
                 node.parent = None;
             });
         }
+    }
+}
+
+impl StringRenderer for MockDom {
+    type Text = Text;
+
+    fn create_text_node(data: &str) -> Self::Text {
+        document().create_text_node(data)
+    }
+
+    fn set_text(node: &Self::Text, text: &str) {
+        Document::with_node_mut(node.0 .0, |node| {
+            if let NodeType::Text(ref mut node) = node.ty {
+                *node = text.to_string();
+            }
+        });
     }
 }
 

@@ -4,16 +4,16 @@ use super::{
 };
 use crate::{
     hydration::Cursor,
-    renderer::{CastFrom, Renderer},
+    renderer::{CastFrom, Renderer, StringRenderer},
 };
 use std::{rc::Rc, sync::Arc};
 
-pub struct StrState<'a, R: Renderer> {
+pub struct StrState<'a, R: StringRenderer> {
     pub node: R::Text,
     str: &'a str,
 }
 
-impl<'a, R: Renderer> Render<R> for &'a str {
+impl<'a, R: StringRenderer> Render<R> for &'a str {
     type State = StrState<'a, R>;
 
     fn build(self) -> Self::State {
@@ -34,7 +34,7 @@ impl<'a> InfallibleRender for &'a str {}
 
 impl<'a, R> RenderHtml<R> for &'a str
 where
-    R: Renderer,
+    R: StringRenderer,
     R::Node: Clone,
     R::Element: Clone,
 {
@@ -98,7 +98,7 @@ impl<'a> ToTemplate for &'a str {
 
 impl<'a, R> Mountable<R> for StrState<'a, R>
 where
-    R: Renderer,
+    R: StringRenderer,
 {
     fn unmount(&mut self) {
         self.node.unmount()
@@ -121,12 +121,12 @@ where
         true
     }
 }
-pub struct StringState<R: Renderer> {
+pub struct StringState<R: StringRenderer> {
     node: R::Text,
     str: String,
 }
 
-impl<R: Renderer> Render<R> for String {
+impl<R: StringRenderer> Render<R> for String {
     type State = StringState<R>;
 
     fn build(self) -> Self::State {
@@ -147,7 +147,7 @@ impl InfallibleRender for String {}
 
 impl<R> RenderHtml<R> for String
 where
-    R: Renderer,
+    R: StringRenderer,
     R::Node: Clone,
     R::Element: Clone,
 {
@@ -184,7 +184,7 @@ impl ToTemplate for String {
     }
 }
 
-impl<R: Renderer> Mountable<R> for StringState<R> {
+impl<R: StringRenderer> Mountable<R> for StringState<R> {
     fn unmount(&mut self) {
         self.node.unmount()
     }
@@ -207,12 +207,12 @@ impl<R: Renderer> Mountable<R> for StringState<R> {
     }
 }
 
-pub struct RcStrState<R: Renderer> {
+pub struct RcStrState<R: StringRenderer> {
     node: R::Text,
     str: Rc<str>,
 }
 
-impl<R: Renderer> Render<R> for Rc<str> {
+impl<R: StringRenderer> Render<R> for Rc<str> {
     type State = RcStrState<R>;
 
     fn build(self) -> Self::State {
@@ -233,7 +233,7 @@ impl InfallibleRender for Rc<str> {}
 
 impl<R> RenderHtml<R> for Rc<str>
 where
-    R: Renderer,
+    R: StringRenderer,
     R::Node: Clone,
     R::Element: Clone,
 {
@@ -271,7 +271,7 @@ impl ToTemplate for Rc<str> {
     }
 }
 
-impl<R: Renderer> Mountable<R> for RcStrState<R> {
+impl<R: StringRenderer> Mountable<R> for RcStrState<R> {
     fn unmount(&mut self) {
         self.node.unmount()
     }
@@ -294,12 +294,12 @@ impl<R: Renderer> Mountable<R> for RcStrState<R> {
     }
 }
 
-pub struct ArcStrState<R: Renderer> {
+pub struct ArcStrState<R: StringRenderer> {
     node: R::Text,
     str: Arc<str>,
 }
 
-impl<R: Renderer> Render<R> for Arc<str> {
+impl<R: StringRenderer> Render<R> for Arc<str> {
     type State = ArcStrState<R>;
 
     fn build(self) -> Self::State {
@@ -320,7 +320,7 @@ impl InfallibleRender for Arc<str> {}
 
 impl<R> RenderHtml<R> for Arc<str>
 where
-    R: Renderer,
+    R: StringRenderer,
     R::Node: Clone,
     R::Element: Clone,
 {
@@ -358,7 +358,7 @@ impl ToTemplate for Arc<str> {
     }
 }
 
-impl<R: Renderer> Mountable<R> for ArcStrState<R> {
+impl<R: StringRenderer> Mountable<R> for ArcStrState<R> {
     fn unmount(&mut self) {
         self.node.unmount()
     }

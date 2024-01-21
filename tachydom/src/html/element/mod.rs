@@ -35,6 +35,29 @@ where
     pub(crate) children: Ch,
 }
 
+impl<E, At, Ch, Rndr> HtmlElement<E, At, Ch, Rndr>
+where
+    At: Attribute<Rndr>,
+    Ch: Render<Rndr>,
+    Rndr: Renderer,
+{
+    pub fn children(&self) -> &Ch {
+        &self.children
+    }
+
+    pub fn children_mut(&mut self) -> &mut Ch {
+        &mut self.children
+    }
+
+    pub fn attributes(&self) -> &At {
+        &self.attributes
+    }
+
+    pub fn attributes_mut(&mut self) -> &mut At {
+        &mut self.attributes
+    }
+}
+
 impl<E, At, Ch, NewChild, Rndr> ElementChild<Rndr, NewChild>
     for HtmlElement<E, At, Ch, Rndr>
 where

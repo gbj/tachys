@@ -1,8 +1,9 @@
 use tachy_route::{
-    location::BrowserUrl,
+    location::{BrowserUrl, RequestUrl},
     matching::{ParamSegment, StaticSegment},
     reactive::{reactive_route, ReactiveRouter},
-    route::RouteDefinition,
+    route::{PossibleRoutes, RouteDefinition},
+    router::FallbackOrView,
 };
 use tachys::{prelude::*, tachydom::dom::body};
 mod api;
@@ -15,7 +16,16 @@ pub fn App() -> impl RenderHtml<Dom> {
     let (is_routing, set_is_routing) = signal(false);
 
     let router = ReactiveRouter(
-        BrowserUrl::new(),
+        {
+            #[cfg(feature = "ssr")]
+            {
+                use_context::<RequestUrl>().unwrap()
+            }
+            #[cfg(not(feature = "ssr"))]
+            {
+                BrowserUrl::new()
+            }
+        },
         || {
             (
                 RouteDefinition::new(
@@ -28,17 +38,17 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (),
                     Story,
                 ),
-                RouteDefinition::new(
+                /* RouteDefinition::new(
                     ParamSegment("stories"),
                     (),
                     reactive_route(Stories),
-                ),
+                ), */
             )
         },
         || "Not Found",
     );
     view! {
-        <Nav />
+        <Nav/>
         <main>
             {router}
         </main>

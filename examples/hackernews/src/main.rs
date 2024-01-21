@@ -1,4 +1,3 @@
-use cfg_if::cfg_if;
 use tachys::prelude::*;
 
 #[cfg(feature = "ssr")]
@@ -24,7 +23,8 @@ mod ssr {
             dev::{ServiceFactory, ServiceRequest},
             error::Error,
         };
-        use leptos_config::LeptosOptions;
+        use tachy_reaccy::{context::provide_context, Root};
+        use tachy_route::{location::RequestUrl, RouteList};
         use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
 
         pub trait TachysRoutes: Sized {
@@ -61,7 +61,18 @@ mod ssr {
             where
                 IV: RenderHtml<Dom> + 'static,
             {
-                todo!()
+                let generated_routes = Root::global_ssr(|| {
+                    // stub out a path for now
+                    provide_context(RequestUrl::from_path(""));
+                    RouteList::generate(app_fn)
+                })
+                .into_value()
+                .expect("could not generate route list");
+                println!("{generated_routes:#?}");
+                /*Root::global_ssr(|| {
+                    additional_context();
+                });*/
+                self
             }
         }
     }
@@ -79,13 +90,13 @@ async fn main() -> std::io::Result<()> {
     let addr = conf.leptos_options.site_addr;
 
     HttpServer::new(move || {
-        let options = &conf.leptos_options;
-        let site_root = &leptos_options.site_root;
+        let site_root = conf.leptos_options.site_root.clone();
+        let options = conf.leptos_options.clone();
 
         App::new()
             .service(css)
             .service(favicon)
-            .tachys_routes(|| {
+            .tachys_routes(move || {
                 view! {
                     <!DOCTYPE html>
                     <html lang="en"> // TODO how to set other meta on this?
@@ -93,8 +104,8 @@ async fn main() -> std::io::Result<()> {
                             <meta charset="utf-8"/>
                             <meta name="viewport" content="width=device-width, initial-scale=1"/>
                             // TODO other meta tags
-                            <AutoReload options/>
-                            <HydrationScripts options/>
+                            <AutoReload options=options.to_owned() />
+                            <HydrationScripts options=options.to_owned() />
                         </head>
                         <body>
                             <App/>

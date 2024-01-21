@@ -4,25 +4,28 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-console_error_panic_hook = "0.1"
+#console_error_panic_hook = "0.1"
 tachys = { version = "0.1.0", path = "../../tachys", features = [
 	"web",
 	"nightly",
 ] }
 #tachy_reaccy_macro = { version = "0.1.0", path = "../../tachy_reaccy_macro" }
-tachy_route = { version = "0.1.0", path = "../../tachy_route", default-features = false, features = [
-	"reaccy",
-] }
-tracing = "0.1.40"
-tracing-subscriber-wasm = "0.1.0"
-tracing-subscriber = "0.3.18"
+#tachy_route = { version = "0.1.0", path = "../../tachy_route", default-features = false, features = [
+#	"reaccy",
+#] }
+#tracing = "0.1.40"
+#tracing-subscriber-wasm = "0.1.0"
+#tracing-subscriber = "0.3.18"
 web-sys = "0.3.66"
 wee_alloc = { version = "0.4.5" }
 
 [profile.release]
-codegen-units = 1
+opt-level = "z"
+debug = false
 lto = true
-opt-level = 'z'
+codegen-units = 1
 panic = "abort"
+strip = true
+incremental = false
 
 [workspace]

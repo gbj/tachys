@@ -32,6 +32,7 @@ web-sys = { version = "0.3", features = ["AbortController", "AbortSignal"] }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 
 [features]
+default = ["ssr"]
 csr = []
 hydrate = []
 ssr = ["dep:actix-files", "dep:actix-web"]

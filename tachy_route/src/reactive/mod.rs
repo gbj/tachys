@@ -1,10 +1,11 @@
 use crate::{
     location::Location,
     matching::Params,
-    route::MatchedRoute,
+    route::{MatchedRoute, PossibleRoutes},
     router::{FallbackOrView, Router},
+    RouteList,
 };
-use std::{marker::PhantomData, mem};
+use std::{fmt::Debug, marker::PhantomData, mem};
 use tachy_reaccy::{
     memo::Memo,
     signal::ArcRwSignal,
@@ -37,6 +38,7 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         RenderHtml<Rndr>,
+    Defs: PossibleRoutes + Debug,
 {
     // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
@@ -85,6 +87,7 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         Render<Rndr>,
+    Defs: PossibleRoutes + Debug,
 {
     type State =
         ReactiveRouterInnerState<Rndr, Loc, Defs, FallbackFn, Fallback>;
@@ -122,13 +125,21 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         RenderHtml<Rndr>,
+    Defs: PossibleRoutes + Debug,
 {
     const MIN_LENGTH: usize = <<Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output as RenderHtml<Rndr>>::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
-        self.inner
-            .fallback_or_view()
-            .to_html_with_buf(buf, position)
+        if RouteList::is_generating() {
+            //let routes = self.routes.to_route_list();
+            println!("defs = {:#?}", self.inner.routes);
+            let routes = RouteList::default();
+            RouteList::register(routes);
+        } else {
+            self.inner
+                .fallback_or_view()
+                .to_html_with_buf(buf, position)
+        }
     }
 
     fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(

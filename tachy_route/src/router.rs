@@ -2,6 +2,7 @@ use crate::{
     location::Location,
     matching::{PartialPathMatch, RouteMatch},
     route::{MatchedRoute, PossibleRoutes, RouteDefinition},
+    RouteList,
 };
 use std::{cmp, marker::PhantomData};
 use tachydom::{
@@ -13,13 +14,34 @@ use tachydom::{
     },
 };
 
-#[derive(Debug)]
-pub struct Router<Rndr, Loc, Defs, FallbackFn>
-where
-    Rndr: Renderer,
+trait HasRouteDefs {
+    type Defs;
+
+    fn route_defs(&self) -> &Self::Defs;
+}
+
+impl<Rndr, Loc, Defs, FallbackFn> HasRouteDefs
+    for Router<Rndr, Loc, Defs, FallbackFn>
 {
+    type Defs = Defs;
+
+    fn route_defs(&self) -> &Self::Defs {
+        &self.routes
+    }
+}
+
+impl HasRouteDefs for () {
+    type Defs = ();
+
+    fn route_defs(&self) -> &Self::Defs {
+        &self
+    }
+}
+
+#[derive(Debug)]
+pub struct Router<Rndr, Loc, Defs, FallbackFn> {
     location: Loc,
-    routes: Defs,
+    pub(crate) routes: Defs,
     fallback: FallbackFn,
     rndr: PhantomData<Rndr>,
 }
@@ -81,6 +103,7 @@ where
     Self: FallbackOrViewHtml,
     Rndr: Renderer,
     Loc: Location,
+    Defs: PossibleRoutes,
     <Self as FallbackOrView>::Output: RenderHtml<Rndr>,
     Rndr::Element: Clone,
     Rndr::Node: Clone,
@@ -88,7 +111,15 @@ where
     const MIN_LENGTH: usize = <Self as FallbackOrViewHtml>::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
-        self.fallback_or_view().to_html_with_buf(buf, position);
+        println!("\n\nchecking RouteList::is_generating()");
+        if RouteList::is_generating() {
+            //let routes = self.routes.to_route_list();
+            println!("generating route list");
+            let routes = RouteList::default();
+            RouteList::register(routes);
+        } else {
+            self.fallback_or_view().to_html_with_buf(buf, position);
+        }
     }
 
     fn hydrate<const FROM_SERVER: bool>(

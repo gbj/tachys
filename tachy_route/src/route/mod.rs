@@ -1,5 +1,7 @@
+mod method;
 use crate::matching::{Params, PartialPathMatch, RouteMatch};
-use std::marker::PhantomData;
+pub use method::*;
+use std::{fmt::Debug, marker::PhantomData};
 use tachydom::{renderer::Renderer, view::Render};
 
 /// Defines a single route in a nested route tree. This is the return
@@ -14,6 +16,21 @@ pub struct RouteDefinition<Rndr, Pat, ViewFn, Children> {
     /// The view that should be displayed when this route is matched.
     pub(crate) view: ViewFn,
     rndr: PhantomData<Rndr>,
+}
+
+impl<Rndr, Pat, ViewFn, Children> Debug
+    for RouteDefinition<Rndr, Pat, ViewFn, Children>
+where
+    Pat: Debug,
+    Children: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RouteDefinition")
+            .field("path", &self.path)
+            .field("children", &self.children)
+            .field("rndr", &self.rndr)
+            .finish()
+    }
 }
 
 pub struct MatchedRoute {

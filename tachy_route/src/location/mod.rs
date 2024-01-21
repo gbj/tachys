@@ -93,7 +93,7 @@ impl Location for RequestUrl {
             origin: url.origin().unicode_serialization(),
             pathname: url.path().to_string(),
             search: url.query().unwrap_or_default().to_string(),
-            search_params: todo!(),
+            search_params: Default::default(), // TODO
             hash: Default::default(),
         })
     }

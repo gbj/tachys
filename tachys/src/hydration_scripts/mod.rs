@@ -7,8 +7,8 @@ use tachydom::view::RenderHtml;
 #[component]
 pub fn AutoReload<'a>(
     #[prop(optional)] disable_watch: bool,
-    nonce: &'a str,
-    options: &'a LeptosOptions,
+    #[prop(optional)] nonce: Option<&'a str>,
+    options: LeptosOptions,
 ) -> impl RenderHtml<Dom> + 'a {
     (!disable_watch && std::env::var("LEPTOS_WATCH").is_ok()).then(|| {
         let reload_port = match options.reload_external_port {
@@ -30,10 +30,10 @@ pub fn AutoReload<'a>(
 }
 
 #[component]
-pub fn HydrationScripts<'a>(
-    options: &'a LeptosOptions,
+pub fn HydrationScripts(
+    options: LeptosOptions,
     #[prop(optional)] islands: bool,
-) -> impl RenderHtml<Dom> + 'a {
+) -> impl RenderHtml<Dom> {
     let pkg_path = &options.site_pkg_dir;
     let output_name = &options.output_name;
     let mut wasm_output_name = output_name.clone();

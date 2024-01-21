@@ -14,7 +14,13 @@ where
         } else if #[cfg(any(test, doctest, feature = "tokio"))] {
             tokio::task::spawn_local(fut);
         }  else {
-            futures::executor::block_on(fut)
+            use std::cell::OnceCell;
+            use futures::executor::LocalPool;
+            use futures::task::LocalSpawnExt;
+            thread_local! {
+                static POOL: OnceCell<LocalPool> = OnceCell::new()
+            }
+            POOL.with(|pool| pool.get_or_init(|| LocalPool::new()).spawner().spawn_local(fut));
         }
     }
 }
@@ -32,7 +38,7 @@ where
         } else if #[cfg(any(test, doctest, feature = "tokio"))] {
             tokio::task::spawn(fut);
         }  else {
-            futures::executor::block_on(fut)
+            spawn_local(fut);
         }
     }
 }

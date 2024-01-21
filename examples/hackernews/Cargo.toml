@@ -17,6 +17,7 @@ actix-web = { version = "4", optional = true, features = ["macros"] }
 console_log = "1"
 console_error_panic_hook = "0.1"
 cfg-if = "1"
+leptos_config = "0.5"
 tachys = { path = "../../tachys", features = ["nightly", "web"] }
 tachy_reaccy = { path = "../../tachy_reaccy", features = ["miniserde"] }
 tachy_route = { path = "../../tachy_route", features = ["reaccy"] }
@@ -31,6 +32,7 @@ web-sys = { version = "0.3", features = ["AbortController", "AbortSignal"] }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 
 [features]
+default = ["ssr"]
 csr = []
 hydrate = []
 ssr = ["dep:actix-files", "dep:actix-web"]

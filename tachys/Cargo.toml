@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+leptos_config = "0.5"
 tachydom = { path = "../tachydom", features = ["reaccy"] }
 tachy_maccy = { path = "../tachy_maccy" }
 tachy_reaccy = { path = "../tachy_reaccy" }

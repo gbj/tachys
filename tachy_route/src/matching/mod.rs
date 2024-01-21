@@ -2,7 +2,7 @@ mod param_segments;
 mod static_segment;
 pub use param_segments::*;
 pub use static_segment::*;
-use std::str::Chars;
+use std::{borrow::Cow, str::Chars};
 
 pub(crate) type Params<K> = Vec<(K, String)>;
 
@@ -20,6 +20,8 @@ pub trait RouteMatch {
     fn matches_iter(&self, path: &mut Chars) -> bool;
 
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>;
+
+    fn to_path(&self, style) -> Cow<'_, str>;
 }
 
 #[derive(Debug)]

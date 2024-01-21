@@ -2,7 +2,7 @@ use std::{mem, sync::atomic::AtomicUsize};
 //use tachy_reaccy_macro::Store;
 use tachys::{
     prelude::*,
-    show::Show,
+    //show::Show,
     tachy_reaccy::store::{
         ArcStore, AtIndex, AtKey, KeyedStoreFieldIterator, Store, Subfield,
     },
@@ -156,8 +156,14 @@ pub fn app() -> impl Render<Dom> {
     }
 }
 
+extern crate wee_alloc;
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 fn main() {
-    console_error_panic_hook::set_once();
+    //console_error_panic_hook::set_once();
 
     /* tracing_subscriber::fmt()
         // this level can be adjusted to filter out messages of different levels of importance

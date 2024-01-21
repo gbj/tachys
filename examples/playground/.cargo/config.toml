@@ -7,4 +7,4 @@ rustflags = [
 	"-Clto",
 	#    "-Zvirtual-function-elimination",
 	"-Zlocation-detail=none",
-]
+

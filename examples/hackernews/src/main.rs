@@ -7,6 +7,7 @@ mod ssr {
     pub use hackernews::App;
     //use leptos_actix::{generate_route_list, LeptosRoutes};
     pub use leptos_config::*;
+    use tachy_reaccy::Owner;
     use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
 
     #[get("/style.css")]
@@ -22,13 +23,18 @@ mod ssr {
         use actix_web::{
             dev::{ServiceFactory, ServiceRequest},
             error::Error,
+            http, web, HttpRequest, HttpResponse, Result,
         };
-        use tachy_reaccy::{context::provide_context, Root};
+        use futures::StreamExt;
+        use tachy_reaccy::{context::provide_context, Owner, Root};
         use tachy_route::{location::RequestUrl, RouteList};
         use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
 
         pub trait TachysRoutes: Sized {
-            fn tachys_routes<IV>(self, app_fn: impl Fn() -> IV) -> Self
+            fn tachys_routes<IV>(
+                self,
+                app_fn: impl Fn() -> IV + Clone + 'static,
+            ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static,
             {
@@ -37,8 +43,8 @@ mod ssr {
 
             fn tachys_routes_with_context<IV>(
                 self,
-                additional_context: impl FnOnce(),
-                app_fn: impl Fn() -> IV,
+                additional_context: impl FnOnce() + Clone + 'static,
+                app_fn: impl Fn() -> IV + Clone + 'static,
             ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static;
@@ -55,24 +61,89 @@ mod ssr {
         {
             fn tachys_routes_with_context<IV>(
                 self,
-                additional_context: impl FnOnce(),
-                app_fn: impl Fn() -> IV,
+                additional_context: impl FnOnce() + Clone + 'static,
+                app_fn: impl Fn() -> IV + Clone + 'static,
             ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static,
             {
+                let mut router = self;
                 let generated_routes = Root::global_ssr(|| {
                     // stub out a path for now
                     provide_context(RequestUrl::from_path(""));
-                    RouteList::generate(app_fn)
+                    RouteList::generate(&app_fn)
                 })
                 .into_value()
-                .expect("could not generate route list");
+                .expect("could not generate route list")
+                .into_inner();
                 println!("{generated_routes:#?}");
+                for (listing, static_data_map) in generated_routes {
+                    let path = listing.path();
+                    let mode = listing.mode();
+
+                    println!("registering {path:?}");
+                    let handler = {
+                        let app_fn = app_fn.clone();
+                        let additional_context = additional_context.clone();
+
+                        move |req: HttpRequest| {
+                            let app_fn = app_fn.clone();
+                            let additional_context = additional_context.clone();
+
+                            async move {
+                                println!("inside handler");
+                                let Root(owner, stream) =
+                                    Root::global_ssr(move || {
+                                        // provide contexts
+                                        let path = req.path();
+                                        additional_context();
+                                        provide_context(RequestUrl::from_path(
+                                            path,
+                                        ));
+                                        // TODO provide HttpRequest
+
+                                        // run app
+                                        let app = app_fn();
+
+                                        // convert app to appropriate response type
+                                        let app_stream =
+                                            app.to_html_stream_out_of_order();
+                                        let shared_context =
+                                            Owner::shared_context().unwrap();
+                                        // TODO nonce
+                                        let shared_context = shared_context
+                                            .pending_data()
+                                            .unwrap()
+                                            .map(|chunk| {
+                                                format!(
+                                                    "<script>{chunk}</script>"
+                                                )
+                                            });
+                                        futures::stream::select(
+                                            app_stream,
+                                            shared_context,
+                                        )
+                                    });
+
+                                HttpResponse::Ok()
+                                    .content_type(
+                                        http::header::ContentType::html(),
+                                    )
+                                    .streaming({
+                                        stream.map(|html| {
+                                            Ok(web::Bytes::from(html))
+                                                as Result<web::Bytes>
+                                        })
+                                    })
+                            }
+                        }
+                    };
+                    router = router.route(path, web::get().to(handler))
+                }
                 /*Root::global_ssr(|| {
                     additional_context();
                 });*/
-                self
+                router
             }
         }
     }
@@ -104,7 +175,7 @@ async fn main() -> std::io::Result<()> {
                             <meta charset="utf-8"/>
                             <meta name="viewport" content="width=device-width, initial-scale=1"/>
                             // TODO other meta tags
-                            <AutoReload options=options.to_owned() />
+                            //<AutoReload options=options.to_owned() />
                             <HydrationScripts options=options.to_owned() />
                         </head>
                         <body>
@@ -113,42 +184,6 @@ async fn main() -> std::io::Result<()> {
                     </html>
                 }
             })
-            /* .route(                web::get().to(|| async {
-            let Root(owner, stream) = Root::global_ssr(move || {
-                        let app = hydration_ex::app::my_app();
-                        let app_stream =
-                            app.to_html_stream_out_of_order();
-                        let shared_context =
-                            Owner::shared_context().unwrap();
-                        // TODO nonce
-                        let shared_context = shared_context
-                            .pending_data()
-                            .unwrap()
-                            .map(|chunk| {
-                                format!("<script>{chunk}</script>")
-                            });
-                        futures::stream::select(
-                            app_stream,
-                            shared_context,
-                        )
-            });
-                                    HttpResponse::Ok()
-                    .content_type(http::header::ContentType::html())
-                    .streaming({
-                                                        futures::stream::once(async move {
-                            String::from(
-                                r#"<!DOCTYPE html>
-                                    <html>
-                                        <head>
-                                        <script type="module">import('/pkg/hydration_ex.js').then(m => m.default("/pkg/hydration_ex.wasm").then(() => m.hydrate()));</script>
-                                        </head><body>"#,
-                            )
-                        })
-                        .chain(stream)
-                        .chain(futures::stream::once(async move {
-                            String::from("</body></html>")
-                        })).map(|html| Ok(web::Bytes::from(html)) as Result<web::Bytes>)
-                                                    })) */
             .service(Files::new("/", site_root))
         //.wrap(middleware::Compress::default())
     })

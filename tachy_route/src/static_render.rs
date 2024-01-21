@@ -12,3 +12,9 @@ pub enum StaticMode {
 // TODO
 #[derive(Debug)]
 pub struct StaticDataMap;
+
+impl StaticDataMap {
+    pub fn new() -> Self {
+        Self
+    }
+}

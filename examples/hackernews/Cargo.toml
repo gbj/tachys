@@ -30,12 +30,13 @@ tracing = "0.1"
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["AbortController", "AbortSignal"] }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
+futures = "0.3.30"
 
 [features]
 default = ["ssr"]
 csr = []
-hydrate = []
-ssr = ["dep:actix-files", "dep:actix-web"]
+hydrate = ["tachys/hydration"]
+ssr = ["tachys/hydration", "dep:actix-files", "dep:actix-web"]
 
 [profile.wasm-release]
 inherits = "release"

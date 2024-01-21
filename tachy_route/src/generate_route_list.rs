@@ -24,8 +24,97 @@ pub struct RouteListing {
     static_mode: Option<StaticMode>,
 }
 
+impl RouteListing {
+    /// Create a route listing from its parts.
+    pub fn new(
+        path: impl ToString,
+        leptos_path: impl ToString,
+        mode: SsrMode,
+        methods: impl IntoIterator<Item = Method>,
+        static_mode: Option<StaticMode>,
+    ) -> Self {
+        Self {
+            path: path.to_string(),
+            leptos_path: leptos_path.to_string(),
+            mode,
+            methods: methods.into_iter().collect(),
+            static_mode,
+        }
+    }
+
+    /// The path this route handles.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// The leptos-formatted path this route handles.
+    pub fn leptos_path(&self) -> &str {
+        &self.leptos_path
+    }
+
+    /// The rendering mode for this path.
+    pub fn mode(&self) -> SsrMode {
+        self.mode
+    }
+
+    /// The HTTP request methods this path can handle.
+    pub fn methods(&self) -> impl Iterator<Item = Method> + '_ {
+        self.methods.iter().copied()
+    }
+
+    /// Whether this route is statically rendered.
+    #[inline(always)]
+    pub fn static_mode(&self) -> Option<StaticMode> {
+        self.static_mode
+    }
+
+    /*
+    /// Build a route statically, will return `Ok(true)` on success or `Ok(false)` when the route
+    /// is not marked as statically rendered. All route parameters to use when resolving all paths
+    /// to render should be passed in the `params` argument.
+    pub async fn build_static<IV>(
+        &self,
+        options: &LeptosOptions,
+        app_fn: impl Fn() -> IV + Send + 'static + Clone,
+        additional_context: impl Fn() + Send + 'static + Clone,
+        params: &StaticParamsMap,
+    ) -> Result<bool, std::io::Error>
+    where
+        IV: IntoView + 'static,
+    {
+        match self.static_mode {
+            None => Ok(false),
+            Some(_) => {
+                let mut path = StaticPath::new(&self.leptos_path);
+                path.add_params(params);
+                for path in path.into_paths() {
+                    path.write(
+                        options,
+                        app_fn.clone(),
+                        additional_context.clone(),
+                    )
+                    .await?;
+                }
+                Ok(true)
+            }
+        }
+    }*/
+}
+
 #[derive(Debug, Default)]
 pub struct RouteList(Vec<(RouteListing, StaticDataMap)>);
+
+impl RouteList {
+    pub fn new(
+        routes: impl IntoIterator<Item = (RouteListing, StaticDataMap)>,
+    ) -> Self {
+        Self(routes.into_iter().collect())
+    }
+
+    pub fn into_inner(self) -> Vec<(RouteListing, StaticDataMap)> {
+        self.0
+    }
+}
 
 impl RouteList {
     // this is used to indicate to the Router that we are generating
@@ -55,7 +144,9 @@ impl RouteList {
     }
 
     pub fn register(routes: RouteList) {
-        Self::GENERATED.with(|inner| *inner.borrow_mut() = Some(routes));
+        Self::GENERATED.with(|inner| {
+            *inner.borrow_mut() = Some(routes);
+        });
     }
 }
 
@@ -67,6 +158,6 @@ impl<Rndr, Pat, ViewFn, Children> AddsToRouteList
     for RouteDefinition<Rndr, Pat, ViewFn, Children>
 {
     fn add_to_route_list(&self, route_list: &mut RouteList) {
-        self.path
+        println!("add to route list");
     }
 }

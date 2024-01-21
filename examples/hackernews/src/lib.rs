@@ -19,7 +19,10 @@ pub fn App() -> impl RenderHtml<Dom> {
         {
             #[cfg(feature = "ssr")]
             {
-                use_context::<RequestUrl>().unwrap()
+                use_context::<RequestUrl>().expect(
+                    "RequestUrl should have been provided by server \
+                     integration.",
+                )
             }
             #[cfg(not(feature = "ssr"))]
             {
@@ -28,7 +31,7 @@ pub fn App() -> impl RenderHtml<Dom> {
         },
         || {
             (
-                RouteDefinition::new(
+                /*RouteDefinition::new(
                     (StaticSegment("users"), ParamSegment("id")),
                     (),
                     User,
@@ -38,7 +41,7 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (),
                     Story,
                 ),
-                /* RouteDefinition::new(
+                 RouteDefinition::new(
                     ParamSegment("stories"),
                     (),
                     reactive_route(Stories),
@@ -76,16 +79,14 @@ pub fn App() -> impl RenderHtml<Dom> {
     } */
 }
 
-// Needs to be in lib.rs AFAIK because wasm-bindgen needs us to be compiling a lib. I may be wrong.
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
     _ = console_log::init_with_level(log::Level::Debug);
     console_error_panic_hook::set_once();
-    Root::global(|| {
-        let view = App();
-        let mut mountable = view.build();
-        mountable.mount(&body(), None);
-        std::mem::forget(mountable);
+    Root::global_hydrate(|| {
+        let root = App();
+        let state = root.hydrate_from::<true>(&body());
+        std::mem::forget(state);
     });
 }

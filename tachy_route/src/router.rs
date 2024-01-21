@@ -118,7 +118,7 @@ where
             let routes = RouteList::default();
             RouteList::register(routes);
         } else {
-            self.fallback_or_view().to_html_with_buf(buf, position);
+            self.fallback_or_view().1.to_html_with_buf(buf, position);
         }
     }
 

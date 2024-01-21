@@ -3,7 +3,8 @@ use crate::{
     matching::Params,
     route::{MatchedRoute, PossibleRoutes},
     router::{FallbackOrView, Router},
-    RouteList,
+    static_render::StaticDataMap,
+    RouteList, RouteListing, SsrMode,
 };
 use std::{fmt::Debug, marker::PhantomData, mem};
 use tachy_reaccy::{
@@ -130,14 +131,26 @@ where
     const MIN_LENGTH: usize = <<Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output as RenderHtml<Rndr>>::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
+        // if this is being run on the server for the first time, generating all possible routes
         if RouteList::is_generating() {
-            //let routes = self.routes.to_route_list();
+            let mut routes = Vec::new();
+
+            // add routes
             println!("defs = {:#?}", self.inner.routes);
-            let routes = RouteList::default();
-            RouteList::register(routes);
+            // TODO actally add them
+
+            // add fallback
+            println!("adding fallback");
+            routes.push((
+                RouteListing::new("/", "/", SsrMode::Async, [], None),
+                StaticDataMap::new(),
+            ));
+
+            RouteList::register(RouteList::new(routes));
         } else {
             self.inner
                 .fallback_or_view()
+                .1
                 .to_html_with_buf(buf, position)
         }
     }
@@ -151,6 +164,7 @@ where
     {
         self.inner
             .fallback_or_view()
+            .1
             .to_html_async_with_buf::<OUT_OF_ORDER>(buf, position)
     }
 
@@ -159,7 +173,15 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        todo!()
+        let (prev_id, inner) = self.inner.fallback_or_view();
+        let owner = self.owner.with(Owner::new);
+        ReactiveRouterInnerState {
+            inner: owner
+                .with(|| inner.hydrate::<FROM_SERVER>(cursor, position)),
+            owner,
+            prev_id,
+            fal: PhantomData,
+        }
     }
 }
 

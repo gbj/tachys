@@ -20,8 +20,6 @@ pub trait RouteMatch {
     fn matches_iter(&self, path: &mut Chars) -> bool;
 
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>;
-
-    fn to_path(&self, style) -> Cow<'_, str>;
 }
 
 #[derive(Debug)]

@@ -101,6 +101,7 @@ macro_rules! tuples {
             }
 
             fn generate_path(&self, path: &mut Vec<PathSegment>) {
+                #[allow(non_snake_case)]
                 let ($($ty,)*) = &self;
                 $(
                     $ty.generate_path(path);

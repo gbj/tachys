@@ -310,7 +310,54 @@ where
     }
 }
 
-// TODO RenderHTML
+impl<ViewFn, View, Rndr> RenderHtml<Rndr> for ReactiveRoute<ViewFn, View, Rndr>
+where
+    ViewFn: Fn(&ReactiveMatchedRoute) -> View,
+    View: RenderHtml<Rndr>,
+    Rndr: Renderer,
+    Rndr::Node: Clone,
+    Rndr::Element: Clone,
+{
+    const MIN_LENGTH: usize = 0;
+
+    fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
+        let MatchedRoute {
+            search_params,
+            params,
+            matched,
+        } = self.matched;
+        let matched = ReactiveMatchedRoute {
+            search_params: ArcRwSignal::new(search_params),
+            params: ArcRwSignal::new(params),
+            matched: ArcRwSignal::new(matched),
+        };
+        untrack(|| (self.view_fn)(&matched).to_html_with_buf(buf, position));
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        cursor: &Cursor<Rndr>,
+        position: &PositionState,
+    ) -> Self::State {
+        let MatchedRoute {
+            search_params,
+            params,
+            matched,
+        } = self.matched;
+        let matched = ReactiveMatchedRoute {
+            search_params: ArcRwSignal::new(search_params),
+            params: ArcRwSignal::new(params),
+            matched: ArcRwSignal::new(matched),
+        };
+        let view_state = untrack(|| {
+            (self.view_fn)(&matched).hydrate::<FROM_SERVER>(cursor, position)
+        });
+        ReactiveRouteState {
+            matched,
+            view_state,
+        }
+    }
+}
 
 pub struct ReactiveRouteState<State> {
     view_state: State,

@@ -31,7 +31,7 @@ pub fn App() -> impl RenderHtml<Dom> {
         },
         || {
             (
-                /*RouteDefinition::new(
+                RouteDefinition::new(
                     (StaticSegment("users"), ParamSegment("id")),
                     (),
                     User,
@@ -40,12 +40,12 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (StaticSegment("stories"), ParamSegment("id")),
                     (),
                     Story,
-                ),
-                 RouteDefinition::new(
-                    ParamSegment("stories"),
-                    (),
-                    reactive_route(Stories),
-                ), */
+                ), /*
+                    RouteDefinition::new(
+                       ParamSegment("stories"),
+                       (),
+                       reactive_route(Stories),
+                   ), */
             )
         },
         || "Not Found",

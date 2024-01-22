@@ -1,55 +1,55 @@
 use crate::{
     route::{Method, RouteDefinition},
-    router::Router,
     static_render::{StaticDataMap, StaticMode},
     SsrMode,
 };
 use std::{
+    borrow::Cow,
     cell::{Cell, RefCell},
     collections::HashSet,
 };
-use tachydom::{
-    html::{attribute::Attribute, element::HtmlElement},
-    renderer::Renderer,
-    view::{Render, RenderHtml},
-};
+use tachydom::{renderer::Renderer, view::RenderHtml};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PathSegment {
+    Static(Cow<'static, str>),
+    Param(Cow<'static, str>),
+    Splat(Cow<'static, str>),
+}
+
+#[derive(Debug, Default)]
 /// A route that this application can serve.
 pub struct RouteListing {
-    path: String,
-    leptos_path: String,
+    path: Vec<PathSegment>,
     mode: SsrMode,
     methods: HashSet<Method>,
-    static_mode: Option<StaticMode>,
+    static_mode: Option<(StaticMode, StaticDataMap)>,
 }
 
 impl RouteListing {
     /// Create a route listing from its parts.
     pub fn new(
-        path: impl ToString,
-        leptos_path: impl ToString,
+        path: impl IntoIterator<Item = PathSegment>,
         mode: SsrMode,
         methods: impl IntoIterator<Item = Method>,
-        static_mode: Option<StaticMode>,
+        static_mode: Option<(StaticMode, StaticDataMap)>,
     ) -> Self {
         Self {
-            path: path.to_string(),
-            leptos_path: leptos_path.to_string(),
+            path: path.into_iter().collect(),
             mode,
             methods: methods.into_iter().collect(),
             static_mode,
         }
     }
 
-    /// The path this route handles.
-    pub fn path(&self) -> &str {
-        &self.path
+    /// Create a route listing from a path, with the other fields set to default values.
+    pub fn from_path(path: impl IntoIterator<Item = PathSegment>) -> Self {
+        Self::new(path, SsrMode::Async, [], None)
     }
 
-    /// The leptos-formatted path this route handles.
-    pub fn leptos_path(&self) -> &str {
-        &self.leptos_path
+    /// The path this route handles.
+    pub fn path(&self) -> &[PathSegment] {
+        &self.path
     }
 
     /// The rendering mode for this path.
@@ -65,7 +65,13 @@ impl RouteListing {
     /// Whether this route is statically rendered.
     #[inline(always)]
     pub fn static_mode(&self) -> Option<StaticMode> {
-        self.static_mode
+        self.static_mode.as_ref().map(|n| n.0)
+    }
+
+    /// Whether this route is statically rendered.
+    #[inline(always)]
+    pub fn static_data_map(&self) -> Option<&StaticDataMap> {
+        self.static_mode.as_ref().map(|n| &n.1)
     }
 
     /*
@@ -102,16 +108,20 @@ impl RouteListing {
 }
 
 #[derive(Debug, Default)]
-pub struct RouteList(Vec<(RouteListing, StaticDataMap)>);
+pub struct RouteList(Vec<RouteListing>);
 
 impl RouteList {
-    pub fn new(
-        routes: impl IntoIterator<Item = (RouteListing, StaticDataMap)>,
-    ) -> Self {
-        Self(routes.into_iter().collect())
+    pub fn push(&mut self, data: RouteListing) {
+        self.0.push(data);
+    }
+}
+
+impl RouteList {
+    pub fn new() -> Self {
+        Self(Vec::new())
     }
 
-    pub fn into_inner(self) -> Vec<(RouteListing, StaticDataMap)> {
+    pub fn into_inner(self) -> Vec<RouteListing> {
         self.0
     }
 }

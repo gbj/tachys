@@ -67,8 +67,9 @@ const BASE: &str = "http://leptos.dev/";
 pub struct RequestUrl(String);
 
 impl RequestUrl {
+    /// Creates a server-side request URL from a path, with an optional initial slash.
     pub fn from_path(path: impl AsRef<str>) -> Self {
-        let path = path.as_ref();
+        let path = path.as_ref().trim_start_matches('/');
         let mut string = String::with_capacity(BASE.len() + path.len());
         string.push_str(BASE);
         string.push_str(path);

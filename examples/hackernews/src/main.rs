@@ -7,8 +7,6 @@ mod ssr {
     pub use hackernews::App;
     //use leptos_actix::{generate_route_list, LeptosRoutes};
     pub use leptos_config::*;
-    use tachy_reaccy::Owner;
-    use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
 
     #[get("/style.css")]
     async fn css() -> impl Responder {
@@ -27,8 +25,35 @@ mod ssr {
         };
         use futures::StreamExt;
         use tachy_reaccy::{context::provide_context, Owner, Root};
-        use tachy_route::{location::RequestUrl, RouteList};
+        use tachy_route::{location::RequestUrl, PathSegment, RouteList};
         use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
+
+        trait ActixPath {
+            fn to_actix_path(&self) -> String;
+        }
+
+        impl ActixPath for &[PathSegment] {
+            fn to_actix_path(&self) -> String {
+                let mut path = String::new();
+                for segment in self.iter() {
+                    path.push('/');
+                    match segment {
+                        PathSegment::Static(s) => path.push_str(s),
+                        PathSegment::Param(s) => {
+                            path.push('{');
+                            path.push_str(s);
+                            path.push('}');
+                        }
+                        PathSegment::Splat(s) => {
+                            path.push('{');
+                            path.push_str(s);
+                            path.push_str(".*}");
+                        }
+                    }
+                }
+                path
+            }
+        }
 
         pub trait TachysRoutes: Sized {
             fn tachys_routes<IV>(
@@ -77,7 +102,7 @@ mod ssr {
                 .expect("could not generate route list")
                 .into_inner();
                 println!("{generated_routes:#?}");
-                for (listing, static_data_map) in generated_routes {
+                for listing in generated_routes {
                     let path = listing.path();
                     let mode = listing.mode();
 
@@ -91,11 +116,11 @@ mod ssr {
                             let additional_context = additional_context.clone();
 
                             async move {
-                                println!("inside handler");
                                 let Root(owner, stream) =
                                     Root::global_ssr(move || {
                                         // provide contexts
                                         let path = req.path();
+                                        println!("inside handler for {path}");
                                         additional_context();
                                         provide_context(RequestUrl::from_path(
                                             path,
@@ -138,7 +163,9 @@ mod ssr {
                             }
                         }
                     };
-                    router = router.route(path, web::get().to(handler))
+                    println!("registering at {}", path.to_actix_path());
+                    router = router
+                        .route(&path.to_actix_path(), web::get().to(handler))
                 }
                 /*Root::global_ssr(|| {
                     additional_context();

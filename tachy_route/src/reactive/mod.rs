@@ -1,16 +1,16 @@
 use crate::{
     location::Location,
     matching::Params,
-    route::{MatchedRoute, PossibleRoutes},
+    route::MatchedRoute,
     router::{FallbackOrView, Router},
     static_render::StaticDataMap,
-    RouteList, RouteListing, SsrMode,
+    PathSegment, RouteList, RouteListing, SsrMode,
 };
-use std::{fmt::Debug, marker::PhantomData, mem};
+use std::{marker::PhantomData, mem};
 use tachy_reaccy::{
     memo::Memo,
     signal::ArcRwSignal,
-    signal_traits::{SignalSet, SignalWith, Track},
+    signal_traits::{SignalGet, SignalSet, SignalWith, Track},
     untrack, Owner,
 };
 use tachydom::{
@@ -39,10 +39,10 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         RenderHtml<Rndr>,
-    Defs: PossibleRoutes + Debug,
 {
     // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
+    println!("ReactiveRoute with url = {:?}", url.get());
 
     // initialize the location service with a router hook that will update
     // this URL signal
@@ -88,7 +88,6 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         Render<Rndr>,
-    Defs: PossibleRoutes + Debug,
 {
     type State =
         ReactiveRouterInnerState<Rndr, Loc, Defs, FallbackFn, Fallback>;
@@ -126,32 +125,27 @@ where
     Router<Rndr, Loc, Defs, FallbackFn>: FallbackOrView,
     <Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output:
         RenderHtml<Rndr>,
-    Defs: PossibleRoutes + Debug,
 {
     const MIN_LENGTH: usize = <<Router<Rndr, Loc, Defs, FallbackFn> as FallbackOrView>::Output as RenderHtml<Rndr>>::MIN_LENGTH;
 
     fn to_html_with_buf(self, buf: &mut String, position: &mut Position) {
         // if this is being run on the server for the first time, generating all possible routes
         if RouteList::is_generating() {
-            let mut routes = Vec::new();
+            let mut routes = RouteList::new();
 
             // add routes
-            println!("defs = {:#?}", self.inner.routes);
-            // TODO actally add them
+            self.inner.generate_route_list(&mut routes);
 
             // add fallback
-            println!("adding fallback");
-            routes.push((
-                RouteListing::new("/", "/", SsrMode::Async, [], None),
-                StaticDataMap::new(),
-            ));
+            routes.push(RouteListing::from_path([PathSegment::Static(
+                "".into(),
+            )]));
 
-            RouteList::register(RouteList::new(routes));
+            RouteList::register(routes);
         } else {
-            self.inner
-                .fallback_or_view()
-                .1
-                .to_html_with_buf(buf, position)
+            let (id, view) = self.inner.fallback_or_view();
+            println!("matched {id}");
+            view.to_html_with_buf(buf, position)
         }
     }
 

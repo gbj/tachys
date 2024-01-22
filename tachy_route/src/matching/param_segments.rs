@@ -1,4 +1,5 @@
 use super::{PartialPathMatch, RouteMatch};
+use crate::PathSegment;
 use std::str::Chars;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -48,6 +49,10 @@ impl RouteMatch for ParamSegment {
             matched,
         ))
     }
+
+    fn generate_path(&self, path: &mut Vec<PathSegment>) {
+        path.push(PathSegment::Param(self.0.into()));
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -78,6 +83,10 @@ impl RouteMatch for WildcardSegment {
             vec![(self.0, param_value)],
             matched,
         ))
+    }
+
+    fn generate_path(&self, path: &mut Vec<PathSegment>) {
+        path.push(PathSegment::Splat(self.0.into()));
     }
 }
 

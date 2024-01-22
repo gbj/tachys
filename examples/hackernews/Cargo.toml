@@ -33,7 +33,7 @@ send_wrapper = { version = "0.6.0", features = ["futures"] }
 futures = "0.3.30"
 
 [features]
-default = ["ssr"]
+default = []
 csr = []
 hydrate = ["tachys/hydration"]
 ssr = ["tachys/hydration", "dep:actix-files", "dep:actix-web"]

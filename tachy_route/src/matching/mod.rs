@@ -1,5 +1,6 @@
 mod param_segments;
 mod static_segment;
+use crate::{PathSegment, RouteList};
 pub use param_segments::*;
 pub use static_segment::*;
 use std::{borrow::Cow, str::Chars};
@@ -20,6 +21,8 @@ pub trait RouteMatch {
     fn matches_iter(&self, path: &mut Chars) -> bool;
 
     fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>;
+
+    fn generate_path(&self, path: &mut Vec<PathSegment>);
 }
 
 #[derive(Debug)]
@@ -95,6 +98,13 @@ macro_rules! tuples {
 						params: full_params
 					})
                 }
+            }
+
+            fn generate_path(&self, path: &mut Vec<PathSegment>) {
+                let ($($ty,)*) = &self;
+                $(
+                    $ty.generate_path(path);
+                )*
             }
         }
 	};

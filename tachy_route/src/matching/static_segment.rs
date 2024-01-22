@@ -1,4 +1,5 @@
 use super::{PartialPathMatch, RouteMatch};
+use crate::{PathSegment, RouteList};
 use std::str::Chars;
 
 impl RouteMatch for () {
@@ -9,6 +10,8 @@ impl RouteMatch for () {
     fn matches_iter(&self, _path: &mut Chars) -> bool {
         true
     }
+
+    fn generate_path(&self, _path: &mut Vec<PathSegment>) {}
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -77,6 +80,10 @@ impl RouteMatch for StaticSegment {
             Vec::new(),
             matched,
         ))
+    }
+
+    fn generate_path(&self, path: &mut Vec<PathSegment>) {
+        path.push(PathSegment::Static(self.0.into()))
     }
 }
 

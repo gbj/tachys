@@ -2,7 +2,7 @@ use crate::{
     location::Location,
     matching::{PartialPathMatch, RouteMatch},
     route::{MatchedRoute, PossibleRoutes, RouteDefinition},
-    RouteList,
+    RouteList, RouteListing,
 };
 use std::{cmp, marker::PhantomData};
 use tachydom::{
@@ -137,6 +137,8 @@ pub trait FallbackOrView {
     type Output;
 
     fn fallback_or_view(&self) -> (&'static str, Self::Output);
+
+    fn generate_route_list(&self, route_list: &mut RouteList);
 }
 
 pub trait FallbackOrViewHtml: FallbackOrView {
@@ -156,6 +158,8 @@ where
     fn fallback_or_view(&self) -> (&'static str, Self::Output) {
         ("Fal", (self.fallback)())
     }
+
+    fn generate_route_list(&self, _route_list: &mut RouteList) {}
 }
 
 impl<Rndr, Loc, FallbackFn, Fal> FallbackOrViewHtml
@@ -222,6 +226,12 @@ where
                 ("Fal", Either::Left(self.fallback()))
             }
         }
+    }
+
+    fn generate_route_list(&self, route_list: &mut RouteList) {
+        let mut path = Vec::new();
+        self.routes.path.generate_path(&mut path);
+        route_list.push(RouteListing::from_path(path));
     }
 }
 
@@ -310,6 +320,15 @@ macro_rules! tuples {
                             ("Fal", [<EitherOf$num>]::$last(self.fallback()))
                         }
                     }
+                }
+
+                fn generate_route_list(&self, route_list: &mut RouteList) {
+                    let mut path = Vec::new();
+                    let ($($ty,)*) = &self.routes;
+                    $(
+                        $ty.path.generate_path(&mut path);
+                        route_list.push(RouteListing::from_path(std::mem::take(&mut path)));
+                    )*
                 }
             }
 

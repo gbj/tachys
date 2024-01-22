@@ -201,9 +201,11 @@ async fn main() -> std::io::Result<()> {
                         <head>
                             <meta charset="utf-8"/>
                             <meta name="viewport" content="width=device-width, initial-scale=1"/>
-                            // TODO other meta tags
-                            //<AutoReload options=options.to_owned() />
+                            <AutoReload options=options.to_owned() />
                             <HydrationScripts options=options.to_owned() />
+                            <link rel="stylesheet" id="leptos" href="/pkg/hackernews.css"/>
+                            <link rel="shortcut icon" type="image/ico" href="/favicon.ico"/>
+                            <meta name="description" content="Leptos implementation of a HackerNews demo."/>
                         </head>
                         <body>
                             <App/>

@@ -15,8 +15,6 @@ pub trait Renderer: Sized {
     type Node: Mountable<Self>;
     /// A visible element in the view tree.
     type Element: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
-    /// A text node in the view tree.
-    type Text: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
     /// A placeholder node, which can be inserted into the tree but does not
     /// appear (e.g., a comment node in the DOM).
     type Placeholder: AsRef<Self::Node>
@@ -29,14 +27,8 @@ pub trait Renderer: Sized {
         tag.create_element()
     }
 
-    /// Creates a new text node.
-    fn create_text_node(text: &str) -> Self::Text;
-
     /// Creates a new placeholder node.
     fn create_placeholder() -> Self::Placeholder;
-
-    /// Sets the text content of the node. If it's not a text node, this does nothing.
-    fn set_text(node: &Self::Text, text: &str);
 
     /// Sets the given attribute on the given node by key and value.
     fn set_attribute(node: &Self::Element, name: &str, value: &str);
@@ -89,6 +81,21 @@ pub trait Renderer: Sized {
     fn next_sibling(node: &Self::Node) -> Option<Self::Node>;
 
     fn log_node(node: &Self::Node);
+}
+
+/// A renderer that supports rendering strings as unstyled text nodes.
+///
+/// This is separated into its own trait because not all renderers support this, and
+/// in those cases should only use their own text widgets, not plain strings.
+pub trait StringRenderer: Renderer {
+    /// A text node in the view tree.
+    type Text: AsRef<Self::Node> + CastFrom<Self::Node> + Mountable<Self>;
+
+    /// Creates a new text node.
+    fn create_text_node(text: &str) -> Self::Text;
+
+    /// Sets the text content of the node.
+    fn set_text(node: &Self::Text, text: &str);
 }
 
 /// Additional rendering behavior that applies only to DOM nodes.

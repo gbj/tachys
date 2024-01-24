@@ -1,6 +1,6 @@
 #[cfg(any(feature = "tokio", feature = "web"))]
 use super::SpawningRenderer;
-use super::{CastFrom, DomRenderer, Renderer};
+use super::{CastFrom, DomRenderer, Renderer, StringRenderer};
 use crate::{
     dom::{document, window},
     ok_or_debug, or_debug,
@@ -71,27 +71,11 @@ impl Dom {
 
 impl Renderer for Dom {
     type Node = Node;
-    type Text = Text;
     type Element = Element;
     type Placeholder = Comment;
 
-    fn create_text_node(text: &str) -> Self::Text {
-        document().create_text_node(text)
-    }
-
     fn create_placeholder() -> Self::Placeholder {
         document().create_comment("")
-    }
-
-    fn set_text(node: &Self::Text, text: &str) {
-        /* PENDING.with(|p| {
-            let mut p = p.borrow_mut();
-            p.text.push_str(text);
-            let idx = add_node_to_heap(node);
-            p.nodes.push(idx);
-            p.lengths.push(text.len() as u32);
-        }); */
-        node.set_node_value(Some(text));
     }
 
     fn set_attribute(node: &Self::Element, name: &str, value: &str) {
@@ -147,6 +131,25 @@ impl Renderer for Dom {
 
     fn clear_children(parent: &Self::Element) {
         parent.set_text_content(Some(""));
+    }
+}
+
+impl StringRenderer for Dom {
+    type Text = Text;
+
+    fn create_text_node(text: &str) -> Self::Text {
+        document().create_text_node(text)
+    }
+
+    fn set_text(node: &Self::Text, text: &str) {
+        /* PENDING.with(|p| {
+            let mut p = p.borrow_mut();
+            p.text.push_str(text);
+            let idx = add_node_to_heap(node);
+            p.nodes.push(idx);
+            p.lengths.push(text.len() as u32);
+        }); */
+        node.set_node_value(Some(text));
     }
 }
 

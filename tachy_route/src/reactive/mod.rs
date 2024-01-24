@@ -42,7 +42,6 @@ where
 {
     // create a reactive URL signal that will drive the router view
     let url = ArcRwSignal::new(location.try_to_url().unwrap_or_default());
-    println!("ReactiveRoute with url = {:?}", url.get());
 
     // initialize the location service with a router hook that will update
     // this URL signal
@@ -144,7 +143,6 @@ where
             RouteList::register(routes);
         } else {
             let (id, view) = self.inner.fallback_or_view();
-            println!("matched {id}");
             view.to_html_with_buf(buf, position)
         }
     }

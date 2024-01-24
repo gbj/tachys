@@ -152,6 +152,7 @@ tokio = { version = "1", features = ["rt", "macros"] }
 default = ["testing"]
 delegation = []                       # enables event delegation
 hydrate = []
+islands = []
 ssr = []
 nightly = ["leptos_reactive/nightly"]
 testing = ["dep:slotmap"]

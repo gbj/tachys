@@ -1,6 +1,6 @@
-(function (protocol, reload_port) {
+(function (reload_port, protocol) {
 let host = window.location.hostname;
-let ws = new WebSocket(`${protocol}${host}:${reload_port}/live_reload'`);
+let ws = new WebSocket(`${protocol}${host}:${reload_port}/live_reload`);
 ws.onmessage = (ev) => {
 	let msg = JSON.parse(ev.data);
 	if (msg.all) window.location.reload();

@@ -29,7 +29,7 @@ pub mod prelude {
         signal::{signal, ArcRwSignal, ReadSignal, RwSignal},
         signal_traits::*,
         store::{StoreField, StoreFieldIndex, StoreFieldIterator},
-        Root,
+        Owner, Root,
     };
 }
 

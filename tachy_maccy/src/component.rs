@@ -222,7 +222,7 @@ impl ToTokens for Model {
         let body_name = unmodified_fn_name_from_fn_name(&body_name);
         let body_expr = if *is_island {
             quote! {
-                ::leptos::SharedContext::with_hydration(move || {
+                ::tachys::tachy_reaccy::Owner::with_hydration(move || {
                     #body_name(#prop_names)
                 })
             }
@@ -246,13 +246,10 @@ impl ToTokens for Model {
         let component = if *is_island {
             quote! {
                 {
-                    ::leptos::leptos_dom::html::custom(
-                        ::leptos::leptos_dom::html::Custom::new("leptos-island"),
-                    )
-                    .attr("data-component", #component_id)
-                    .attr("data-hkc", ::leptos::leptos_dom::HydrationCtx::peek_always().to_string())
-                    #island_serialized_props
-                    .child(#component)
+                    ::tachys::tachydom::html::element::custom("leptos-island")
+                        .attr("data-component", #component_id)
+                        #island_serialized_props
+                        .child(#component)
                 }
             }
         } else {
@@ -335,94 +332,91 @@ impl ToTokens for Model {
             #component
         };
 
-        let binding = if *is_island && cfg!(feature = "hydrate") {
-            let island_props = if is_island_with_children
-                || is_island_with_other_props
-            {
-                let (destructure, prop_builders) = if is_island_with_other_props
-                {
-                    let prop_names = props
-                        .iter()
-                        .filter_map(|prop| {
-                            if prop.name.ident == "children" {
-                                None
-                            } else {
-                                let name = &prop.name.ident;
-                                Some(quote! { #name, })
-                            }
-                        })
-                        .collect::<TokenStream>();
-                    let destructure = quote! {
-                        let #props_serialized_name {
-                            #prop_names
-                        } = props;
-                    };
-                    let prop_builders = props
-                        .iter()
-                        .filter_map(|prop| {
-                            if prop.name.ident == "children" {
-                                None
-                            } else {
-                                let name = &prop.name.ident;
-                                Some(quote! {
-                                    .#name(#name)
+        let binding = if *is_island {
+            let island_props =
+                if is_island_with_children || is_island_with_other_props {
+                    let (destructure, prop_builders) =
+                        if is_island_with_other_props {
+                            let prop_names = props
+                                .iter()
+                                .filter_map(|prop| {
+                                    if prop.name.ident == "children" {
+                                        None
+                                    } else {
+                                        let name = &prop.name.ident;
+                                        Some(quote! { #name, })
+                                    }
                                 })
-                            }
-                        })
-                        .collect::<TokenStream>();
-                    (destructure, prop_builders)
-                } else {
-                    (quote! {}, quote! {})
-                };
-                let children = if is_island_with_children {
-                    quote! {
-                        .children(Box::new(move || ::leptos::Fragment::lazy(|| vec![
-                            ::leptos::SharedContext::with_hydration(move || {
-                                ::leptos::leptos_dom::html::custom(
-                                    ::leptos::leptos_dom::html::Custom::new("leptos-children"),
-                                )
-                                .prop("$$owner", ::leptos::Owner::current().map(|n| n.as_ffi()))
-                                .into_view()
-                        })])))
-                    }
+                                .collect::<TokenStream>();
+                            let destructure = quote! {
+                                let #props_serialized_name {
+                                    #prop_names
+                                } = props;
+                            };
+                            let prop_builders = props
+                                .iter()
+                                .filter_map(|prop| {
+                                    if prop.name.ident == "children" {
+                                        None
+                                    } else {
+                                        let name = &prop.name.ident;
+                                        Some(quote! {
+                                            .#name(#name)
+                                        })
+                                    }
+                                })
+                                .collect::<TokenStream>();
+                            (destructure, prop_builders)
+                        } else {
+                            (quote! {}, quote! {})
+                        };
+                    let children = /*if is_island_with_children {
+                                                  quote! {
+                                                      .children(Box::new(move || ::leptos::Fragment::lazy(|| vec![
+                                                          ::leptos::SharedContext::with_hydration(move || {
+                                                              ::leptos::leptos_dom::html::custom(
+                                                                  ::leptos::leptos_dom::html::Custom::new("leptos-children"),
+                                                              )
+                                                              .prop("$$owner", ::leptos::Owner::current().map(|n| n.as_ffi()))
+                                                              .into_view()
+                                                      })])))
+                                                  }
+                                              } else {
+                                                  quote! {}
+                                              };*/
+                    // TODO
+
+                    quote! {{
+                        #destructure
+                        #props_name::builder()
+                            #prop_builders
+                            #children
+                            .build()
+                    }}
                 } else {
                     quote! {}
                 };
-
-                quote! {{
-                    #destructure
-                    #props_name::builder()
-                        #prop_builders
-                        #children
-                        .build()
-                }}
-            } else {
-                quote! {}
-            };
-            let deserialize_island_props = if is_island_with_other_props {
-                quote! {
-                    let props = el.dataset().get(::leptos::wasm_bindgen::intern("props"))
-                        .and_then(|data| ::leptos::serde_json::from_str::<#props_serialized_name>(&data).ok())
-                        .expect("could not deserialize props");
-                }
-            } else {
-                quote! {}
-            };
+            let deserialize_island_props = quote! {}; /*if is_island_with_other_props {
+                                                          quote! {
+                                                              let props = el.dataset().get("props") // TODO ::leptos::wasm_bindgen::intern("props"))
+                                                                  .and_then(|data| ::leptos::serde_json::from_str::<#props_serialized_name>(&data).ok())
+                                                                  .expect("could not deserialize props");
+                                                          }
+                                                      } else {
+                                                          quote! {}
+                                                      };*/
+            // TODO
 
             quote! {
-                #[::leptos::wasm_bindgen::prelude::wasm_bindgen]
+                #[::tachys::tachydom::wasm_bindgen::prelude::wasm_bindgen]
                 #[allow(non_snake_case)]
-                pub fn #hydrate_fn_name(el: ::leptos::web_sys::HtmlElement) {
-                    if let Some(Ok(key)) = el.dataset().get(::leptos::wasm_bindgen::intern("hkc")).map(|key| std::str::FromStr::from_str(&key)) {
-                        ::leptos::leptos_dom::HydrationCtx::continue_from(key);
-                    }
+                pub fn #hydrate_fn_name(el: ::tachys::tachydom::web_sys::HtmlElement) {
                     #deserialize_island_props
-                    _ = ::leptos::run_as_child(move || {
-                        ::leptos::SharedContext::register_island(&el);
-                        ::leptos::leptos_dom::mount_to_with_stop_hydrating(el, false, move || {
-                            #name(#island_props)
-                        })
-                    });
+                    ::tachys::tachydom::log("made it to island!");
+                    let island = #name(#island_props);
+                    let state = island.hydrate_from_position::<true>(&el, ::tachys::tachydom::view::Position::Current);
+                    // TODO better cleanup
+                    std::mem::forget(state);
                 }
             }
         } else {
@@ -491,8 +485,8 @@ impl ToTokens for Model {
 
 impl Model {
     #[allow(clippy::wrong_self_convention)]
-    pub fn is_island(mut self) -> Self {
-        self.is_island = true;
+    pub fn is_island(mut self, is_island: bool) -> Self {
+        self.is_island = is_island;
 
         self
     }

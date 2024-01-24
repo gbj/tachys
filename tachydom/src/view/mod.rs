@@ -200,8 +200,20 @@ where
     where
         Self: Sized,
     {
+        self.hydrate_from_position::<FROM_SERVER>(el, Position::default())
+    }
+
+    /// Hydrates using [`RenderHtml::hydrate`], beginning at the given element and position.
+    fn hydrate_from_position<const FROM_SERVER: bool>(
+        self,
+        el: &R::Element,
+        position: Position,
+    ) -> Self::State
+    where
+        Self: Sized,
+    {
         let cursor = Cursor::new(el.clone());
-        let position = PositionState::default();
+        let position = PositionState::new(position);
         self.hydrate::<FROM_SERVER>(&cursor, &position)
     }
 }
@@ -318,6 +330,7 @@ impl PositionState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum Position {
+    Current,
     #[default]
     FirstChild,
     NextChild,

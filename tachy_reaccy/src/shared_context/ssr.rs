@@ -8,19 +8,30 @@ use parking_lot::RwLock;
 use std::{
     fmt::{Debug, Write},
     mem,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 #[derive(Default)]
 pub struct SsrSharedContext {
     id: AtomicUsize,
+    is_hydrating: AtomicBool,
     sync_buf: RwLock<Vec<ResolvedData>>,
     async_buf: RwLock<Vec<(SerializedDataId, PinnedFuture<String>)>>,
 }
 
 impl SsrSharedContext {
     pub fn new() -> Self {
-        Default::default()
+        Self {
+            is_hydrating: AtomicBool::new(true),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_islands() -> Self {
+        Self {
+            is_hydrating: AtomicBool::new(false),
+            ..Default::default()
+        }
     }
 }
 
@@ -28,6 +39,7 @@ impl Debug for SsrSharedContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SsrSharedContext")
             .field("id", &self.id)
+            .field("is_hydrating", &self.is_hydrating)
             .field("sync_buf", &self.sync_buf)
             .field("async_buf", &self.async_buf.read().len())
             .finish()
@@ -88,6 +100,14 @@ impl SharedContext for SsrSharedContext {
 
     fn await_data(&self, _id: &SerializedDataId) -> Option<String> {
         None
+    }
+
+    fn get_is_hydrating(&self) -> bool {
+        self.is_hydrating.load(Ordering::Relaxed)
+    }
+
+    fn set_is_hydrating(&self, is_hydrating: bool) {
+        self.is_hydrating.store(true, Ordering::Relaxed)
     }
 }
 

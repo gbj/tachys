@@ -1,3 +1,4 @@
+use super::ElementWithChildren;
 use crate::{
     html::element::{CreateElement, ElementType, HtmlElement},
     renderer::{dom::Dom, Renderer},
@@ -36,6 +37,8 @@ where
     }
 }
 
+impl<E> ElementWithChildren for Custom<E> where E: CustomElementKey {}
+
 impl<E> CreateElement<Dom> for Custom<E>
 where
     E: CustomElementKey,
@@ -49,32 +52,33 @@ where
     }
 }
 
+// TODO these are all broken for custom elements
 pub trait CustomElementKey: AsRef<str> {
     const KEY: &'static str;
 }
 
 impl<'a> CustomElementKey for &'a str {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 impl<'a> CustomElementKey for Cow<'a, str> {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 impl CustomElementKey for &String {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 impl CustomElementKey for String {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 impl CustomElementKey for Rc<str> {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 impl CustomElementKey for Arc<str> {
-    const KEY: &'static str = "";
+    const KEY: &'static str = "leptos-island";
 }
 
 #[cfg(feature = "nightly")]

@@ -360,9 +360,10 @@ where
             todo!()
         }
 
-        if position.get() == Position::FirstChild {
+        let curr_position = position.get();
+        if curr_position == Position::FirstChild {
             cursor.child();
-        } else {
+        } else if curr_position != Position::Current {
             cursor.sibling();
         }
         let el = Rndr::Element::cast_from(cursor.current()).unwrap();

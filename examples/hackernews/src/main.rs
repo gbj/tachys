@@ -93,7 +93,7 @@ mod ssr {
                 IV: RenderHtml<Dom> + 'static,
             {
                 let mut router = self;
-                let generated_routes = Root::global_ssr(|| {
+                let generated_routes = Root::global_ssr_islands(|| {
                     // stub out a path for now
                     provide_context(RequestUrl::from_path(""));
                     RouteList::generate(&app_fn)
@@ -101,12 +101,10 @@ mod ssr {
                 .into_value()
                 .expect("could not generate route list")
                 .into_inner();
-                println!("{generated_routes:#?}");
                 for listing in generated_routes {
                     let path = listing.path();
                     let mode = listing.mode();
 
-                    println!("registering {path:?}");
                     let handler = {
                         let app_fn = app_fn.clone();
                         let additional_context = additional_context.clone();
@@ -163,7 +161,6 @@ mod ssr {
                             }
                         }
                     };
-                    println!("registering at {}", path.to_actix_path());
                     router = router
                         .route(&path.to_actix_path(), web::get().to(handler))
                 }
@@ -202,7 +199,7 @@ async fn main() -> std::io::Result<()> {
                             <meta charset="utf-8"/>
                             <meta name="viewport" content="width=device-width, initial-scale=1"/>
                             <AutoReload options=options.to_owned() />
-                            <HydrationScripts options=options.to_owned() />
+                            <HydrationScripts options=options.to_owned() islands=true/>
                             <link rel="stylesheet" id="leptos" href="/pkg/hackernews.css"/>
                             <link rel="shortcut icon" type="image/ico" href="/favicon.ico"/>
                             <meta name="description" content="Leptos implementation of a HackerNews demo."/>

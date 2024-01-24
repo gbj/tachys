@@ -1,11 +1,9 @@
 #[cfg(feature = "web")]
 mod hydrate;
-mod islands;
 mod ssr;
 use crate::{PinnedFuture, PinnedStream};
 #[cfg(feature = "web")]
 pub use hydrate::*;
-pub use islands::*;
 use serde::{Deserialize, Serialize};
 pub use ssr::*;
 use std::fmt::Debug;
@@ -47,6 +45,10 @@ pub trait SharedContext: Debug {
     ///
     /// In browser implementations, this return `None`.
     fn pending_data(&self) -> Option<PinnedStream<String>>;
+
+    fn get_is_hydrating(&self) -> bool;
+
+    fn set_is_hydrating(&self, is_hydrating: bool);
 }
 
 #[derive(

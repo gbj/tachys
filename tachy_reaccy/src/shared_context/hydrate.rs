@@ -2,7 +2,7 @@ use super::{SerializedDataId, SharedContext};
 use crate::{PinnedFuture, PinnedStream};
 use core::fmt::Debug;
 use js_sys::Array;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen]
@@ -13,12 +13,21 @@ extern "C" {
 #[derive(Default)]
 pub struct HydrateSharedContext {
     id: AtomicUsize,
+    is_hydrating: AtomicBool,
 }
 
 impl HydrateSharedContext {
     pub fn new() -> Self {
         Self {
             id: AtomicUsize::new(0),
+            is_hydrating: AtomicBool::new(true),
+        }
+    }
+
+    pub fn new_islands() -> Self {
+        Self {
+            id: AtomicUsize::new(0),
+            is_hydrating: AtomicBool::new(false),
         }
     }
 }
@@ -47,5 +56,13 @@ impl SharedContext for HydrateSharedContext {
 
     fn pending_data(&self) -> Option<PinnedStream<String>> {
         None
+    }
+
+    fn get_is_hydrating(&self) -> bool {
+        self.is_hydrating.load(Ordering::Relaxed)
+    }
+
+    fn set_is_hydrating(&self, is_hydrating: bool) {
+        self.is_hydrating.store(true, Ordering::Relaxed)
     }
 }

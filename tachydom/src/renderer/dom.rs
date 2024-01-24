@@ -440,6 +440,10 @@ impl CastFrom<Node> for Comment {
 
 impl CastFrom<Node> for Element {
     fn cast_from(node: Node) -> Option<Element> {
+        web_sys::console::log_2(
+            &wasm_bindgen::JsValue::from_str("casting element from"),
+            &node,
+        );
         node.clone().dyn_into().ok()
     }
 }

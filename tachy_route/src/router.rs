@@ -324,6 +324,7 @@ macro_rules! tuples {
 
                 fn generate_route_list(&self, route_list: &mut RouteList) {
                     let mut path = Vec::new();
+                    #[allow(non_snake_case)]
                     let ($($ty,)*) = &self.routes;
                     $(
                         $ty.path.generate_path(&mut path);

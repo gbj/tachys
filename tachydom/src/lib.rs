@@ -38,6 +38,11 @@ pub mod ssr;
 pub mod svg;
 pub mod view;
 
+#[cfg(feature = "islands")]
+pub use wasm_bindgen;
+#[cfg(feature = "islands")]
+pub use web_sys;
+
 #[cfg(all(feature = "leptos", not(feature = "reaccy")))]
 mod leptos;
 

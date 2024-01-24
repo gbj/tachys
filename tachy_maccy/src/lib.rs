@@ -65,11 +65,21 @@ pub fn component(
     _args: proc_macro::TokenStream,
     s: TokenStream,
 ) -> TokenStream {
+    component_macro(s, false)
+}
+
+#[proc_macro_error::proc_macro_error]
+#[proc_macro_attribute]
+pub fn island(_args: proc_macro::TokenStream, s: TokenStream) -> TokenStream {
+    component_macro(s, true)
+}
+
+fn component_macro(s: TokenStream, island: bool) -> TokenStream {
     let mut dummy = syn::parse::<DummyModel>(s.clone());
     let parse_result = syn::parse::<component::Model>(s);
 
     if let (Ok(ref mut unexpanded), Ok(model)) = (&mut dummy, parse_result) {
-        let expanded = model.into_token_stream();
+        let expanded = model.is_island(island).into_token_stream();
         if !matches!(unexpanded.vis, Visibility::Public(_)) {
             unexpanded.vis = Visibility::Public(Pub {
                 span: unexpanded.vis.span(),

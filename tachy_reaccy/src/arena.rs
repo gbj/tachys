@@ -45,7 +45,6 @@ impl<T> Root<T> {
         value
     }
 
-    #[cfg(feature = "web")]
     pub fn global_hydrate(fun: impl FnOnce() -> T) -> T {
         let Root(owner, value) = Root::new_with_shared_context(
             fun,
@@ -55,10 +54,26 @@ impl<T> Root<T> {
         value
     }
 
+    pub fn global_islands(fun: impl FnOnce() -> T) -> T {
+        let Root(owner, value) = Root::new_with_shared_context(
+            fun,
+            Some(Arc::new(HydrateSharedContext::new_islands())),
+        );
+        mem::forget(owner);
+        value
+    }
+
     pub fn global_ssr(fun: impl FnOnce() -> T) -> Root<T> {
         Root::new_with_shared_context(
             fun,
             Some(Arc::new(SsrSharedContext::new())),
+        )
+    }
+
+    pub fn global_ssr_islands(fun: impl FnOnce() -> T) -> Root<T> {
+        Root::new_with_shared_context(
+            fun,
+            Some(Arc::new(SsrSharedContext::new_islands())),
         )
     }
 
@@ -157,6 +172,20 @@ impl Owner {
         #[cfg(not(feature = "hydration"))]
         {
             None
+        }
+    }
+
+    #[inline(always)]
+    pub fn with_hydration<T>(fun: impl FnOnce() -> T) -> T {
+        let sc = Self::shared_context();
+        if let Some(sc) = sc {
+            let prev = sc.get_is_hydrating();
+            sc.set_is_hydrating(true);
+            let v = fun();
+            sc.set_is_hydrating(prev);
+            v
+        } else {
+            fun()
         }
     }
 

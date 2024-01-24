@@ -5,10 +5,20 @@ use tachy_route::{
     route::{PossibleRoutes, RouteDefinition},
     router::FallbackOrView,
 };
-use tachys::{prelude::*, tachydom::dom::body};
+use tachys::{island, prelude::*, tachydom::dom::body};
 mod api;
 mod routes;
 use routes::{nav::Nav, stories::Stories, story::Story, users::User};
+use tachys::children::Children;
+
+#[island]
+pub fn TestIsland(children: Children) -> impl RenderHtml<Dom> {
+    view! {
+        <button on:click=move |_| tachys::tachydom::log("test")>
+            Click me
+        </button>
+    }
+}
 
 #[component]
 pub fn App() -> impl RenderHtml<Dom> {
@@ -30,7 +40,7 @@ pub fn App() -> impl RenderHtml<Dom> {
             }
         },
         || {
-            (
+            /*(
                 RouteDefinition::new(
                     (StaticSegment("users"), ParamSegment("id")),
                     (),
@@ -46,13 +56,17 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (),
                     reactive_route(Stories),
                 ),
-            )
+            )*/
+            RouteDefinition::new((), (), |_| "Test!")
         },
         || "Not Found",
     );
     view! {
         <Nav/>
         <main>
+            <TestIsland>
+                <div>"some server content"</div>
+            </TestIsland>
             {router}
         </main>
     }
@@ -84,9 +98,10 @@ pub fn App() -> impl RenderHtml<Dom> {
 pub fn hydrate() {
     _ = console_log::init_with_level(log::Level::Debug);
     console_error_panic_hook::set_once();
-    Root::global_hydrate(|| {
+    /*Root::global_hydrate(|| {
         let root = App();
         let state = root.hydrate_from::<true>(&body());
         std::mem::forget(state);
-    });
+    });*/
+    Root::global_islands(|| ());
 }

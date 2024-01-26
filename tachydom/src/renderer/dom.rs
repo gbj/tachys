@@ -20,55 +20,6 @@ thread_local! {
     pub(crate) static GLOBAL_EVENTS: RefCell<FxHashSet<Cow<'static, str>>> = Default::default();
 }
 
-/* #[derive(Debug, Default)]
-struct PendingStuff {
-    pub text: String,
-    pub nodes: Vec<u32>,
-    pub lengths: Vec<u32>,
-}
-
-thread_local! {
-    static PENDING: RefCell<PendingStuff> = Default::default();
-} */
-
-/* #[wasm_bindgen(inline_js = "
-let __NODE_HEAP = [];
-export function flush_nodes(bytes, lengths, nodes) {
-        let utf8decoder = new TextDecoder();
-        let all_text = utf8decoder.decode(bytes);
-        let last = 0;
-        for(let i = 0; i < lengths.length; i++) {
-            let length = lengths[i];
-            let text = all_text.slice(last, last + length);
-            last = last + length;
-            __NODE_HEAP[nodes[i]].nodeValue = text;
-        }
-        __NODE_HEAP = [];
-    }
-
-    export function add_node_to_heap(node) {
-        __NODE_HEAP.push(node);
-        return __NODE_HEAP.length - 1;
-    }")]
-extern "C" {
-    fn flush_nodes(bytes: &[u8], lengths: &[u32], nodes: &[u32]);
-
-    fn add_node_to_heap(node: &Text) -> u32;
-}
-
-impl Dom {
-    pub fn flush() {
-        PENDING.with(|t| {
-            let mut t = t.borrow_mut();
-            flush_nodes(
-                std::mem::take(&mut t.text).as_bytes(),
-                &std::mem::take(&mut t.lengths),
-                &std::mem::take(&mut t.nodes),
-            );
-        })
-    }
-} */
-
 impl Renderer for Dom {
     type Node = Node;
     type Text = Text;
@@ -84,13 +35,6 @@ impl Renderer for Dom {
     }
 
     fn set_text(node: &Self::Text, text: &str) {
-        /* PENDING.with(|p| {
-            let mut p = p.borrow_mut();
-            p.text.push_str(text);
-            let idx = add_node_to_heap(node);
-            p.nodes.push(idx);
-            p.lengths.push(text.len() as u32);
-        }); */
         node.set_node_value(Some(text));
     }
 

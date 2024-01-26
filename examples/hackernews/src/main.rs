@@ -93,7 +93,7 @@ mod ssr {
                 IV: RenderHtml<Dom> + 'static,
             {
                 let mut router = self;
-                let generated_routes = Root::global_ssr_islands(|| {
+                let generated_routes = Root::global_ssr(|| {
                     // stub out a path for now
                     provide_context(RequestUrl::from_path(""));
                     RouteList::generate(&app_fn)
@@ -115,7 +115,7 @@ mod ssr {
 
                             async move {
                                 let Root(owner, stream) =
-                                    Root::global_ssr(move || {
+                                    Root::global_ssr_islands(move || {
                                         // provide contexts
                                         let path = req.path();
                                         println!("inside handler for {path}");
@@ -147,6 +147,7 @@ mod ssr {
                                             shared_context,
                                         )
                                     });
+                                std::mem::forget(owner); // TOOD close leak
 
                                 HttpResponse::Ok()
                                     .content_type(
@@ -164,9 +165,6 @@ mod ssr {
                     router = router
                         .route(&path.to_actix_path(), web::get().to(handler))
                 }
-                /*Root::global_ssr(|| {
-                    additional_context();
-                });*/
                 router
             }
         }

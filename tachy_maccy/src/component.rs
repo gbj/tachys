@@ -246,10 +246,11 @@ impl ToTokens for Model {
         let component = if *is_island {
             quote! {
                 {
-                    ::tachys::tachydom::html::element::custom("leptos-island")
-                        .attr("data-component", #component_id)
-                        #island_serialized_props
-                        .child(#component)
+                    ::tachys::tachydom::html::islands::Island::new(
+                        #component_id,
+                        #component
+                    )
+                        // #island_serialized_props
                 }
             }
         } else {
@@ -267,19 +268,10 @@ impl ToTokens for Model {
         let destructure_props = if no_props {
             quote! {}
         } else {
-            let wrapped_children = if is_island_with_children
-                && cfg!(feature = "ssr")
-            {
+            let wrapped_children = if is_island_with_children {
                 quote! {
-                    let children = Box::new(|| ::leptos::Fragment::lazy(|| vec![
-                        ::leptos::SharedContext::with_hydration(move || {
-                            ::leptos::leptos_dom::html::custom(
-                                ::leptos::leptos_dom::html::Custom::new("leptos-children"),
-                            )
-                            .child(::leptos::SharedContext::no_hydration(children))
-                            .into_view()
-                        })
-                    ]));
+                    use tachys::tachydom::view::any_view::IntoAny;
+                    let children = Box::new(|| ::tachys::tachydom::html::islands::IslandChildren::new(children()).into_any());
                 }
             } else {
                 quote! {}
@@ -333,69 +325,75 @@ impl ToTokens for Model {
         };
 
         let binding = if *is_island {
-            let island_props =
-                if is_island_with_children || is_island_with_other_props {
-                    let (destructure, prop_builders) =
-                        if is_island_with_other_props {
-                            let prop_names = props
-                                .iter()
-                                .filter_map(|prop| {
-                                    if prop.name.ident == "children" {
-                                        None
-                                    } else {
-                                        let name = &prop.name.ident;
-                                        Some(quote! { #name, })
-                                    }
+            let island_props = if is_island_with_children
+                || is_island_with_other_props
+            {
+                let (destructure, prop_builders) = if is_island_with_other_props
+                {
+                    let prop_names = props
+                        .iter()
+                        .filter_map(|prop| {
+                            if prop.name.ident == "children" {
+                                None
+                            } else {
+                                let name = &prop.name.ident;
+                                Some(quote! { #name, })
+                            }
+                        })
+                        .collect::<TokenStream>();
+                    let destructure = quote! {
+                        let #props_serialized_name {
+                            #prop_names
+                        } = props;
+                    };
+                    let prop_builders = props
+                        .iter()
+                        .filter_map(|prop| {
+                            if prop.name.ident == "children" {
+                                None
+                            } else {
+                                let name = &prop.name.ident;
+                                Some(quote! {
+                                    .#name(#name)
                                 })
-                                .collect::<TokenStream>();
-                            let destructure = quote! {
-                                let #props_serialized_name {
-                                    #prop_names
-                                } = props;
-                            };
-                            let prop_builders = props
-                                .iter()
-                                .filter_map(|prop| {
-                                    if prop.name.ident == "children" {
-                                        None
-                                    } else {
-                                        let name = &prop.name.ident;
-                                        Some(quote! {
-                                            .#name(#name)
-                                        })
-                                    }
-                                })
-                                .collect::<TokenStream>();
-                            (destructure, prop_builders)
-                        } else {
-                            (quote! {}, quote! {})
-                        };
-                    let children = /*if is_island_with_children {
-                                                  quote! {
-                                                      .children(Box::new(move || ::leptos::Fragment::lazy(|| vec![
-                                                          ::leptos::SharedContext::with_hydration(move || {
-                                                              ::leptos::leptos_dom::html::custom(
-                                                                  ::leptos::leptos_dom::html::Custom::new("leptos-children"),
-                                                              )
-                                                              .prop("$$owner", ::leptos::Owner::current().map(|n| n.as_ffi()))
-                                                              .into_view()
-                                                      })])))
-                                                  }
-                                              } else {
-                                                  quote! {}
-                                              };*/
-                    // TODO
-
-                    quote! {{
-                        #destructure
-                        #props_name::builder()
-                            #prop_builders
-                            #children
-                            .build()
-                    }}
+                            }
+                        })
+                        .collect::<TokenStream>();
+                    (destructure, prop_builders)
+                } else {
+                    (quote! {}, quote! {})
+                };
+                let children = if is_island_with_children {
+                    quote! {
+                        .children({Box::new(|| {
+                            use tachys::tachydom::view::any_view::IntoAny;
+                            ::tachys::tachydom::html::islands::IslandChildren::new(
+                                // TODO owner restoration for context
+                                ()
+                            ).into_any()})})
+                        //.children(children)
+                        /*.children(Box::new(|| {
+                            use tachys::tachydom::view::any_view::IntoAny;
+                            ::tachys::tachydom::html::islands::IslandChildren::new(
+                                // TODO owner restoration for context
+                                ()
+                            ).into_any()
+                        }))*/
+                    }
                 } else {
                     quote! {}
                 };
+
+                quote! {{
+                    #destructure
+                    #props_name::builder()
+                        #prop_builders
+                        #children
+                        .build()
+                }}
+            } else {
+                quote! {}
+            };
             let deserialize_island_props = quote! {}; /*if is_island_with_other_props {
                                                           quote! {
                                                               let props = el.dataset().get("props") // TODO ::leptos::wasm_bindgen::intern("props"))
@@ -412,7 +410,7 @@ impl ToTokens for Model {
                 #[allow(non_snake_case)]
                 pub fn #hydrate_fn_name(el: ::tachys::tachydom::web_sys::HtmlElement) {
                     #deserialize_island_props
-                    ::tachys::tachydom::log("made it to island!");
+                    ::tachys::tachydom::web_sys::console::log_2(&tachys::tachydom::wasm_bindgen::JsValue::from_str("island is"), &el);
                     let island = #name(#island_props);
                     let state = island.hydrate_from_position::<true>(&el, ::tachys::tachydom::view::Position::Current);
                     // TODO better cleanup

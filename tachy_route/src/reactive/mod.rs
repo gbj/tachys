@@ -332,6 +332,29 @@ where
         untrack(|| (self.view_fn)(&matched).to_html_with_buf(buf, position));
     }
 
+    fn to_html_async_with_buf<const OUT_OF_ORDER: bool>(
+        self,
+        buf: &mut StreamBuilder,
+        position: &mut Position,
+    ) where
+        Self: Sized,
+    {
+        let MatchedRoute {
+            search_params,
+            params,
+            matched,
+        } = self.matched;
+        let matched = ReactiveMatchedRoute {
+            search_params: ArcRwSignal::new(search_params),
+            params: ArcRwSignal::new(params),
+            matched: ArcRwSignal::new(matched),
+        };
+        untrack(|| {
+            (self.view_fn)(&matched)
+                .to_html_async_with_buf::<OUT_OF_ORDER>(buf, position)
+        });
+    }
+
     fn hydrate<const FROM_SERVER: bool>(
         self,
         cursor: &Cursor<Rndr>,

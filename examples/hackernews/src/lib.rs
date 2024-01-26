@@ -11,15 +11,6 @@ mod routes;
 use routes::{nav::Nav, stories::Stories, story::Story, users::User};
 use tachys::children::Children;
 
-#[island]
-pub fn TestIsland(children: Children) -> impl RenderHtml<Dom> {
-    view! {
-        <button on:click=move |_| tachys::tachydom::log("test")>
-            Click me
-        </button>
-    }
-}
-
 #[component]
 pub fn App() -> impl RenderHtml<Dom> {
     //provide_meta_context();
@@ -40,7 +31,7 @@ pub fn App() -> impl RenderHtml<Dom> {
             }
         },
         || {
-            /*(
+            (
                 RouteDefinition::new(
                     (StaticSegment("users"), ParamSegment("id")),
                     (),
@@ -56,17 +47,13 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (),
                     reactive_route(Stories),
                 ),
-            )*/
-            RouteDefinition::new((), (), |_| "Test!")
+            )
         },
         || "Not Found",
     );
     view! {
         <Nav/>
         <main>
-            <TestIsland>
-                <div>"some server content"</div>
-            </TestIsland>
             {router}
         </main>
     }
@@ -96,8 +83,8 @@ pub fn App() -> impl RenderHtml<Dom> {
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
-    _ = console_log::init_with_level(log::Level::Debug);
-    console_error_panic_hook::set_once();
+    //_ = console_log::init_with_level(log::Level::Debug);
+    //console_error_panic_hook::set_once();
     /*Root::global_hydrate(|| {
         let root = App();
         let state = root.hydrate_from::<true>(&body());

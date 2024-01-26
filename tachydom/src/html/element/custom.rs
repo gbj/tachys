@@ -5,6 +5,7 @@ use crate::{
 };
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData, rc::Rc, sync::Arc};
 
+// FIXME custom element HTML rendering is broken because tag names aren't static
 pub fn custom<E, Rndr>(tag: E) -> HtmlElement<Custom<E>, (), (), Rndr>
 where
     E: CustomElementKey,
@@ -58,27 +59,27 @@ pub trait CustomElementKey: AsRef<str> {
 }
 
 impl<'a> CustomElementKey for &'a str {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 impl<'a> CustomElementKey for Cow<'a, str> {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 impl CustomElementKey for &String {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 impl CustomElementKey for String {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 impl CustomElementKey for Rc<str> {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 impl CustomElementKey for Arc<str> {
-    const KEY: &'static str = "leptos-island";
+    const KEY: &'static str = "";
 }
 
 #[cfg(feature = "nightly")]

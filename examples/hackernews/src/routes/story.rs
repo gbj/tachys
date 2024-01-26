@@ -4,7 +4,8 @@ use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
 //use leptos_meta::*;
 //use leptos_router::*;
 use tachys::{
-    prelude::*,
+    prelude::*, island,
+    children::Children,
     tachydom::view::{any_view::IntoAny, either::Either},
 };
 
@@ -71,48 +72,59 @@ pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
     }).suspend().with_fallback("Loading...")
 }
 
+#[island]
+pub fn Toggle(children: Children) -> impl RenderHtml<Dom> {
+    let open = ArcRwSignal::new(true);
+    view! {
+        <div class="toggle" class:open={
+            let open = open.clone();
+            move || open.get()
+        }>
+            <a
+                on:click={
+                    let open = open.clone();
+                    move |_| open.update(|n| *n = !*n)
+                }
+            >
+                {let open = open.clone();
+                move || if open.get() {
+                    "[-]"
+                } else {
+                    "[+] comments collapsed"
+                }}
+            </a>
+        </div>
+        <ul
+            class="comment-children"
+            style:display=move || if open.get() {
+                "block"
+            } else {
+                "none"
+            }
+        >
+            {children()}
+        </ul>
+    }
+}
+
 #[component]
 pub fn Comment(comment: api::Comment) -> impl RenderHtml<Dom> {
-    let open = RwSignal::new(true);
-
     view! {
         <li class="comment">
-        <div class="by">
-            <a href=format!("/users/{}", comment.user.clone().unwrap_or_default())>{comment.user.clone()}</a>
-            {format!(" {}", comment.time_ago)}
-        </div>
-        <div class="text" inner_html=comment.content.unwrap_or_default()></div>
-        {(!comment.comments.is_empty()).then(|| {
-            view! {
-                <div>
-                    <div class="toggle" class:open=move || open.get()>
-                        <a on:click=move |_| open.update(|n| *n = !*n)>
-                            {
-                                let comments_len = comment.comments.len();
-                                move || if open.get() {
-                                    "[-]".into()
-                                } else {
-                                    format!("[+] {}{} collapsed", comments_len, pluralize(comments_len))
-                                }
-                            }
-                        </a>
-                    </div>
-                    {move || open.get().then({
-                        let comments = comment.comments.clone();
-                        move || view! {
-                            <ul class="comment-children">
-                                {comments.into_iter().map(|comment| {
-                                    // TODO I'd like to find a better way to enable
-                                    // statically-typed recursive/self-referencing components
-                                    // IntoAny is an extremely blunt tool here
-                                    view! { <Comment comment /> }.into_any()
-                                }).collect::<Vec<_>>()}
-                            </ul>
-                        }
-                    })}
-                </div>
-            }
-        })}
+            <div class="by">
+                <a href=format!("/users/{}", comment.user.clone().unwrap_or_default())>{comment.user.clone()}</a>
+                {format!(" {}", comment.time_ago)}
+            </div>
+            <div class="text" inner_html=comment.content.unwrap_or_default()></div>
+            {(!comment.comments.is_empty()).then(|| {
+                view! {
+                    <Toggle>
+                        {comment.comments.into_iter()
+                            .map(|comment: api::Comment| view! { <Comment comment /> })
+                            .collect::<Vec<_>>()}
+                    </Toggle>
+                }
+            })}
         </li>
     }
 }

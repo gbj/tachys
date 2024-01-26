@@ -270,9 +270,13 @@ where
         buf.push('>');
 
         if !E::SELF_CLOSING {
-            // children
-            *position = Position::FirstChild;
-            self.children.to_html_with_buf(buf, position);
+            if !inner_html.is_empty() {
+                buf.push_str(&inner_html);
+            } else {
+                // children
+                *position = Position::FirstChild;
+                self.children.to_html_with_buf(buf, position);
+            }
 
             // closing tag
             buf.push_str("</");
@@ -354,6 +358,7 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
+        crate::log(&format!("hydrating {}", E::TAG));
         // non-Static custom elements need special support in templates
         // because they haven't been inserted type-wise
         if E::TAG.is_empty() && !FROM_SERVER {

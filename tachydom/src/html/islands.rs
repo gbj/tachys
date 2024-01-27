@@ -104,7 +104,6 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        crate::log("hydrating Island");
         position.set(Position::FirstChild);
         self.view.hydrate::<FROM_SERVER>(cursor, position)
     }
@@ -193,7 +192,6 @@ where
         cursor: &Cursor<Rndr>,
         position: &PositionState,
     ) -> Self::State {
-        crate::log("hydrating IslandChildren");
         // island children aren't hydrated
         // we update the walk to pass over them
         // but we don't hydrate their children

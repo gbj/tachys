@@ -13,23 +13,10 @@ use tachys::children::Children;
 
 #[component]
 pub fn App() -> impl RenderHtml<Dom> {
-    //provide_meta_context();
-    let (is_routing, set_is_routing) = signal(false);
-
     let router = ReactiveRouter(
-        {
-            #[cfg(feature = "ssr")]
-            {
-                use_context::<RequestUrl>().expect(
-                    "RequestUrl should have been provided by server \
-                     integration.",
-                )
-            }
-            #[cfg(not(feature = "ssr"))]
-            {
-                BrowserUrl::new()
-            }
-        },
+        use_context::<RequestUrl>().expect(
+            "RequestUrl should have been provided by server integration.",
+        ),
         || {
             (
                 RouteDefinition::new(
@@ -42,11 +29,7 @@ pub fn App() -> impl RenderHtml<Dom> {
                     (),
                     Story,
                 ),
-                RouteDefinition::new(
-                    ParamSegment("stories"),
-                    (),
-                    reactive_route(Stories),
-                ),
+                RouteDefinition::new(ParamSegment("stories"), (), Stories),
             )
         },
         || "Not Found",

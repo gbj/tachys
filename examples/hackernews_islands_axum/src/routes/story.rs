@@ -4,8 +4,9 @@ use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
 //use leptos_meta::*;
 //use leptos_router::*;
 use tachys::{
-    prelude::*, island,
     children::Children,
+    island,
+    prelude::*,
     tachydom::view::{any_view::IntoAny, either::Either},
 };
 

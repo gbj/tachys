@@ -18,12 +18,11 @@ console_log = "1"
 console_error_panic_hook = "0.1"
 cfg-if = "1"
 leptos_config = "0.5"
-tachys = { path = "../../tachys", features = ["islands", "nightly", "web"] }
+tachys = { path = "../../tachys", features = ["hydration", "islands", "nightly", "web"] }
 tachy_reaccy = { path = "../../tachy_reaccy", features = ["miniserde"] }
 tachy_route = { path = "../../tachy_route", features = ["reaccy"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
-gloo-net = { version = "0.2", features = ["http"] }
 reqwest = { version = "0.11", features = ["json"] }
 tracing = "0.1"
 # openssl = { version = "0.10", features = ["v110"] }
@@ -34,9 +33,8 @@ futures = "0.3.30"
 
 [features]
 default = []
-csr = []
-hydrate = ["tachys/hydration"]
-ssr = ["tachys/hydration", "tachys/tokio", "dep:actix-files", "dep:actix-web"]
+hydrate = []
+ssr = ["tachys/tokio", "dep:actix-files", "dep:actix-web"]
 
 [profile.wasm-release]
 inherits = "release"
@@ -46,7 +44,7 @@ codegen-units = 1
 
 [package.metadata.cargo-all-features]
 denylist = ["actix-files", "actix-web", "leptos_actix"]
-skip_feature_sets = [["csr", "ssr"], ["csr", "hydrate"], ["ssr", "hydrate"]]
+skip_feature_sets = [["ssr", "hydrate"]]
 
 [package.metadata.leptos]
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name   

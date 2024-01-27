@@ -1,7 +1,9 @@
 use crate::api;
-use tachy_reaccy::async_signal::AsyncState;
-use tachy_route::reactive::ReactiveMatchedRoute;
-use tachys::{prelude::*, tachydom::view::either::Either, Show};
+use tachy_route::route::MatchedRoute;
+use tachys::{
+    prelude::*,
+    tachydom::view::{any_view::IntoAny, either::Either},
+};
 
 fn category(from: &str) -> &'static str {
     match from {
@@ -13,80 +15,62 @@ fn category(from: &str) -> &'static str {
     }
 }
 
-pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
+pub fn Stories(matched: MatchedRoute) -> impl RenderHtml<Dom> {
     let page = matched.search("page");
     let story_type = matched.param("stories");
-    let page = move || {
-        page.get()
-            .and_then(|page| page.parse::<usize>().ok())
-            .unwrap_or(1)
-    };
-    let story_type =
-        move || story_type.get().unwrap_or_else(|| "top".to_string());
-    let stories = AsyncDerived::new_unsync(move || {
-        let page = page();
-        let story_type = story_type();
+    let page = page
+        .and_then(|page| page.parse::<usize>().ok())
+        .unwrap_or(1);
+    let story_type = story_type.unwrap_or("top");
+    let stories = {
+        let story_type = story_type.to_string();
         async move {
             let path = format!("{}?page={}", category(&story_type), page);
             api::fetch_api::<Vec<api::Story>>(&api::story(&path)).await
         }
-    });
-    let pending = move || stories.with(AsyncState::loading);
-
-    let hide_more_link = move || {
-        stories
-            .get()
-            .current_value()
-            .and_then(|value| value.as_ref().map(|value| value.len()))
-            .unwrap_or_default()
-            < 28
-            || pending()
     };
 
-    let stories = move || {
-        async move {
-            match stories.await {
-                None => Either::Left(view! { <p>"Error loading stories."</p> }),
-                Some(stories) => Either::Right(view! {
-                    <ul>
-                        {stories.into_iter().map(|story| {
-                            view! { <Story story /> }
-                        }).collect::<Vec<_>>()}
-                    </ul>
-                }),
-            }
+    let stories = async move {
+        match stories.await {
+            None => Either::Left(view! { <p>"Error loading stories."</p> }),
+            Some(stories) => Either::Right(view! {
+                <ul>
+                    {stories.into_iter().map(|story| {
+                        view! { <Story story /> }
+                    }).collect::<Vec<_>>()}
+                </ul>
+            }),
         }
-        .suspend()
-        .track()
-        .transition()
-        .with_fallback("Loading...")
-    };
+    }
+    .suspend()
+    .track()
+    .transition()
+    .with_fallback("Loading...");
 
     view! {
         <div class="news-view">
             <div class="news-list-nav">
                 <span>
-                    <Show when=move || { page() > 1 }
-                        fallback=|| view! {
+                    {if page == 1 {
+                        view! {
                             <span class="page-link disabled" aria-hidden="true">
                                 "< prev"
                             </span>
-                        }
-                    >
-                        <a class="page-link"
-                            href=move || format!("/{}?page={}", story_type(), page() - 1)
-                            aria-label="Previous Page"
-                        >
-                            "< prev"
-                        </a>
-                    </Show>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <a class="page-link"
+                                href=format!("/{}?page={}", story_type, page - 1)
+                                aria-label="Previous Page"
+                            >
+                                "< prev"
+                            </a>
+                        }.into_any()
+                    }}
                 </span>
                 <span>"page " {page}</span>
-                <span class="page-link"
-                    class:disabled=hide_more_link
-                    aria-hidden=hide_more_link
-                >
-                    <a href=move || format!("/{}?page={}", story_type(), page() + 1)
+                <span class="page-link" >
+                    <a href=format!("/{}?page={}", story_type, page + 1)
                         aria-label="Next Page"
                     >
                         "more >"

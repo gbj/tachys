@@ -36,7 +36,7 @@ futures = "0.3.30"
 default = []
 csr = []
 hydrate = ["tachys/hydration"]
-ssr = ["tachys/hydration", "dep:actix-files", "dep:actix-web"]
+ssr = ["tachys/hydration", "tachys/tokio", "dep:actix-files", "dep:actix-web"]
 
 [profile.wasm-release]
 inherits = "release"

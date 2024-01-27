@@ -15,4 +15,5 @@ typed-builder-macro = "0.18"
 hydration = ["tachy_reaccy/hydration"]
 islands = ["tachydom/islands"]
 nightly = ["tachydom/nightly", "tachy_maccy/nightly"]
+tokio = ["tachy_reaccy/tokio"]
 web = ["tachydom/web", "tachy_reaccy/web"]

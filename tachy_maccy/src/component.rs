@@ -410,7 +410,6 @@ impl ToTokens for Model {
                 #[allow(non_snake_case)]
                 pub fn #hydrate_fn_name(el: ::tachys::tachydom::web_sys::HtmlElement) {
                     #deserialize_island_props
-                    ::tachys::tachydom::web_sys::console::log_2(&tachys::tachydom::wasm_bindgen::JsValue::from_str("island is"), &el);
                     let island = #name(#island_props);
                     let state = island.hydrate_from_position::<true>(&el, ::tachys::tachydom::view::Position::Current);
                     // TODO better cleanup

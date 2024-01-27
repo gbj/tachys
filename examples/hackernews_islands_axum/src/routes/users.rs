@@ -1,11 +1,6 @@
 use crate::api::{self, User};
-use tachy_route::{route::MatchedRoute};
-use tachys::{
-    prelude::*,
-    tachydom::view::{
-        either::Either 
-    }
-};
+use tachy_route::route::MatchedRoute;
+use tachys::{prelude::*, tachydom::view::either::Either};
 
 pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
     // There's no actual way to navigate from a User to another User,
@@ -41,7 +36,7 @@ pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
                     </div>
                 }),
             }
-    }.suspend()
+    }.suspend();
     view! {
         <div class="user-view">{user_view}</div>
     }

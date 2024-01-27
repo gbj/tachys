@@ -15,12 +15,12 @@ lto = true
 console_error_panic_hook = "0.1"
 cfg-if = "1"
 leptos_config = "0.6"
-tachys = { path = "../../tachys", features = ["hydration", "islands", "nightly", "web"] }
-tachy_reaccy = { path = "../../tachy_reaccy", features = ["miniserde"] }
-tachy_route = { path = "../../tachy_route", features = ["reaccy"] }
-#tachys = { git = "https://github.com/gbj/tachys", features = ["hydration", "islands", "nightly", "web"] }
-#tachy_reaccy = { git = "https://github.com/gbj/tachys", features = ["miniserde"] }
-#tachy_route = { git = "https://github.com/gbj/tachys", features = ["reaccy"] }
+#tachys = { path = "../../tachys", features = ["hydration", "islands", "nightly", "web"] }
+#tachy_reaccy = { path = "../../tachy_reaccy", features = ["miniserde"] }
+#tachy_route = { path = "../../tachy_route", features = ["reaccy"] }
+tachys = { git = "https://github.com/gbj/tachys", features = ["hydration", "islands", "nightly", "web"] }
+tachy_reaccy = { git = "https://github.com/gbj/tachys", features = ["miniserde"] }
+tachy_route = { git = "https://github.com/gbj/tachys", features = ["reaccy"] }
 serde = { version = "1", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
 tracing = "0.1"

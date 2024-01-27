@@ -92,7 +92,7 @@ impl Location for RequestUrl {
         let url = url::Url::parse(&self.0)?;
         let search_params = url
             .query_pairs()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
         Ok(Url {
             origin: url.origin().unicode_serialization(),

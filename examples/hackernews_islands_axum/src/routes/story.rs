@@ -69,7 +69,7 @@ pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
                 </div>
             })
         }
-    }.suspend().with_fallback("Loading...")
+    }.suspend()
 }
 
 #[island]

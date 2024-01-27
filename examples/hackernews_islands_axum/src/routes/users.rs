@@ -1,12 +1,10 @@
 use crate::api::{self, User};
-use std::{collections::HashMap, future::IntoFuture};
-use tachy_reaccy::async_signal::ArcAsyncDerived;
-use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
+use tachy_route::{route::MatchedRoute};
 use tachys::{
     prelude::*,
     tachydom::view::{
-        any_view::IntoAny, either::Either, template::ViewTemplate,
-    },
+        either::Either 
+    }
 };
 
 pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
@@ -43,7 +41,7 @@ pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
                     </div>
                 }),
             }
-    }.suspend().with_fallback("Loading...");
+    }.suspend()
     view! {
         <div class="user-view">{user_view}</div>
     }

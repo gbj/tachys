@@ -42,10 +42,7 @@ pub fn Stories(matched: MatchedRoute) -> impl RenderHtml<Dom> {
             }),
         }
     }
-    .suspend()
-    .track()
-    .transition()
-    .with_fallback("Loading...");
+    .suspend();
 
     view! {
         <div class="news-view">

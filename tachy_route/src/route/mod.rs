@@ -46,6 +46,13 @@ impl MatchedRoute {
             .find(|n| n.0 == key)
             .map(|(_, v)| v.as_str())
     }
+
+    pub fn search(&self, key: &str) -> Option<&str> {
+        self.search_params
+            .iter()
+            .find(|n| n.0 == key)
+            .map(|(_, v)| v.as_str())
+    }
 }
 
 impl<Rndr, Pat, ViewFn, Children> RouteDefinition<Rndr, Pat, ViewFn, Children> {

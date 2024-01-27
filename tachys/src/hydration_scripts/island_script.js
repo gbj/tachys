@@ -15,7 +15,6 @@
 						const l = e.dataset.component;
 						const islandFn = mod["_island_" + l];
 						if (islandFn) {
-							console.log("running islandFn on ", e);
 							islandFn(e);
 						} else {
 							console.warn(`Could not find WASM function for the island ${l}.`);

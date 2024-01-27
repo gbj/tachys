@@ -14,7 +14,6 @@ fn category(from: &str) -> &'static str {
 }
 
 pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
-    println!("Stories");
     let page = matched.search("page");
     let story_type = matched.param("stories");
     let page = move || {
@@ -27,10 +26,7 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
     let stories = AsyncDerived::new_unsync(move || {
         let page = page();
         let story_type = story_type();
-        println!("starting to load stories");
         async move {
-            
-        println!("inside async to load stories");
             let path = format!("{}?page={}", category(&story_type), page);
             api::fetch_api::<Vec<api::Story>>(&api::story(&path)).await
         }
@@ -49,7 +45,6 @@ pub fn Stories(matched: &ReactiveMatchedRoute) -> impl RenderHtml<Dom> {
 
     let stories = move || {
         async move {
-            println!("Loading stories here");
             match stories.await {
                 None => Either::Left(view! { <p>"Error loading stories."</p> }),
                 Some(stories) => Either::Right(view! {

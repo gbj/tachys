@@ -340,8 +340,12 @@ where
         if !E::SELF_CLOSING {
             // children
             *position = Position::FirstChild;
-            self.children
-                .to_html_async_with_buf::<OUT_OF_ORDER>(buffer, position);
+            if !inner_html.is_empty() {
+                buf.push_str(&inner_html);
+            } else {
+                self.children
+                    .to_html_async_with_buf::<OUT_OF_ORDER>(buffer, position);
+            }
 
             // closing tag
             let mut buf = String::with_capacity(3 + E::TAG.len());

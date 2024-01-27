@@ -17,7 +17,7 @@ actix-web = { version = "4", optional = true, features = ["macros"] }
 console_log = "1"
 console_error_panic_hook = "0.1"
 cfg-if = "1"
-leptos_config = "0.5"
+leptos_config = "0.6"
 tachys = { path = "../../tachys", features = ["islands", "nightly", "web"] }
 tachy_reaccy = { path = "../../tachy_reaccy", features = ["miniserde"] }
 tachy_route = { path = "../../tachy_route", features = ["reaccy"] }

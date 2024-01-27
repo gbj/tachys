@@ -1,15 +1,15 @@
 use tachy_route::{
-    location::{BrowserUrl, RequestUrl},
+    location::RequestUrl,
     matching::{ParamSegment, StaticSegment},
-    reactive::{reactive_route, ReactiveRouter},
-    route::{PossibleRoutes, RouteDefinition},
-    router::FallbackOrView,
+    reactive::ReactiveRouter,
+    route::RouteDefinition,
 };
-use tachys::{island, prelude::*, tachydom::dom::body};
+use tachys::prelude::*;
 mod api;
 mod routes;
 use routes::{nav::Nav, stories::Stories, story::Story, users::User};
-use tachys::children::Children;
+#[cfg(feature = "ssr")]
+pub mod fallback;
 
 #[component]
 pub fn App() -> impl RenderHtml<Dom> {

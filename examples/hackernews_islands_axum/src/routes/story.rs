@@ -1,5 +1,4 @@
 use crate::api;
-use send_wrapper::SendWrapper;
 use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
 //use leptos_meta::*;
 //use leptos_router::*;
@@ -31,7 +30,7 @@ pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
             .unwrap_or_else(|| "Loading story...".to_string())
     }; */
 
-    SendWrapper::new(async move {
+    async move {
         match story.await {
             None => Either::Left(view! {  <div class="item-view">"Error loading this story."</div> }),
             Some(story) => Either::Right(view! {
@@ -70,7 +69,7 @@ pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
                 </div>
             })
         }
-    }).suspend().with_fallback("Loading...")
+    }.suspend().with_fallback("Loading...")
 }
 
 #[island]

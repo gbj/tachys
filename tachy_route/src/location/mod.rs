@@ -90,7 +90,10 @@ impl Location for RequestUrl {
 
     fn try_to_url(&self) -> Result<Url, Self::Error> {
         let url = url::Url::parse(&self.0)?;
-        let search_params = url.query_pairs().collect();
+        let search_params = url
+            .query_pairs()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         Ok(Url {
             origin: url.origin().unicode_serialization(),
             pathname: url.path().to_string(),

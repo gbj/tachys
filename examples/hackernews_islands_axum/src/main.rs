@@ -2,52 +2,35 @@ use tachys::prelude::*;
 
 #[cfg(feature = "ssr")]
 mod ssr {
-    pub use actix_files::Files;
-    pub use actix_web::*;
-    pub use hackernews::App;
-    //use leptos_actix::{generate_route_list, LeptosRoutes};
-    pub use leptos_config::*;
-
-    #[get("/style.css")]
-    async fn css() -> impl Responder {
-        actix_files::NamedFile::open_async("./style.css").await
-    }
-    #[get("/favicon.ico")]
-    async fn favicon() -> impl Responder {
-        actix_files::NamedFile::open_async("./target/site//favicon.ico").await
-    }
-
     pub mod integration {
-        use actix_web::{
-            dev::{ServiceFactory, ServiceRequest},
-            error::Error,
-            http, web, HttpRequest, HttpResponse, Result,
+        use axum::{
+            body::Body, extract::FromRef, response::Html, routing::get,
         };
-        use futures::StreamExt;
+        use futures::{stream::once, StreamExt};
+        use http::Request;
+        use leptos_config::LeptosOptions;
         use tachy_reaccy::{context::provide_context, Owner, Root};
         use tachy_route::{location::RequestUrl, PathSegment, RouteList};
         use tachys::tachydom::{renderer::dom::Dom, view::RenderHtml};
 
-        trait ActixPath {
-            fn to_actix_path(&self) -> String;
+        trait AxumPath {
+            fn to_axum_path(&self) -> String;
         }
 
-        impl ActixPath for &[PathSegment] {
-            fn to_actix_path(&self) -> String {
+        impl AxumPath for &[PathSegment] {
+            fn to_axum_path(&self) -> String {
                 let mut path = String::new();
                 for segment in self.iter() {
                     path.push('/');
                     match segment {
                         PathSegment::Static(s) => path.push_str(s),
                         PathSegment::Param(s) => {
-                            path.push('{');
+                            path.push(':');
                             path.push_str(s);
-                            path.push('}');
                         }
                         PathSegment::Splat(s) => {
-                            path.push('{');
+                            path.push('*');
                             path.push_str(s);
-                            path.push_str(".*}");
                         }
                     }
                 }
@@ -58,7 +41,7 @@ mod ssr {
         pub trait TachysRoutes: Sized {
             fn tachys_routes<IV>(
                 self,
-                app_fn: impl Fn() -> IV + Clone + 'static,
+                app_fn: impl Fn() -> IV + Send + Clone + 'static,
             ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static,
@@ -68,26 +51,22 @@ mod ssr {
 
             fn tachys_routes_with_context<IV>(
                 self,
-                additional_context: impl FnOnce() + Clone + 'static,
-                app_fn: impl Fn() -> IV + Clone + 'static,
+                additional_context: impl FnOnce() + Send + Clone + 'static,
+                app_fn: impl Fn() -> IV + Send + Clone + 'static,
             ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static;
         }
 
-        impl<T> TachysRoutes for actix_web::App<T>
+        impl<S> TachysRoutes for axum::Router<S>
         where
-            T: ServiceFactory<
-                ServiceRequest,
-                Config = (),
-                Error = Error,
-                InitError = (),
-            >,
+            LeptosOptions: FromRef<S>,
+            S: Clone + Send + Sync + 'static,
         {
             fn tachys_routes_with_context<IV>(
                 self,
-                additional_context: impl FnOnce() + Clone + 'static,
-                app_fn: impl Fn() -> IV + Clone + 'static,
+                additional_context: impl FnOnce() + Send + Clone + 'static,
+                app_fn: impl Fn() -> IV + Send + Clone + 'static,
             ) -> Self
             where
                 IV: RenderHtml<Dom> + 'static,
@@ -101,15 +80,17 @@ mod ssr {
                 .into_value()
                 .expect("could not generate route list")
                 .into_inner();
+
                 for listing in generated_routes {
                     let path = listing.path();
+                    // TODO other modes
                     let mode = listing.mode();
 
                     let handler = {
                         let app_fn = app_fn.clone();
                         let additional_context = additional_context.clone();
 
-                        move |req: HttpRequest| {
+                        move |req: Request<Body>| {
                             let app_fn = app_fn.clone();
                             let additional_context = additional_context.clone();
 
@@ -117,13 +98,17 @@ mod ssr {
                                 let Root(owner, stream) =
                                     Root::global_ssr_islands(move || {
                                         // provide contexts
-                                        let path = req.path();
-                                        println!("inside handler for {path}");
+                                        let path = req
+                                            .uri()
+                                            .path_and_query()
+                                            .unwrap()
+                                            .as_str();
+                                        println!("path = {path:?}");
                                         additional_context();
                                         provide_context(RequestUrl::from_path(
                                             path,
                                         ));
-                                        // TODO provide HttpRequest
+                                        // TODO provide Request
 
                                         // run app
                                         let app = app_fn();
@@ -147,23 +132,27 @@ mod ssr {
                                             shared_context,
                                         )
                                     });
-                                std::mem::forget(owner); // TOOD close leak
 
-                                HttpResponse::Ok()
-                                    .content_type(
-                                        http::header::ContentType::html(),
-                                    )
-                                    .streaming({
-                                        stream.map(|html| {
-                                            Ok(web::Bytes::from(html))
-                                                as Result<web::Bytes>
+                                Html(Body::from_stream(
+                                    stream
+                                        .map(|chunk| {
+                                            Ok(chunk)
+                                                as Result<
+                                                    String,
+                                                    std::io::Error,
+                                                >
                                         })
-                                    })
+                                        // drop the owner, cleaning up the reactive runtime,
+                                        // once the stream is over
+                                        .chain(once(async move {
+                                            drop(owner);
+                                            Ok(Default::default())
+                                        })),
+                                ))
                             }
                         }
                     };
-                    router = router
-                        .route(&path.to_actix_path(), web::get().to(handler))
+                    router = router.route(&path.to_axum_path(), get(handler))
                 }
                 router
             }
@@ -172,7 +161,56 @@ mod ssr {
 }
 
 #[cfg(feature = "ssr")]
-#[actix_web::main]
+#[tokio::main]
+async fn main() {
+    pub use axum::{routing::get, Router};
+    pub use hackernews_islands_axum::fallback::file_and_error_handler;
+    use hackernews_islands_axum::*;
+    use leptos_config::get_configuration;
+    use ssr::integration::*;
+    use tachys::{AutoReload, HydrationScripts};
+
+    let conf = get_configuration(None).await.unwrap();
+    let addr = conf.leptos_options.site_addr;
+    let options = conf.leptos_options.clone();
+
+    // build our application with a route
+    let app = Router::new()
+        .route("/favicon.ico", get(file_and_error_handler))
+        .fallback(file_and_error_handler)
+        .tachys_routes({
+            let options = options.clone();
+            move || {
+            view! {
+                <!DOCTYPE html>
+                <html lang="en"> 
+                    <head>
+                        <meta charset="utf-8"/>
+                        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                        //<AutoReload options=options.to_owned() />
+                        <HydrationScripts options=options.to_owned() islands=true/>
+                        <link rel="stylesheet" id="leptos" href="/pkg/style.css"/>
+                        <link rel="shortcut icon" type="image/ico" href="/favicon.ico"/>
+                        <meta name="description" content="Leptos implementation of a HackerNews demo."/>
+                    </head>
+                    <body>
+                        <App/>
+                    </body>
+                </html>
+            }
+            }})
+        .with_state(options);
+
+    // run our app with hyper
+    // `axum::Server` is a re-export of `hyper::Server`
+    println!("listening on {}", addr);
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    axum::serve(listener, app.into_make_service())
+        .await
+        .unwrap();
+}
+
+/*#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     use ssr::{integration::TachysRoutes, *};
     use tachys::{AutoReload, HydrationScripts};
@@ -214,9 +252,7 @@ async fn main() -> std::io::Result<()> {
     .bind(&addr)?
     .run()
     .await
-}
-
-trait TachysRoutes {}
+}*/
 
 #[cfg(not(feature = "ssr"))]
 fn main() {

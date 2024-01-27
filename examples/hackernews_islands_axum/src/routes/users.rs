@@ -1,5 +1,4 @@
 use crate::api::{self, User};
-use send_wrapper::SendWrapper;
 use std::{collections::HashMap, future::IntoFuture};
 use tachy_reaccy::async_signal::ArcAsyncDerived;
 use tachy_route::{reactive::ReactiveMatchedRoute, route::MatchedRoute};
@@ -21,7 +20,7 @@ pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
             api::fetch_api::<User>(&api::user(&id)).await
         }
     };
-    let user_view = SendWrapper::new(async move {
+    let user_view = async move {
         match user.await {
                 None => Either::Left(view! { <h1>"User not found."</h1> }),
                 Some(user) => Either::Right(view! {
@@ -44,7 +43,7 @@ pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
                     </div>
                 }),
             }
-    }).suspend().with_fallback("Loading...");
+    }.suspend().with_fallback("Loading...");
     view! {
         <div class="user-view">{user_view}</div>
     }

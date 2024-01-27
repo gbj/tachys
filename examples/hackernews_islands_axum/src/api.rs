@@ -21,13 +21,7 @@ pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
     T: DeserializeOwned,
 {
-    reqwest::get(path)
-        .await
-        .map_err(|e| log::error!("{e}"))
-        .ok()?
-        .json()
-        .await
-        .ok()?
+    reqwest::get(path).await.ok()?.json().await.ok()?
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Default)]

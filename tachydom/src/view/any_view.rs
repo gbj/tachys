@@ -30,7 +30,6 @@ where
     R: Renderer,
 {
     type_id: TypeId,
-    placeholder: R::Placeholder,
     state: Box<dyn Any>,
     unmount: fn(&mut dyn Any),
     mount: fn(&mut dyn Any, parent: &R::Element, marker: Option<&R::Node>),
@@ -71,7 +70,6 @@ where
         .downcast_mut::<T::State>()
         .expect("AnyViewState::unmount couldn't downcast state");
     state.unmount();
-    // TODO remove placeholder?
 }
 
 fn insert_before_this<R, T>(
@@ -110,9 +108,6 @@ where
                     .downcast::<T>()
                     .expect("AnyView::to_html could not be downcast");
                 value.to_html_with_buf(buf, position);
-                // insert marker node
-                buf.push_str("<!>");
-                *position = Position::NextChild;
             };
         let build = |value: Box<dyn Any>| {
             let value = value
@@ -123,7 +118,6 @@ where
             AnyViewState {
                 type_id: TypeId::of::<T>(),
                 state,
-                placeholder: R::create_placeholder(),
                 rndr: PhantomData,
                 mount: mount_any::<R, T>,
                 unmount: unmount_any::<R, T>,
@@ -139,17 +133,10 @@ where
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
 
-                // get placeholder node
-                cursor.sibling();
-                let placeholder = R::Placeholder::cast_from(cursor.current())
-                    .expect("should be a placeholder node");
-                position.set(Position::NextChild);
-
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
                     rndr: PhantomData,
-                    placeholder,
                     mount: mount_any::<R, T>,
                     unmount: unmount_any::<R, T>,
                     insert_before_this: insert_before_this::<R, T>,
@@ -164,17 +151,10 @@ where
                     .expect("AnyView::hydrate_from_server couldn't downcast");
                 let state = Box::new(value.hydrate::<true>(cursor, position));
 
-                // get placeholder node
-                cursor.sibling();
-                let placeholder = R::Placeholder::cast_from(cursor.current())
-                    .expect("should be a placeholder node");
-                position.set(Position::NextChild);
-
                 AnyViewState {
                     type_id: TypeId::of::<T>(),
                     state,
                     rndr: PhantomData,
-                    placeholder,
                     mount: mount_any::<R, T>,
                     unmount: unmount_any::<R, T>,
                     insert_before_this: insert_before_this::<R, T>,
@@ -193,16 +173,10 @@ where
                     .expect("AnyView::rebuild couldn't downcast state");
                 value.rebuild(state);
             } else {
-                // new state will be built with its own placeholder
-                // but this is a rebuild, and we actually want to reuse
-                // the old placeholder, because it's... well, it's holding the place
                 let mut new = value.into_any().build();
-                new.placeholder = state.placeholder.clone();
 
-                // get parent based on the old placeholder
-                // we're going to unmount the previous version,
-                // and remount the new version relative to the placeholder
-                R::mount_before(&mut new, state.placeholder.as_ref());
+                // TODO mount new state
+                /*R::mount_before(&mut new, state.placeholder.as_ref());*/
                 state.unmount();
                 *state = new;
             }

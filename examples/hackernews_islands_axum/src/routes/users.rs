@@ -2,10 +2,8 @@ use crate::api::{self, User};
 use tachy_route::route::MatchedRoute;
 use tachys::{prelude::*, tachydom::view::either::Either};
 
-pub fn User(matched: MatchedRoute) -> impl RenderHtml<Dom> {
-    // There's no actual way to navigate from a User to another User,
-    // so we're going to do non-reactive accesses here
-    let id = matched.param("id").unwrap_or_default().to_owned();
+pub fn User(route: MatchedRoute) -> impl RenderHtml<Dom> {
+    let id = route.param("id").unwrap_or_default().to_owned();
     let user = async move {
         if id.is_empty() {
             None

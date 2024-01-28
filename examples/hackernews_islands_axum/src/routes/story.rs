@@ -9,11 +9,9 @@ use tachys::{
     tachydom::view::{any_view::IntoAny, either::Either},
 };
 
-pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
-    // There's no actual way to navigate from a Story to another Story,
-    // so we're going to do non-reactive accesses here
+pub fn Story(route: MatchedRoute) -> impl RenderHtml<Dom> {
     let mut path = String::from("item/");
-    let id = matched.param("id").unwrap_or_default();
+    let id = route.param("id").unwrap_or_default();
     let id_is_empty = id.is_empty();
     path.push_str(id);
     let story = async move {
@@ -23,12 +21,6 @@ pub fn Story(matched: MatchedRoute) -> impl RenderHtml<Dom> {
             api::fetch_api::<api::Story>(&api::story(&path)).await
         }
     };
-    /* let meta_description = move || {
-        story
-            .get()
-            .and_then(|story| story.map(|story| story.title))
-            .unwrap_or_else(|| "Loading story...".to_string())
-    }; */
 
     async move {
         match story.await {

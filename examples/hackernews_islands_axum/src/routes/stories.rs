@@ -15,9 +15,9 @@ fn category(from: &str) -> &'static str {
     }
 }
 
-pub fn Stories(matched: MatchedRoute) -> impl RenderHtml<Dom> {
-    let page = matched.search("page");
-    let story_type = matched.param("stories");
+pub fn Stories(route: MatchedRoute) -> impl RenderHtml<Dom> {
+    let page = route.search("page");
+    let story_type = route.param("stories");
     let page = page
         .and_then(|page| page.parse::<usize>().ok())
         .unwrap_or(1);

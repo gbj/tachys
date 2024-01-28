@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use tachy_route::{
     location::RequestUrl,
     matching::{ParamSegment, StaticSegment},

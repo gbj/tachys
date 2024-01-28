@@ -341,7 +341,7 @@ where
             // children
             *position = Position::FirstChild;
             if !inner_html.is_empty() {
-                buf.push_str(&inner_html);
+                buffer.push_sync(&inner_html);
             } else {
                 self.children
                     .to_html_async_with_buf::<OUT_OF_ORDER>(buffer, position);

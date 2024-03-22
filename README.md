@@ -1,3 +1,5 @@
+**Work on this repo has moved into [the `leptos_0.7` branch of the main Leptos repository](https://github.com/leptos-rs/leptos/tree/leptos_0.7).**
+
 # tachys
 ### Experimental web UI library for Rust.
 
